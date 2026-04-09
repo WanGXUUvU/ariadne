@@ -19,64 +19,106 @@ def get_all_todos():
 
     todos=db.query(Todo).all()
 
-    db.close()
-
-    return [{"id":todo.id,"title":todo.title}
+    result=[{"id":todo.id,"title":todo.title}
             for todo in todos
     
     ]
 
+    db.close()
+
+    return result
 def get_todo_by_id(todo_id):
-    conn=get_connection()
-    cursor=conn.cursor()
+    db=SessionLocal()
 
-    cursor.execute("SELECT id,title FROM todos where id=?",(todo_id,))
-    row=cursor.fetchone()
-    conn.close()
+    todo=db.query(Todo).filter(Todo.id==todo_id).first()
 
-    if row==None:return None
+    if todo is None:
+        db.close()
+        return None
+    result={"id":todo.id,"title":todo.title}
+    db.close()
 
-    return{"id":row["id"],"title":row["title"]}
+    return result
 
 ##新增一个todo
-def create_todo(title:str):
-    conn=get_connection()
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO todos (title) VALUES (?)",(title,))
+def create_todo(title: str):
+    db = SessionLocal()
 
-    conn.commit()
-    
-    new_id=cursor.lastrowid
-    conn.close()
-    return{"id":new_id,"title":title}
+    todo = Todo(title=title)
+    db.add(todo)
+    db.commit()
+    db.refresh(todo)
+
+    result = {
+        "id": todo.id,
+        "title": todo.title
+    }
+
+    db.close()
+    return result
     
     
 ##删除一个todo
-def delete_todo(todo_id:int):
-    todo=get_todo_by_id(todo_id)
-    if todo is None:return None
-    conn=get_connection()
-    cursor=conn.cursor()
+#def delete_todo(todo_id:int):
+    # todo=get_todo_by_id(todo_id)
+    # if todo is None:return None
+    # conn=get_connection()
+    # cursor=conn.cursor()
 
-    cursor.execute("DELETE  from todos where id=?",(todo_id,))
+    # cursor.execute("DELETE  from todos where id=?",(todo_id,))
 
-    conn.commit()
+    # conn.commit()
     
-    conn.close()
-    return todo
+    # conn.close()
+    # return 
+def delete_todo(todo_id:int):
+    db=SessionLocal()
+
+    todo=db.query(Todo).filter(Todo.id==todo_id).first()
+    if todo is None:
+        db.close()
+        return None
+    
+    result={"id":todo.id,"title":todo.title}
+    db.delete(todo)
+
+    db.commit()
+
+    db.close()
+
+    return result
+
+
+# def update_todo(todo_id:int,title:str):
+#     conn=get_connection()
+#     cursor=conn.cursor()
+
+#     cursor.execute("UPDATE todos set title = ? where id=?",(title,todo_id,))
+
+#     conn.commit()
+    
+#     if cursor.rowcount==0:
+#         conn.close()
+#         return None
+
+#     conn.close()
+
+#     return {"id":todo_id,"title":title}
 
 def update_todo(todo_id:int,title:str):
-    conn=get_connection()
-    cursor=conn.cursor()
+    db=SessionLocal()
 
-    cursor.execute("UPDATE todos set title = ? where id=?",(title,todo_id,))
+    todo=db.query(Todo).filter(Todo.id==todo_id).first()
 
-    conn.commit()
-    
-    if cursor.rowcount==0:
-        conn.close()
+    if todo is None:
+        db.close()
         return None
 
-    conn.close()
+    todo.title=title
+    db.commit()
+    
+    db.refresh(todo)
+    result={"id":todo.id,"title":todo.title}
+    db.close()
 
-    return {"id":todo_id,"title":title}
+    return result
