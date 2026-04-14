@@ -40,3 +40,13 @@ SessionLocal=sessionmaker(
 )
 #BASE:所有ORM表模型的父类
 Base=declarative_base()
+
+
+def get_db():
+    db=SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+    
+    
