@@ -10,5 +10,3 @@ app.include_router(router)
 
 #把 Python 里定义好的表模型，同步创建到数据库里，但只负责创建，不负责迁移
 Base.metadata.create_all(bind=engine)
-
-
