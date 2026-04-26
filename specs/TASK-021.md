@@ -4,7 +4,7 @@
 把 API 输出整理成更适合产品使用的稳定结构。
 
 ## 产品层
-Product Surface
+产品表面层（Product Surface）
 
 ## 范围内
 - 明确用户可见 reply 和内部 trace 的边界

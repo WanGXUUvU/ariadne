@@ -4,7 +4,7 @@
 让调用方可以显式指定使用哪个 SkillPack，为后续自动路由打基础。
 
 ## 产品层
-Product Surface
+产品表面层（Product Surface）
 
 ## 范围内
 - 给 `AgentInput` 增加可选 `skill_name`

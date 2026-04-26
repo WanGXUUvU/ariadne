@@ -4,7 +4,7 @@
 让 `Agent` 运行时使用从 SkillPack 加载出来的 instructions，而不是依赖单一硬编码 system prompt。
 
 ## 产品层
-Session Runtime
+会话运行层（Session Runtime）
 
 ## 范围内
 - 让 `Agent` 接收已加载的 SkillPack 文本

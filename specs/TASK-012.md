@@ -4,7 +4,7 @@
 把工具执行错误转成结构化事件，而不是让异常直接打断用户视角。
 
 ## 产品层
-Execution Trace
+执行轨迹层（Execution Trace）
 
 ## 范围内
 - 增加 `tool_error` 事件类型

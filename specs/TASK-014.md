@@ -4,7 +4,7 @@
 让 session 不只是状态 JSON，还拥有产品级元数据。
 
 ## 产品层
-Session Runtime
+会话运行层（Session Runtime）
 
 ## 范围内
 - 为 session 增加名称、创建时间、更新时间

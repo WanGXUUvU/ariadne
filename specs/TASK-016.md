@@ -4,7 +4,7 @@
 把执行轨迹从一次响应里的临时数据，推进到可回放的产品能力。
 
 ## 产品层
-Execution Trace
+执行轨迹层（Execution Trace）
 
 ## 范围内
 - 设计 trace 存储位置

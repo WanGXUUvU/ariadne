@@ -4,7 +4,7 @@
 支持启用和禁用 SkillPack，让产品能管理可用能力集合。
 
 ## 产品层
-Product Surface + SkillPack
+产品表面层 + SkillPack（Product Surface + SkillPack）
 
 ## 范围内
 - 新增本地 skill 配置文件

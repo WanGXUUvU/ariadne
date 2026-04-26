@@ -4,7 +4,7 @@
 制定从当前 Chat Completions 风格迁移到 Responses API 的计划。
 
 ## 产品层
-Session Runtime
+会话运行层（Session Runtime）
 
 ## 范围内
 - 对比当前 adapter 和 Responses adapter 的输入输出

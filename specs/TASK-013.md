@@ -4,7 +4,7 @@
 统一工具输出格式，避免每个工具随意返回不同结构，方便 trace 和前端展示。
 
 ## 产品层
-Tool Registry + Execution Trace
+工具注册层 + 执行轨迹层（Tool Registry + Execution Trace）
 
 ## 范围内
 - 定义 `ToolResult`

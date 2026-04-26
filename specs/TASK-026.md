@@ -4,7 +4,7 @@
 把模型调用封装成可替换 adapter，为未来从 Chat Completions 迁移到 Responses API 做准备。
 
 ## 产品层
-Session Runtime
+会话运行层（Session Runtime）
 
 ## 范围内
 - 定义模型 adapter 接口

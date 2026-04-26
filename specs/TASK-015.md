@@ -4,7 +4,7 @@
 提供最小 session 管理 API，让产品能展示已有会话。
 
 ## 产品层
-Product Surface
+产品表面层（Product Surface）
 
 ## 范围内
 - 新增 `GET /sessions`

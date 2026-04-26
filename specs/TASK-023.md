@@ -4,7 +4,7 @@
 为后续产品 UI 做规划，但暂不实现 UI。
 
 ## 产品层
-Product Surface
+产品表面层（Product Surface）
 
 ## 范围内
 - 定义首个 UI 需要展示的核心对象

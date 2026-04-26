@@ -4,7 +4,7 @@
 提供一个最小命令行入口，方便像 Codex/Claude Code 一样从终端使用 agent。
 
 ## 产品层
-Product Surface
+产品表面层（Product Surface）
 
 ## 范围内
 - 新增本地 CLI 脚本入口
