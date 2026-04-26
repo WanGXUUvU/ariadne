@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: planning
-- Task: specs/TASK-003.md
+- Task: agent 主线回归，下一张任务卡待创建
 - Gate: Draft
 - Allowed Now: start-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 先把 `routes.py` / `services.py` 的导入、签名、表初始化接通，再跑通 `/run` 和 `/reset`。
+- Next action: 回到 agent 主线，确定下一步要强化的能力点。
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -25,3 +25,7 @@
 | 2026-04-24 | 创建下一张任务卡 | planning | 新增 `specs/TASK-003.md`，聚焦会话持久化。 |
 | 2026-04-24 | 确认存储方案 | planning | `TASK-003` 先走 SQLite，不上更重的数据库。 |
 | 2026-04-26 | 开始接通 SQLite 链路 | implementation | 已有 `db.py`、`models.py`、`session_store.py`、`services.py`，下一步是修正接口引用并初始化表。 |
+| 2026-04-26 | `TASK-003` 功能完成 | Review | SQLite 会话持久化链路已跑通，功能收口。 |
+| 2026-04-26 | 创建下一张任务卡 | planning | 新增 `specs/TASK-004.md`，聚焦 SQLite 迁移与 Alembic。 |
+| 2026-04-26 | `TASK-004` 验证完成 | Verify | Alembic baseline migration 已补齐并通过 `upgrade head` / `current` 验证。 |
+| 2026-04-26 | `TASK-004` 收口 | Review | `session_records` 已完成 Alembic 接管，迁移流程可用。 |

@@ -6,5 +6,6 @@ class SessionRecord(Base):#会话记录表
     __tablename__="session_records"#表名
 
     session_id=Column(String,primary_key=True,index=True)
+    session_name = Column(String, nullable=True)
     state_json=Column(Text,nullable=False)
     updated_at=Column(DateTime,server_default=func.now(),onupdate=func.now())
