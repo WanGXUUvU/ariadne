@@ -1,6 +1,17 @@
 from pydantic import BaseModel, Field
 from typing import List,Literal,Optional
 
+# Pydantic 对象，你可以直接理解成：
+
+# “带校验规则的 Python 数据对象”。
+
+# 它不是普通的 dict，也不是普通的 class 随便装数据。
+# 它的特点是：
+
+# 创建时会自动校验字段
+# 会自动把数据转换成合适的类型
+# 能方便地转成 dict / JSON
+# 常用在 FastAPI 里做请求和响应的数据结构
 
 class ToolCallFunction(BaseModel):
     name:str

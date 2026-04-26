@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: implementation
-- Task: specs/TASK-002.md
-- Gate: Review
-- Allowed Now: next task planning
+- Phase: planning
+- Task: specs/TASK-003.md
+- Gate: Draft
+- Allowed Now: start-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 先修 `agent_prototype/tests/test_agent.py` 的 `session_id` 入参，再做提交。
+- Next action: 先把 `routes.py` / `services.py` 的导入、签名、表初始化接通，再跑通 `/run` 和 `/reset`。
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -22,3 +22,6 @@
 | 2026-04-24 | `TASK-002` 功能收口 | Review | 会话隔离与重置功能完成，测试按当前安排延期。 |
 | 2026-04-24 | 回归验证失败 | Verify | `unittest` 运行失败，`AgentInput` 还缺 `session_id`，测试未同步。 |
 | 2026-04-24 | 回归验证通过 | Verify | `python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-04-24 | 创建下一张任务卡 | planning | 新增 `specs/TASK-003.md`，聚焦会话持久化。 |
+| 2026-04-24 | 确认存储方案 | planning | `TASK-003` 先走 SQLite，不上更重的数据库。 |
+| 2026-04-26 | 开始接通 SQLite 链路 | implementation | 已有 `db.py`、`models.py`、`session_store.py`、`services.py`，下一步是修正接口引用并初始化表。 |
