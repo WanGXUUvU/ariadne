@@ -29,6 +29,7 @@ class ChatMessage(BaseModel):
     tool_call_id:Optional[str]=None
 #单词运行请求
 class AgentInput(BaseModel):
+    agent_name:Optional[str]=None
     session_id:str=Field(min_length=1) #会话id，隔离会话
     user_input:str =Field(min_length=1)
 #重置请求
@@ -38,6 +39,7 @@ class ResetInput(BaseModel):
 class AgentState(BaseModel):
     messages:List[ChatMessage]=Field(default_factory=list)
     step:int=0
+    agent_name:Optional[str]=None
 
 class AgentEvent(BaseModel):
     index:int

@@ -1,5 +1,6 @@
 from pydantic import BaseModel,Field
 from typing import Optional
+
 class AgentDefinition(BaseModel): #Agent产品层定义
     id:str=Field(default="default") 
     name:str =Field(default="Default Agent")

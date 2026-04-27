@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: 规划
-- Task: specs/TASK-007.md
+- Task: specs/TASK-010.md
 - Gate: 实现审批
 - Allowed Now: start-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按轻量流程推进；从 `TASK-007` 的定义读取器开始实现。
+- Next action: 按轻量流程推进；从 `TASK-010` 的统一 Tool Registry 开始实现。
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -43,3 +43,5 @@
 | 2026-04-27 | 校正产品方向 | 规划 | 结合开源 agent 产品的架构，对当前阶段切换为 Agent 核心定义 + Skill / Plugin 扩展路线。 |
 | 2026-04-27 | 路线审查完成 | Review | 任务卡主线整体合理，少量残留语义仍需统一，重点关注 plugin 是否要承载 agents、以及 skill 术语是否继续保留。 |
 | 2026-04-27 | `TASK-006` 功能完成 | Verify / Review | Agent 定义层已接入 runtime，默认定义与 SQLite store 已打通，单测通过。 |
+| 2026-04-27 | `TASK-007` 功能完成 | Verify / Review | 默认 agent 定义读取器已接入数据库读取与内存回退，单测通过。 |
+| 2026-04-27 | `TASK-008` 功能完成 | Verify / Review | Agent 定义已注入 runtime，默认运行路径使用定义层，单测通过。 |
