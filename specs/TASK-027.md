@@ -19,7 +19,7 @@ Model Adapter / Runtime
 - 直接迁移代码
 - 删除现有 adapter
 - 改 UI
-- 改 SkillPack 格式
+- 改 skill / extension 格式
 
 ## 实现步骤
 1. 列出当前 Chat Completions adapter 输入输出。
@@ -40,4 +40,3 @@ Model Adapter / Runtime
 - 是否保留旧 adapter 作为回退。
 - 是否避免一次性重写 runtime。
 - 是否把迁移边界放在 model adapter 层。
-

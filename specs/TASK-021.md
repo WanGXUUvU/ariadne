@@ -20,7 +20,7 @@ API
 
 ## 实现步骤
 1. 审查当前 `AgentOutput`。
-2. 增加 response metadata：session_id、skill_name、run_id。
+2. 增加 response metadata：session_id、agent_name、skill_name、run_id。
 3. 确保 events schema 稳定。
 4. 对常见错误使用统一错误响应。
 5. 更新测试断言。
@@ -37,4 +37,3 @@ API
 - response 是否过大。
 - 是否兼容前端和 CLI。
 - 是否为 streaming 留接口。
-

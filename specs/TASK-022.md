@@ -1,14 +1,14 @@
 # TASK-022 - 最小 CLI 入口
 
 ## 目标
-提供一个最小命令行入口，可以发送消息、指定 session、指定 skill。
+提供一个最小命令行入口，可以发送消息、指定 session、指定 agent，必要时指定 skill。
 
 ## 产品层
 CLI
 
 ## 范围内
 - 新增 `python -m agent_prototype.cli`
-- 参数：message、session-id、skill-name
+- 参数：message、session-id、agent-name、skill-name
 - 打印 reply
 - 可选打印 events
 - 复用 service 层，不直接调 FastAPI
@@ -39,4 +39,3 @@ CLI
 - CLI 是否没有复制业务逻辑。
 - 输出是否适合人读。
 - 是否不强依赖真实 API Key 测试。
-

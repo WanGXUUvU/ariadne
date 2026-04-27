@@ -1,10 +1,10 @@
-# TASK-011 - SkillPack 允许工具列表
+# TASK-011 - Skill 允许工具列表
 
 ## 目标
-让 SkillPack 可以声明自己允许使用哪些工具，Agent 只把允许的工具暴露给模型。
+让 Skill 可以声明自己允许使用哪些工具，Agent 只把允许的工具暴露给模型。
 
 ## 产品层
-SkillPack / Tool Registry
+Skill / Tool Registry
 
 ## 范围内
 - `SKILL.md` 支持 `allowed_tools`
@@ -19,7 +19,7 @@ SkillPack / Tool Registry
 
 ## 实现步骤
 1. 扩展 `SKILL.md` 格式，给 default skill 加 `allowed_tools`。
-2. 扩展 `SkillPack` 数据结构。
+2. 扩展 `Skill` 数据结构。
 3. loader 解析 allowed tools。
 4. `get_tool_schemas(tool_names=...)` 只返回允许工具。
 5. 执行工具前检查 tool name 是否在允许列表。
@@ -37,4 +37,3 @@ SkillPack / Tool Registry
 - 是否同时做了暴露前过滤和执行前校验。
 - allowed tools 缺省值是否安全。
 - 错误事件是否可追踪。
-

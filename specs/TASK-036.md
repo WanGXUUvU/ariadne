@@ -1,7 +1,7 @@
 # TASK-036 - 运行配置与人格配置
 
 ## 目标
-把 model、temperature、personality、default skill、permission profile 这类运行配置集中管理。
+把 model、temperature、personality、default agent、default skill、permission profile 这类运行配置集中管理。
 
 ## 产品层
 Config / Runtime
@@ -11,7 +11,7 @@ Config / Runtime
 - 支持项目级默认配置
 - 支持 session 覆盖配置
 - API 能读取当前 effective config
-- 预留 `/model`、`/personality` 命令入口
+- 预留 `/model`、`/personality`、`/agents`、`/skills` 命令入口
 
 ## 范围外
 - 完整配置文件热加载
@@ -37,4 +37,3 @@ Config / Runtime
 - 配置是否集中。
 - 是否避免环境变量、常量、session 状态多处混杂。
 - 默认配置是否适合学习阶段。
-
