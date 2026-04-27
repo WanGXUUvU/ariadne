@@ -1,7 +1,7 @@
 # TASK-010 - 统一 Tool Registry
 
 ## 目标
-把本地工具整理成统一注册入口，为后续 MCP、插件工具、SkillPack 工具约束做准备。
+把本地工具整理成统一注册入口，为后续 MCP、插件工具、Skill 工具约束做准备。
 
 ## 产品层
 Tool Registry
@@ -39,4 +39,3 @@ Tool Registry
 - registry 是否足够简单。
 - 工具 schema 和 handler 是否绑定清楚。
 - unknown tool 是否不会崩溃。
-

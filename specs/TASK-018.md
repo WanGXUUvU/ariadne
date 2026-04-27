@@ -1,7 +1,7 @@
 # TASK-018 - 渐进式 Skill 加载
 
 ## 目标
-模拟 Codex 的渐进式加载：初始只给模型 skill 摘要，只有选中时才加载完整 instructions。
+模拟 OpenCode 式的渐进式加载：初始只给模型 skill 摘要，只有选中时才加载完整 instructions。
 
 ## 产品层
 Skill Management / Context
@@ -36,4 +36,3 @@ Skill Management / Context
 - 是否真正减少上下文。
 - catalog 是否足够模型选择。
 - 超长 description 是否会被截断。
-

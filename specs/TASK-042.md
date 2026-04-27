@@ -7,7 +7,7 @@
 Review / Agent Behavior
 
 ## 范围内
-- 新增 review skill 或 review mode
+- 新增 review agent 或 review mode
 - 读取 git diff
 - 生成 review prompt
 - 输出 findings、questions、testing gaps
@@ -19,10 +19,10 @@ Review / Agent Behavior
 - 多文件复杂静态分析
 
 ## 实现步骤
-1. 新建 `skills/review/SKILL.md`。
-2. 给 review skill 写明确输出格式。
-3. 将 git diff 作为上下文输入。
-4. 增加 `/review` command。
+1. 定义 review mode 的输出格式。
+2. 将 git diff 作为上下文输入。
+3. 增加 `/review` command。
+4. 如果采用 skill 形态，则只把它当作可选 review skill，不作为系统核心。
 5. 测试 command 不会进入普通聊天路径。
 
 ## 完成标准
@@ -38,4 +38,3 @@ Review / Agent Behavior
 - review prompt 是否具体。
 - 是否避免自动修改文件。
 - 输出是否适合用户直接阅读。
-

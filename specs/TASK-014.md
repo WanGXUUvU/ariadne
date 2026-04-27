@@ -10,6 +10,7 @@ Session
 - session name
 - created_at
 - updated_at
+- last_agent_name
 - last_skill_name
 - message_count
 - last_reply_preview
@@ -23,7 +24,7 @@ Session
 1. 扩展 ORM model 和 migration。
 2. 新建或更新 session 时维护 created/updated。
 3. 每次 run 后更新 message_count 和 preview。
-4. 记录本轮使用的 skill。
+4. 记录本轮使用的 agent 和 skill。
 5. 测试元数据更新。
 
 ## 完成标准
@@ -39,4 +40,3 @@ Session
 - migration 是否兼容已有 SQLite。
 - preview 是否限制长度。
 - 元数据是否避免重复计算过重。
-

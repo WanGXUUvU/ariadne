@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: 规划
-- Task: specs/TASK-006.md
+- Task: specs/TASK-007.md
 - Gate: 实现审批
 - Allowed Now: start-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按轻量流程推进；如认可，从 `TASK-006` 的 SkillPack 文件结构开始实现。
+- Next action: 按轻量流程推进；从 `TASK-007` 的定义读取器开始实现。
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -35,8 +35,11 @@
 | 2026-04-26 | 创建下一张任务卡 | planning | 新增 `specs/TASK-006.md`，聚焦 Prompt/Skill 体系 v1。 |
 | 2026-04-26 | 仓库体检 | Review | 发现 `tools.py` 冲突标记导致测试无法导入，且 `llm_client.py` 存在硬编码 API Key，需先处理。 |
 | 2026-04-26 | 修复导入阻塞 | Verify | `tools.py` 的 merge conflict 标记已清除，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-04-27 | 重新分解 `TASK-006` | planning | `TASK-006` 将从内存版 skill 过渡为文件化 skill 路线，按最终产品形态拆分后续任务。 |
+| 2026-04-27 | 重新分解 `TASK-006` | planning | `TASK-006` 已从内存 prompt 过渡为 Agent 核心定义路线，并为后续 skill / plugin 扩展预留结构。 |
 | 2026-04-27 | 建立产品规划与任务卡体系 | 实现审批 | 新增 `SPEC.md`、`DECISIONS.md`、`BUILD_PLAN.md`，删除旧 `TASK-006` 并重建 `TASK-006` 到 `TASK-027`。 |
 | 2026-04-27 | 切换为轻量流程 | 规划 | 保留已预建任务卡和路线图，但日常执行只推进当前任务卡，路线文档仅在范围变化时读取。 |
 | 2026-04-27 | 精简流程文档 | 规划 | 删除完整流程遗留的 `SPEC.md` 和 `DECISIONS.md`，轻量流程保留 `STATUS.md`、任务卡和 `BUILD_PLAN.md` 路线图。 |
 | 2026-04-27 | 扩展 Codex 类产品路线 | 规划 | 基于 Codex 官方 Skills / Plugins / CLI 能力面，细化 `TASK-006` 到 `TASK-027`，新增 `TASK-028` 到 `TASK-051`。 |
+| 2026-04-27 | 校正产品方向 | 规划 | 结合开源 agent 产品的架构，对当前阶段切换为 Agent 核心定义 + Skill / Plugin 扩展路线。 |
+| 2026-04-27 | 路线审查完成 | Review | 任务卡主线整体合理，少量残留语义仍需统一，重点关注 plugin 是否要承载 agents、以及 skill 术语是否继续保留。 |
+| 2026-04-27 | `TASK-006` 功能完成 | Verify / Review | Agent 定义层已接入 runtime，默认定义与 SQLite store 已打通，单测通过。 |

@@ -9,3 +9,9 @@ class SessionRecord(Base):#会话记录表
     session_name = Column(String, nullable=True)
     state_json=Column(Text,nullable=False)
     updated_at=Column(DateTime,server_default=func.now(),onupdate=func.now())
+
+class AgentDefinitionRecord(Base):
+    __tablename__="agent_definitions"#表名
+    agent_id=Column(String,primary_key=True,index=True)
+    definition_json=Column(Text,nullable=False)
+    update_at=Column(DateTime,server_default=func.now())

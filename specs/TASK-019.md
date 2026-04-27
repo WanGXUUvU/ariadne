@@ -20,7 +20,7 @@ Skill Management / Config
 ## 实现步骤
 1. 选择配置存储位置，优先简单 JSON 或项目配置。
 2. 实现读取 enabled/disabled 列表。
-3. 在 `load_skill_pack` 前检查是否启用。
+3. 在 `load_skill` 前检查是否启用。
 4. 新增 enable/disable service 函数。
 5. 测试禁用 skill 后无法使用。
 
@@ -36,4 +36,3 @@ Skill Management / Config
 - 默认 skill 被禁用时如何处理。
 - 配置文件是否适合提交到 repo。
 - 是否为插件配置留空间。
-

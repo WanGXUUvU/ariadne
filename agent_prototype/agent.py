@@ -3,9 +3,7 @@ from .schemas import AgentInput, AgentState, AgentOutput, ChatMessage, ToolCall,
 from .llm_client import call_llm
 from .tools import echo_tool,TOOLS
 from typing import Optional
-
-
-SYSTEM_PROMPT = "You are a helpful assistant."
+from .agent_definition import AgentDefinition,DEFAULT_AGENT_DEFINITION
 
 def strip_think(content:str)->str:
     if "</think>" not in content:
@@ -23,9 +21,9 @@ def execute_tool(tool_call: ToolCall) -> str:
 
 
 class Agent:
-    def __init__(self,state:Optional[AgentState]=None):
+    def __init__(self,state:Optional[AgentState]=None,definition:Optional[AgentDefinition]=None):
         self.state = state or AgentState()
-
+        self.definition=definition or DEFAULT_AGENT_DEFINITION
     def run(self, agent_input: AgentInput) -> AgentOutput:
 
         events= []
@@ -34,7 +32,7 @@ class Agent:
         self.state.step += 1
 
         # 发送给模型的完整上下文：system + 历史消息 + 当前用户输入。
-        messages = [ChatMessage(role="system", content=SYSTEM_PROMPT)] + self.state.messages
+        messages = [ChatMessage(role="system", content=self.definition.system_prompt)] + self.state.messages
 
         while True:
             # 第一次请求模型时，它可能返回 tool_calls，而不是最终回复。

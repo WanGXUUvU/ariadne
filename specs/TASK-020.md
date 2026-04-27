@@ -1,7 +1,7 @@
 # TASK-020 - Skill 草稿创建流程
 
 ## 目标
-提供创建 SkillPack 草稿的后端流程，让系统能生成一个可编辑的 `SKILL.md`。
+提供创建 skill 草稿的后端流程，让系统能生成一个可编辑的 `SKILL.md`。
 
 ## 产品层
 Skill Authoring
@@ -37,4 +37,3 @@ Skill Authoring
 - 文件名是否安全。
 - 模板是否和 loader 格式一致。
 - 是否避免自动生成过多复杂内容。
-
