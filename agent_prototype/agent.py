@@ -1,7 +1,6 @@
-import json
 from .schemas import AgentInput, AgentState, AgentOutput, ChatMessage, ToolCall,AgentEvent
 from .llm_client import call_llm
-from .tools import echo_tool,TOOLS
+from .tool_registry import ToolRegistry,DEFAULT_TOOL_REGISTRY
 from typing import Optional
 from .agent_definition import AgentDefinition,DEFAULT_AGENT_DEFINITION
 
@@ -10,20 +9,13 @@ def strip_think(content:str)->str:
         return content.strip()
     return content.split("</think>",1)[1].strip()
 
-def execute_tool(tool_call: ToolCall) -> str:
-    # tool_call.function.arguments 是 JSON 字符串，先解析成字典。
-    args = json.loads(tool_call.function.arguments or "{}")
-
-    if tool_call.function.name == "echo_tool":
-        return echo_tool(**args)
-
-    raise ValueError(f"Unknown tool: {tool_call.function.name}")
 
 
 class Agent:
-    def __init__(self,state:Optional[AgentState]=None,definition:Optional[AgentDefinition]=None):
+    def __init__(self,state:Optional[AgentState]=None,definition:Optional[AgentDefinition]=None,tool_registry:Optional[ToolRegistry]=None):
         self.state = state or AgentState()
         self.definition=definition or DEFAULT_AGENT_DEFINITION
+        self.tool_registry=tool_registry or DEFAULT_TOOL_REGISTRY
     def run(self, agent_input: AgentInput) -> AgentOutput:
 
         events= []
@@ -36,7 +28,7 @@ class Agent:
 
         while True:
             # 第一次请求模型时，它可能返回 tool_calls，而不是最终回复。
-            assistant_msg = call_llm([m.model_dump(exclude_none=True) for m in messages],TOOLS)
+            assistant_msg = call_llm([m.model_dump(exclude_none=True) for m in messages],self.tool_registry.get_tool_schemas())
 
             if assistant_msg.get("tool_calls"):
                 # 先把“模型要求调用工具”这条 assistant 消息记下来。
@@ -60,7 +52,10 @@ class Agent:
                         )
                     )
                     event_index += 1
-                    tool_result = execute_tool(tool_call)
+                    tool_result = self.tool_registry.execute_tool_call(
+                        tool_call.function.name,
+                        tool_call.function.arguments,
+                    )
                     # 把工具执行结果作为 tool 消息回填给模型。
                     # tool_call_id 必须和这次 tool_calls 的 id 对上。
                     tool_message = ChatMessage(

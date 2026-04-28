@@ -45,3 +45,4 @@
 | 2026-04-27 | `TASK-006` 功能完成 | Verify / Review | Agent 定义层已接入 runtime，默认定义与 SQLite store 已打通，单测通过。 |
 | 2026-04-27 | `TASK-007` 功能完成 | Verify / Review | 默认 agent 定义读取器已接入数据库读取与内存回退，单测通过。 |
 | 2026-04-27 | `TASK-008` 功能完成 | Verify / Review | Agent 定义已注入 runtime，默认运行路径使用定义层，单测通过。 |
+| 2026-04-27 | `TASK-009` 功能完成 | Verify / Review | Agent 输入已支持显式 agent_name，默认回退与未知 agent 错误路径已验证。 |
