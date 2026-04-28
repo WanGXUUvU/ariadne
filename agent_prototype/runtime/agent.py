@@ -1,9 +1,8 @@
-from .schemas import AgentInput, AgentState, AgentOutput, ChatMessage, ToolCall,AgentEvent
+from ..core.schemas import AgentInput, AgentState, AgentOutput, ChatMessage, ToolCall, AgentEvent
 from .llm_client import call_llm
-from .tool_registry import ToolRegistry,DEFAULT_TOOL_REGISTRY
+from .tool_registry import ToolRegistry, DEFAULT_TOOL_REGISTRY
 from typing import Optional
-from .agent_definition import AgentDefinition,DEFAULT_AGENT_DEFINITION
-
+from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
 def strip_think(content:str)->str:
     if "</think>" not in content:
         return content.strip()
@@ -59,27 +58,45 @@ class Agent:
                         tool_call.function.name,
                         tool_call.function.arguments,
                     )
-                    # 把工具执行结果作为 tool 消息回填给模型。
-                    # tool_call_id 必须和这次 tool_calls 的 id 对上。
-                    tool_message = ChatMessage(
-                        role="tool",
-                        tool_call_id=tool_call.id,
-                        content=tool_result,
-                    )
-                    messages.append(tool_message)
-                    
-                    self.state.messages.append(tool_message)
 
-                    events.append(
-                        AgentEvent(
-                            index=event_index,
-                            type="tool_result",
-                            tool_name=tool_call.function.name,
-                            tool_call_id=tool_call.id,
-                            content=tool_result,
+                    if tool_result.ok:
+                        events.append(
+                            AgentEvent(
+                                index=event_index,
+                                type="tool_result",
+                                tool_name=tool_call.function.name,
+                                tool_call_id=tool_call.id,
+                                content=tool_result.content,
+                                tool_result=tool_result,
+                            )
                         )
-                    )
+                        tool_message = ChatMessage(
+                            role="tool",
+                            tool_call_id=tool_call.id,
+                            content=tool_result.content,
+                        )
+                    else:
+                        
+                        error_message = tool_result.error.message if tool_result.error else "Tool failed"
+                        events.append(
+                            AgentEvent(
+                                index=event_index,
+                                type="tool_error",
+                                tool_name=tool_call.function.name,
+                                tool_call_id=tool_call.id,
+                                content=error_message,
+                                tool_result=tool_result,
+                            )
+                        )
+                        tool_message = ChatMessage(
+                            role="tool",
+                            tool_call_id=tool_call.id,
+                            content=f"[TOOL_ERROR] {error_message}",
+                        )
+
                     event_index += 1
+                    messages.append(tool_message)
+                    self.state.messages.append(tool_message)
                 continue
 
             # 如果没有 tool_calls，说明模型已经给出了最终回复。

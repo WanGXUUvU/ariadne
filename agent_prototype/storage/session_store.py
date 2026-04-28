@@ -2,7 +2,7 @@ import json
 from typing import Optional
 from sqlalchemy.orm import Session
 from .models import SessionRecord
-from .schemas import AgentState
+from ..core.schemas import AgentState
 
 class SqliteSessionStore:
     def __init__(self,db:Session):

@@ -7,14 +7,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.agent import Agent
-from agent_prototype.agent_definition import AgentDefinition
-from agent_prototype.agent_definition_store import SqliteAgentDefinitionStore
-from agent_prototype.app import app
-from agent_prototype.agent_loader import load_agent_definition
-from agent_prototype.tool_registry import build_default_tool_registry
-from agent_prototype.db import Base, get_db
-from agent_prototype.schemas import AgentInput
+from agent_prototype.runtime.agent import Agent
+from agent_prototype.core.agent_definition import AgentDefinition
+from agent_prototype.storage.agent_definition_store import SqliteAgentDefinitionStore
+from agent_prototype.api.app import app
+from agent_prototype.runtime.agent_loader import load_agent_definition
+from agent_prototype.runtime.tool_registry import build_default_tool_registry
+from agent_prototype.storage.db import Base, get_db
+from agent_prototype.core.schemas import AgentInput
 
 
 class TestAgentLoader(unittest.TestCase):
@@ -78,7 +78,7 @@ class TestAgentLoader(unittest.TestCase):
 
 
 class TestAgent(unittest.TestCase):
-    @patch("agent_prototype.agent.call_llm", return_value={"role": "assistant", "content": "mock reply"})
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "mock reply"})
     def test_run_uses_definition_system_prompt(self, mock_call_llm):
         custom_definition = AgentDefinition(
             id="default",
@@ -100,7 +100,7 @@ class TestAgent(unittest.TestCase):
         self.assertEqual(messages[1]["role"], "user")
         self.assertEqual(messages[1]["content"], "你好")
 
-    @patch("agent_prototype.agent.call_llm", return_value={"role": "assistant", "content": "mock reply"})
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "mock reply"})
     def test_run_updates_state_and_returns_reply(self, mock_call_llm):
         agent = Agent()
         agent_input = AgentInput(session_id="session-a", user_input="你好")
@@ -129,7 +129,7 @@ class TestAgent(unittest.TestCase):
         mock_call_llm.assert_called_once()
 
     @patch(
-        "agent_prototype.agent.call_llm",
+        "agent_prototype.runtime.agent.call_llm",
         side_effect=[
             {
                 "role": "assistant",
@@ -197,6 +197,11 @@ class TestAgent(unittest.TestCase):
                     "tool_name": "echo_tool",
                     "tool_call_id": "call_001",
                     "content": "tool received:hello",
+                    "tool_result": {
+                        "ok": True,
+                        "content": "tool received:hello",
+                        "metadata": {"tool_name": "echo_tool"},
+                    },
                 },
                 {
                     "index": 2,
@@ -208,7 +213,7 @@ class TestAgent(unittest.TestCase):
         self.assertEqual(mock_call_llm.call_count, 2)
 
     @patch(
-        "agent_prototype.agent.call_llm",
+        "agent_prototype.runtime.agent.call_llm",
         side_effect=[
             {
                 "role": "assistant",
@@ -244,6 +249,93 @@ class TestAgent(unittest.TestCase):
         self.assertIn("Tool not allowed:write_file", str(ctx.exception))
         self.assertEqual(mock_call_llm.call_count, 1)
 
+    @patch(
+        "agent_prototype.runtime.agent.call_llm",
+        side_effect=[
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_001",
+                        "type": "function",
+                        "function": {
+                            "name": "write_file",
+                            "arguments": "{\"path\": \"/tmp\", \"content\": \"hello\"}",
+                        },
+                    }
+                ],
+            },
+            {"role": "assistant", "content": "final reply after error"},
+        ],
+    )
+    def test_run_records_tool_error_trace(self, mock_call_llm):
+        agent = Agent()
+        agent_input = AgentInput(session_id="session-a", user_input="帮我测试错误 trace")
+
+        output = agent.run(agent_input)
+
+        self.assertEqual(output.reply, "final reply after error")
+        self.assertEqual(
+            [e.model_dump(exclude_none=True) for e in output.events],
+            [
+                {
+                    "index": 0,
+                    "type": "assistant_tool_call",
+                    "tool_name": "write_file",
+                    "tool_call_id": "call_001",
+                    "content": "{\"path\": \"/tmp\", \"content\": \"hello\"}",
+                },
+                {
+                    "index": 1,
+                    "type": "tool_error",
+                    "tool_name": "write_file",
+                    "tool_call_id": "call_001",
+                    "content": "Path is a directory: /tmp",
+                    "tool_result": {
+                        "ok": False,
+                        "error": {
+                            "code": "tool_runtime_error",
+                            "tool_name": "write_file",
+                            "message": "Path is a directory: /tmp",
+                        },
+                        "metadata": {"tool_name": "write_file"},
+                    },
+                },
+                {
+                    "index": 2,
+                    "type": "final_answer",
+                    "content": "final reply after error",
+                },
+            ],
+        )
+        self.assertEqual(
+            [m.model_dump(exclude_none=True) for m in output.state.messages],
+            [
+                {"role": "user", "content": "帮我测试错误 trace"},
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_001",
+                            "type": "function",
+                            "function": {
+                                "name": "write_file",
+                                "arguments": "{\"path\": \"/tmp\", \"content\": \"hello\"}",
+                            },
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "content": "[TOOL_ERROR] Path is a directory: /tmp",
+                    "tool_call_id": "call_001",
+                },
+                {"role": "assistant", "content": "final reply after error"},
+            ],
+        )
+        self.assertEqual(mock_call_llm.call_count, 2)
+
 
 class TestAgentApi(unittest.TestCase):
     def setUp(self):
@@ -269,7 +361,7 @@ class TestAgentApi(unittest.TestCase):
         self.engine.dispose()
         self.temp_dir.cleanup()
 
-    @patch("agent_prototype.agent.call_llm", return_value={"role": "assistant", "content": "mock reply"})
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "mock reply"})
     def test_run_endpoint(self, mock_call_llm):
         response = self.client.post("/run", json={"session_id": "session-a", "user_input": "你好"})
 
@@ -293,12 +385,13 @@ class TestAgentApi(unittest.TestCase):
                     "content": "mock reply",
                     "tool_name": None,
                     "tool_call_id": None,
+                    "tool_result": None,
                 }
             ],
         )
 
-    @patch("agent_prototype.services.load_agent_definition")
-    @patch("agent_prototype.agent.call_llm", return_value={"role": "assistant", "content": "review reply"})
+    @patch("agent_prototype.runtime.services.load_agent_definition")
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "review reply"})
     def test_run_endpoint_uses_explicit_agent_name(self, mock_call_llm, mock_load_agent_definition):
         mock_load_agent_definition.return_value = AgentDefinition(
             id="reviewer",
@@ -337,7 +430,9 @@ class TestToolRegistry(unittest.TestCase):
             f'{{"path":"{file_path}"}}',
         )
 
-        self.assertEqual(result, "hello registry")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.content, "hello registry")
+        self.assertEqual(result.metadata["tool_name"], "read_file")
 
     def test_execute_list_dir_tool_call(self):
         folder_path = Path(self.temp_dir.name) / "folder"
@@ -350,7 +445,8 @@ class TestToolRegistry(unittest.TestCase):
             f'{{"path":"{folder_path}"}}',
         )
 
-        self.assertEqual(result, "a.txt\nb.txt")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.content, "a.txt\nb.txt")
 
     def test_execute_search_text_tool_call(self):
         folder_path = Path(self.temp_dir.name) / "search"
@@ -363,8 +459,9 @@ class TestToolRegistry(unittest.TestCase):
             f'{{"query":"search me","path":"{folder_path}"}}',
         )
 
-        self.assertIn("sample.txt", result)
-        self.assertIn("search me here", result)
+        self.assertTrue(result.ok)
+        self.assertIn("sample.txt", result.content)
+        self.assertIn("search me here", result.content)
 
     def test_execute_write_file_tool_call(self):
         file_path = Path(self.temp_dir.name) / "written.txt"
@@ -374,7 +471,8 @@ class TestToolRegistry(unittest.TestCase):
             f'{{"path":"{file_path}","content":"hello write"}}',
         )
 
-        self.assertIn("Wrote", result)
+        self.assertTrue(result.ok)
+        self.assertIn("Wrote", result.content)
         self.assertTrue(file_path.exists())
         self.assertEqual(file_path.read_text(encoding="utf-8"), "hello write")
 
@@ -383,3 +481,30 @@ class TestToolRegistry(unittest.TestCase):
         tool_names = [schema["function"]["name"] for schema in schemas]
 
         self.assertIn("echo_tool", tool_names)
+
+    def test_unknown_tool_raises_structured_error(self):
+        result = self.registry.execute_tool_call("missing_tool", "{}")
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error.code, "unknown_tool")
+        self.assertEqual(result.error.tool_name, "missing_tool")
+        self.assertIn("Unknown tool: missing_tool", result.error.message)
+
+    def test_invalid_json_arguments_raises_structured_error(self):
+        result = self.registry.execute_tool_call("echo_tool", "{bad json")
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error.code, "invalid_arguments")
+        self.assertEqual(result.error.tool_name, "echo_tool")
+        self.assertIn("Invalid JSON arguments", result.error.message)
+
+    def test_tool_runtime_error_raises_structured_error(self):
+        result = self.registry.execute_tool_call(
+            "write_file",
+            f'{{"path":"{self.temp_dir.name}","content":"hello"}}',
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error.code, "tool_runtime_error")
+        self.assertEqual(result.error.tool_name, "write_file")
+        self.assertIn("Path is a directory", result.error.message)

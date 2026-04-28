@@ -1,8 +1,8 @@
-from .agent_definition import AgentDefinition,DEFAULT_AGENT_DEFINITION
-import json 
+import json
 from sqlalchemy.orm import Session
 
-from .agent_definition_store import SqliteAgentDefinitionStore
+from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
+from ..storage.agent_definition_store import SqliteAgentDefinitionStore
 
 def load_agent_definition(agent_name: str, db: Session) -> AgentDefinition:  # 按名字加载 agent 定义
     store = SqliteAgentDefinitionStore(db)  # 创建定义存储器
@@ -15,4 +15,3 @@ def load_agent_definition(agent_name: str, db: Session) -> AgentDefinition:  # �
         return DEFAULT_AGENT_DEFINITION  # 回退内存默认定义
 
     raise ValueError(f"Unknown agent definition: {agent_name}")  # 其他名字不存在就报错
-

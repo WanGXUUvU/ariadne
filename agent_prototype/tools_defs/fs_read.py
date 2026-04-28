@@ -1,6 +1,6 @@
 from pathlib import Path  # 方便处理文件路径
 
-from ..tool_types import ToolDefinition  # 导入工具定义
+from ..core.tool_types import ToolDefinition  # 导入工具定义
 
 
 def read_file(path: str) -> str:  # 真正读文件的函数
