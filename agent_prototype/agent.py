@@ -12,10 +12,11 @@ def strip_think(content:str)->str:
 
 
 class Agent:
-    def __init__(self,state:Optional[AgentState]=None,definition:Optional[AgentDefinition]=None,tool_registry:Optional[ToolRegistry]=None):
+    def __init__(self,state:Optional[AgentState]=None,definition:Optional[AgentDefinition]=None,tool_registry:Optional[ToolRegistry]=None,allow_tool_names:Optional[list[str]]=None,):
         self.state = state or AgentState()
         self.definition=definition or DEFAULT_AGENT_DEFINITION
         self.tool_registry=tool_registry or DEFAULT_TOOL_REGISTRY
+        self.allow_tool_names = allow_tool_names if allow_tool_names is not None else self.definition.tool_names
     def run(self, agent_input: AgentInput) -> AgentOutput:
 
         events= []
@@ -28,7 +29,7 @@ class Agent:
 
         while True:
             # 第一次请求模型时，它可能返回 tool_calls，而不是最终回复。
-            assistant_msg = call_llm([m.model_dump(exclude_none=True) for m in messages],self.tool_registry.get_tool_schemas())
+            assistant_msg = call_llm([m.model_dump(exclude_none=True) for m in messages],self.tool_registry.get_tool_schemas(self.allow_tool_names))
 
             if assistant_msg.get("tool_calls"):
                 # 先把“模型要求调用工具”这条 assistant 消息记下来。
@@ -52,6 +53,8 @@ class Agent:
                         )
                     )
                     event_index += 1
+                    if self.allow_tool_names is not None and tool_call.function.name not in self.allow_tool_names:
+                        raise ValueError(f"Tool not allowed:{tool_call.function.name}")
                     tool_result = self.tool_registry.execute_tool_call(
                         tool_call.function.name,
                         tool_call.function.arguments,

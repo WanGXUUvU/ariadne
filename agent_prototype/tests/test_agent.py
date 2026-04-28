@@ -62,7 +62,7 @@ class TestAgentLoader(unittest.TestCase):
             self.assertEqual(definition.name, "Default Agent")
             self.assertEqual(definition.system_prompt, "你是一个助手")
             self.assertEqual(definition.description, None)
-            self.assertEqual(definition.tool_names, [])
+            self.assertEqual(definition.tool_names, None)
         finally:
             db.close()
 
@@ -207,6 +207,43 @@ class TestAgent(unittest.TestCase):
         )
         self.assertEqual(mock_call_llm.call_count, 2)
 
+    @patch(
+        "agent_prototype.agent.call_llm",
+        side_effect=[
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_001",
+                        "type": "function",
+                        "function": {
+                            "name": "write_file",
+                            "arguments": "{\"path\": \"demo.txt\", \"content\": \"hello\"}",
+                        },
+                    }
+                ],
+            }
+        ],
+    )
+    def test_run_rejects_disallowed_tool_call(self, mock_call_llm):
+        agent = Agent(
+            definition=AgentDefinition(
+                id="default",
+                name="Default Agent",
+                system_prompt="你是一个助手",
+                description=None,
+                tool_names=["echo_tool"],
+            )
+        )
+        agent_input = AgentInput(session_id="session-a", user_input="帮我测试权限")
+
+        with self.assertRaises(ValueError) as ctx:
+            agent.run(agent_input)
+
+        self.assertIn("Tool not allowed:write_file", str(ctx.exception))
+        self.assertEqual(mock_call_llm.call_count, 1)
+
 
 class TestAgentApi(unittest.TestCase):
     def setUp(self):
@@ -340,3 +377,9 @@ class TestToolRegistry(unittest.TestCase):
         self.assertIn("Wrote", result)
         self.assertTrue(file_path.exists())
         self.assertEqual(file_path.read_text(encoding="utf-8"), "hello write")
+
+    def test_default_registry_exposes_echo_tool(self):
+        schemas = self.registry.get_tool_schemas()
+        tool_names = [schema["function"]["name"] for schema in schemas]
+
+        self.assertIn("echo_tool", tool_names)

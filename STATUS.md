@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: 规划
-- Task: specs/TASK-010.md
+- Task: specs/TASK-012.md
 - Gate: 实现审批
 - Allowed Now: start-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按轻量流程推进；从 `TASK-010` 的统一 Tool Registry 开始实现。
+- Next action: 按轻量流程推进；从 `TASK-012` 的工具错误事件开始实现。
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -46,3 +46,5 @@
 | 2026-04-27 | `TASK-007` 功能完成 | Verify / Review | 默认 agent 定义读取器已接入数据库读取与内存回退，单测通过。 |
 | 2026-04-27 | `TASK-008` 功能完成 | Verify / Review | Agent 定义已注入 runtime，默认运行路径使用定义层，单测通过。 |
 | 2026-04-27 | `TASK-009` 功能完成 | Verify / Review | Agent 输入已支持显式 agent_name，默认回退与未知 agent 错误路径已验证。 |
+| 2026-04-28 | `TASK-010` 功能完成 | Verify / Review | Tool Registry 已统一注册本地工具，schema 暴露与执行链路已通过测试。 |
+| 2026-04-28 | `TASK-011` 功能完成 | Verify / Review | Skill 工具允许列表已串到 runtime，默认 skill 仍可用 echo_tool，禁止工具会被拦截。 |
