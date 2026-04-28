@@ -10,7 +10,7 @@ def run_agent_service(agent_input:AgentInput,db:Session)-> AgentOutput:
     state =store.get(agent_input.session_id) or AgentState()
     effective_agent_name=agent_input.agent_name or "default"
     definiton =load_agent_definition(effective_agent_name,db)
-    agent =Agent(state=state,definition=definiton)
+    agent =Agent(state=state,definition=definiton,allow_tool_names=definiton.tool_names,)
     output=agent.run(agent_input)
     output.state.agent_name=effective_agent_name
     store.save(agent_input.session_id,state=output.state)
