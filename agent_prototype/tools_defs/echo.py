@@ -1,9 +1,14 @@
-from ..tool_types import ToolDefinition
+from ..core.tool_types import ToolDefinition
+from ..core.schemas import ToolResult
 
-def echo_tool(text: str) -> str:
+def echo_tool(text: str) -> ToolResult:
     # 这是本地真正执行的工具逻辑。
     # 模型只会返回 tool_calls，真正的函数执行发生在这里。
-    return f"tool received:{text}"
+    return ToolResult(
+        ok=True,
+        content=f"tool received:{text}",
+        metadata={"tool_name":"echo_tool"},
+    )
 
 ECHO_TOOL_SCHEMA = {  # 给模型看的工具说明
     "type": "function",

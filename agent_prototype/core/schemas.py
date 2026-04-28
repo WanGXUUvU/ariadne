@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List,Literal,Optional
+from typing import List,Literal,Optional,Any
 
 # Pydantic 对象，你可以直接理解成：
 
@@ -22,6 +22,17 @@ class ToolCall(BaseModel):
     type:Literal["function"]="function"
     function:ToolCallFunction
 
+class ToolError(BaseModel):
+    code:str
+    tool_name:str
+    message:str
+
+class ToolResult(BaseModel):
+    ok:bool #这次调用是否成功
+    content:Optional[str]=None
+    error:Optional[ToolError]=None #适合用户看到的 前端UI展示的
+    metadata:dict[str,Any]=Field(default_factory=dict)#额外元数据，比如工具名、耗时、原始一场信息，不适合直接给用户看
+
 class ChatMessage(BaseModel):
     role:Literal["system","user","assistant","tool"]
     content:Optional[str]=None
@@ -43,10 +54,11 @@ class AgentState(BaseModel):
 
 class AgentEvent(BaseModel):
     index:int
-    type:Literal["assistant_tool_call","tool_result","final_answer"]
+    type:Literal["assistant_tool_call","tool_result","tool_error","final_answer"]
     content:Optional[str]=None
     tool_name:Optional[str]=None
     tool_call_id:Optional[str]=None
+    tool_result:Optional[ToolResult]=None
 
 class AgentOutput(BaseModel):
     reply:str

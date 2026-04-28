@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .models import AgentDefinitionRecord
-from .agent_definition import AgentDefinition,DEFAULT_AGENT_DEFINITION
+from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
 
 class SqliteAgentDefinitionStore:
     def __init__(self,db:Session):

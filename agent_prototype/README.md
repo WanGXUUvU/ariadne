@@ -15,7 +15,7 @@ alembic upgrade head
 ```
 4. 启动应用
 ```bash
-uvicorn agent_prototype.app:app --reload
+uvicorn agent_prototype.api.app:app --reload
 ```
 
 ## 常用命令
