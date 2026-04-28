@@ -21,16 +21,40 @@ class SqliteSessionStore:
         #AgentState.model_validate(...） 把普通字典，验证并转换成 AgentState 对象
         return AgentState.model_validate(json.loads(record.state_json))
     #把一个AgentState保存到sqlite里面
-    def save(self,session_id:str,state:AgentState)->None:
+    def save(self,
+             session_id:str,
+             state:AgentState,
+             session_name:Optional[str]=None,
+             last_agent_name:Optional[str]=None,
+             last_skill_name:Optional[str]=None,
+             last_reply_preview:Optional[str]=None,
+             )->None:
         #state.model_dump()把一个Pydantic对象转换为字典，因为数据库不能直接存Pydantic对象
         #json.dumps就是把字典转换为json字符串
         #ensure_ascii=False就是直接保留中文
         state_json=json.dumps(state.model_dump(),ensure_ascii=False)
+        message_count=len(state.messages)
         record=self.db.query(SessionRecord).filter(SessionRecord.session_id==session_id).first()
         if record:
-            record.state_json=state_json
+            record.state_json=state_json #更新状态
+            if session_name is not None:
+                record.session_name=session_name
+            elif not record.session_name:#如果老记录没有name
+                record.session_name=session_id #默认用id
+            record.last_agent_name=last_agent_name
+            record.last_reply_preview=last_reply_preview
+            record.message_count=message_count
+            record.last_skill_name=last_skill_name
+
         else:
-            record = SessionRecord(session_id=session_id,state_json=state_json)
+            record = SessionRecord(
+                session_id=session_id,
+                session_name=session_name or session_id,
+                state_json=state_json,
+                last_agent_name=last_agent_name,
+                last_skill_name=last_skill_name,
+                message_count=message_count,
+                last_reply_preview=last_reply_preview,)
             self.db.add(record)
         self.db.commit()
 

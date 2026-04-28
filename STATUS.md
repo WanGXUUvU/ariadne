@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: 规划
-- Task: specs/TASK-013.md
+- Task: specs/TASK-015.md
 - Gate: 实现审批
 - Allowed Now: start-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按轻量流程推进；准备 `TASK-013` 的 Review。
+- Next action: 按轻量流程推进；开始 `TASK-015` 的 Session 列表和读取接口。
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -51,3 +51,5 @@
 | 2026-04-28 | `TASK-012` 验证完成 | Verify | 工具错误已转成结构化 `tool_error` 事件，未知工具、参数错误、运行异常测试通过。 |
 | 2026-04-28 | `TASK-013` 验证完成 | Verify | 工具结果已统一为 `ToolResult`，成功和失败路径都通过测试。 |
 | 2026-04-28 | 模块结构整理完成 | Review | 将 `agent_prototype/` 按 api/core/runtime/storage/tools_defs 分层，旧入口路径已清理，新入口可从 `agent_prototype.api.app` 启动。 |
+| 2026-04-28 | `TASK-014` 验证完成 | Verify | Session 元数据已接入 `session_records`，创建/更新时间、最近 agent、消息数和回复预览都通过测试。 |
+| 2026-04-29 | `TASK-014` 收口 | Review | Session 元数据已完成，进入 Session 列表与读取接口阶段。 |

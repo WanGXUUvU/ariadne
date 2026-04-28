@@ -14,6 +14,7 @@ from agent_prototype.api.app import app
 from agent_prototype.runtime.agent_loader import load_agent_definition
 from agent_prototype.runtime.tool_registry import build_default_tool_registry
 from agent_prototype.storage.db import Base, get_db
+from agent_prototype.storage.models import SessionRecord
 from agent_prototype.core.schemas import AgentInput
 
 
@@ -344,10 +345,10 @@ class TestAgentApi(unittest.TestCase):
         self.engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
         Base.metadata.create_all(bind=self.engine)
 
-        TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.session_local = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
         def override_get_db():
-            db = TestingSessionLocal()
+            db = self.session_local()
             try:
                 yield db
             finally:
@@ -389,6 +390,32 @@ class TestAgentApi(unittest.TestCase):
                 }
             ],
         )
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "mock reply\nwith preview"})
+    def test_run_endpoint_updates_session_metadata(self, mock_call_llm):
+        response = self.client.post(
+            "/run",
+            json={"session_id": "session-meta", "user_input": "你好，简单回复我一句"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        db = self.session_local()
+        try:
+            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-meta").first()
+
+            self.assertIsNotNone(record)
+            self.assertEqual(record.session_id, "session-meta")
+            self.assertEqual(record.session_name, "session-meta")
+            self.assertEqual(record.last_agent_name, "default")
+            self.assertIsNone(record.last_skill_name)
+            self.assertEqual(record.message_count, 2)
+            self.assertEqual(record.last_reply_preview, "mock reply with preview")
+            self.assertIsNotNone(record.created_at)
+            self.assertIsNotNone(record.updated_at)
+            self.assertGreaterEqual(record.updated_at, record.created_at)
+        finally:
+            db.close()
 
     @patch("agent_prototype.runtime.services.load_agent_definition")
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "review reply"})
