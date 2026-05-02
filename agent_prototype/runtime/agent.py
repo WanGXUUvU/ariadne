@@ -1,45 +1,82 @@
-from ..core.schemas import AgentInput, AgentState, AgentOutput, ChatMessage, ToolCall, AgentEvent
-from .llm_client import call_llm
-from .tool_registry import ToolRegistry, DEFAULT_TOOL_REGISTRY
+"""Agent 执行器。
+
+这个文件只负责“一次 run 怎么跑”：
+- 把用户输入追加进上下文
+- 调用 LLM
+- 处理 tool calls
+- 生成结构化 events
+- 返回最终 reply 和最新 state
+
+它不负责数据库持久化；持久化由 service 层处理。
+"""
+
 from typing import Optional
+
 from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
-def strip_think(content:str)->str:
+from ..core.schemas import AgentEvent, AgentInput, AgentOutput, AgentState, ChatMessage, ToolCall
+from .llm_client import call_llm
+from .tool_registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
+
+
+def strip_think(content: str) -> str:
+    """去掉模型可能返回的思维链包裹内容，只保留用户可见部分。"""
+
     if "</think>" not in content:
         return content.strip()
-    return content.split("</think>",1)[1].strip()
-
+    # `split(sep, 1)` 只切一次，保留 `</think>` 后面的正文。
+    return content.split("</think>", 1)[1].strip()
 
 
 class Agent:
-    def __init__(self,state:Optional[AgentState]=None,definition:Optional[AgentDefinition]=None,tool_registry:Optional[ToolRegistry]=None,allow_tool_names:Optional[list[str]]=None,):
-        self.state = state or AgentState()
-        self.definition=definition or DEFAULT_AGENT_DEFINITION
-        self.tool_registry=tool_registry or DEFAULT_TOOL_REGISTRY
-        self.allow_tool_names = allow_tool_names if allow_tool_names is not None else self.definition.tool_names
-    def run(self, agent_input: AgentInput) -> AgentOutput:
+    """单次 agent 执行器。
 
-        events= []
+    这个类接收：
+    - 当前 session state
+    - agent 定义
+    - 工具注册表
+
+    然后完成一次完整的“模型 -> 工具 -> 模型”闭环。
+    """
+
+    def __init__(
+        self,
+        state: Optional[AgentState] = None,
+        definition: Optional[AgentDefinition] = None,
+        tool_registry: Optional[ToolRegistry] = None,
+        allow_tool_names: Optional[list[str]] = None,
+    ):
+        self.state = state or AgentState()
+        self.definition = definition or DEFAULT_AGENT_DEFINITION
+        self.tool_registry = tool_registry or DEFAULT_TOOL_REGISTRY
+        self.allow_tool_names = allow_tool_names if allow_tool_names is not None else self.definition.tool_names
+
+    def run(self, agent_input: AgentInput) -> AgentOutput:
+        """执行一次 run，返回 reply、state 和结构化 events。"""
+
+        events = []
         event_index = 0
+
         self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
         self.state.step += 1
 
-        # 发送给模型的完整上下文：system + 历史消息 + 当前用户输入。
+        # 发送给模型的消息 = system prompt + 历史消息 + 当前用户输入。
         messages = [ChatMessage(role="system", content=self.definition.system_prompt)] + self.state.messages
 
         while True:
-            # 第一次请求模型时，它可能返回 tool_calls，而不是最终回复。
-            assistant_msg = call_llm([m.model_dump(exclude_none=True) for m in messages],self.tool_registry.get_tool_schemas(self.allow_tool_names))
+            # 这里把 Pydantic 对象转成普通字典，方便交给 LLM client。
+            assistant_msg = call_llm(
+                [message.model_dump(exclude_none=True) for message in messages],
+                self.tool_registry.get_tool_schemas(self.allow_tool_names),
+            )
 
             if assistant_msg.get("tool_calls"):
-                # 先把“模型要求调用工具”这条 assistant 消息记下来。
                 assistant_message = ChatMessage(
                     role="assistant",
                     content=assistant_msg.get("content"),
-                    tool_calls=[ToolCall.model_validate(tc) for tc in assistant_msg["tool_calls"]],
+                    tool_calls=[ToolCall.model_validate(tool_call) for tool_call in assistant_msg["tool_calls"]],
                 )
                 messages.append(assistant_message)
                 self.state.messages.append(assistant_message)
-                
 
                 for tool_call in assistant_message.tool_calls or []:
                     events.append(
@@ -52,8 +89,10 @@ class Agent:
                         )
                     )
                     event_index += 1
+
                     if self.allow_tool_names is not None and tool_call.function.name not in self.allow_tool_names:
                         raise ValueError(f"Tool not allowed:{tool_call.function.name}")
+
                     tool_result = self.tool_registry.execute_tool_call(
                         tool_call.function.name,
                         tool_call.function.arguments,
@@ -76,7 +115,6 @@ class Agent:
                             content=tool_result.content,
                         )
                     else:
-                        
                         error_message = tool_result.error.message if tool_result.error else "Tool failed"
                         events.append(
                             AgentEvent(
@@ -99,18 +137,19 @@ class Agent:
                     self.state.messages.append(tool_message)
                 continue
 
-            # 如果没有 tool_calls，说明模型已经给出了最终回复。
+            # 没有 tool_calls 说明模型此轮已经给出了最终回答。
             raw_reply = assistant_msg.get("content", "")
-            reply=strip_think(raw_reply)
+            reply = strip_think(raw_reply)
 
             events.append(
                 AgentEvent(
                     index=event_index,
                     type="final_answer",
-                    content=reply
+                    content=reply,
                 )
             )
+
             assistant_message = ChatMessage(role="assistant", content=raw_reply)
             messages.append(assistant_message)
             self.state.messages.append(assistant_message)
-            return AgentOutput(reply=reply, state=self.state,events=events)
+            return AgentOutput(reply=reply, state=self.state, events=events)

@@ -1,66 +1,142 @@
+"""项目核心数据模型。
+
+这里定义的是 Pydantic schema，不是数据库 ORM：
+- 请求体长什么样
+- 响应体长什么样
+- 运行时 state / event 长什么样
+
+FastAPI 会基于这些模型做参数校验、类型转换和响应序列化。
+"""
+
+from datetime import datetime
+from typing import Any, Literal, Optional
+
 from pydantic import BaseModel, Field
-from typing import List,Literal,Optional,Any
 
-# Pydantic 对象，你可以直接理解成：
-
-# “带校验规则的 Python 数据对象”。
-
-# 它不是普通的 dict，也不是普通的 class 随便装数据。
-# 它的特点是：
-
-# 创建时会自动校验字段
-# 会自动把数据转换成合适的类型
-# 能方便地转成 dict / JSON
-# 常用在 FastAPI 里做请求和响应的数据结构
 
 class ToolCallFunction(BaseModel):
-    name:str
-    arguments:str
+    """模型返回的 function calling 结构中的函数部分。"""
+
+    name: str
+    arguments: str
+
 
 class ToolCall(BaseModel):
-    id:str
-    type:Literal["function"]="function"
-    function:ToolCallFunction
+    """一次工具调用请求。"""
+
+    id: str
+    type: Literal["function"] = "function"
+    function: ToolCallFunction
+
 
 class ToolError(BaseModel):
-    code:str
-    tool_name:str
-    message:str
+    """工具失败时返回给上层的结构化错误。"""
+
+    code: str
+    tool_name: str
+    message: str
+
 
 class ToolResult(BaseModel):
-    ok:bool #这次调用是否成功
-    content:Optional[str]=None
-    error:Optional[ToolError]=None #适合用户看到的 前端UI展示的
-    metadata:dict[str,Any]=Field(default_factory=dict)#额外元数据，比如工具名、耗时、原始一场信息，不适合直接给用户看
+    """统一的工具执行结果。
+
+    `metadata` 用 `default_factory=dict`，表示每次创建对象时都生成一个新字典，
+    避免多个实例共享同一个可变默认值。
+    """
+
+    ok: bool
+    content: Optional[str] = None
+    error: Optional[ToolError] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
 
 class ChatMessage(BaseModel):
-    role:Literal["system","user","assistant","tool"]
-    content:Optional[str]=None
-    tool_calls:Optional[list[ToolCall]]=None
-    tool_call_id:Optional[str]=None
-#单词运行请求
+    """运行时消息对象，既用于上下文，也用于持久化 session state。"""
+
+    role: Literal["system", "user", "assistant", "tool"]
+    content: Optional[str] = None
+    tool_calls: Optional[list[ToolCall]] = None
+    tool_call_id: Optional[str] = None
+
+
 class AgentInput(BaseModel):
-    agent_name:Optional[str]=None
-    session_id:str=Field(min_length=1) #会话id，隔离会话
-    user_input:str =Field(min_length=1)
-#重置请求
+    """`/run` 请求体。"""
+
+    agent_name: Optional[str] = None
+    session_id: str = Field(min_length=1)
+    user_input: str = Field(min_length=1)
+
+
 class ResetInput(BaseModel):
-    session_id:str=Field(min_length=1)
+    """`/reset` 请求体。"""
+
+    session_id: str = Field(min_length=1)
+
 
 class AgentState(BaseModel):
-    messages:List[ChatMessage]=Field(default_factory=list)
-    step:int=0
-    agent_name:Optional[str]=None
+    """某个 session 的最新状态快照。"""
+
+    messages: list[ChatMessage] = Field(default_factory=list)
+    step: int = 0
+    agent_name: Optional[str] = None
+
 
 class AgentEvent(BaseModel):
-    index:int
-    type:Literal["assistant_tool_call","tool_result","tool_error","final_answer"]
-    content:Optional[str]=None
-    tool_name:Optional[str]=None
-    tool_call_id:Optional[str]=None
-    tool_result:Optional[ToolResult]=None
+    """一次 run 中的结构化事件。"""
+
+    index: int
+    type: Literal["assistant_tool_call", "tool_result", "tool_error", "final_answer"]
+    content: Optional[str] = None
+    tool_name: Optional[str] = None
+    tool_call_id: Optional[str] = None
+    tool_result: Optional[ToolResult] = None
+
 
 class AgentOutput(BaseModel):
-    reply:str
-    state:AgentState
-    events: List[AgentEvent]
+    """`/run` 响应体。"""
+
+    run_id: str = ""
+    reply: str
+    state: AgentState
+    events: list[AgentEvent]
+
+
+class SessionSummary(BaseModel):
+    """session 列表页用的摘要信息。"""
+
+    session_id: str
+    session_name: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    last_agent_name: Optional[str] = None
+    last_skill_name: Optional[str] = None
+    message_count: int = 0
+    last_reply_preview: Optional[str] = None
+
+
+class SessionDetail(SessionSummary):
+    """session 详情，继承摘要信息并补上完整 state。"""
+
+    state: AgentState
+
+
+class TraceRunSummary(BaseModel):
+    """单次 run 的回放数据。"""
+
+    run_id: str
+    session_id: str
+    agent_name: Optional[str] = None
+    skill_name: Optional[str] = None
+    user_input: str
+    reply: str
+    event_count: int
+    created_at: datetime
+    finished_at: datetime
+    events: list[AgentEvent]
+
+
+class TraceResponse(BaseModel):
+    """`/sessions/{session_id}/trace` 的响应体。"""
+
+    session_id: str
+    runs: list[TraceRunSummary]
