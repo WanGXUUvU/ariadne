@@ -24,11 +24,12 @@ from ..core.schemas import (
     ToolResult,
     TraceResponse,
     TraceRunSummary,
+    SkillSummary,
 )
 from ..runtime.services import reset_session_service, run_agent_service
 from ..storage.db import get_db
 from ..storage.session_store import SqliteSessionStore
-
+from ..runtime.skill_loader import list_skills
 router = APIRouter()
 
 
@@ -153,3 +154,8 @@ def read_session_trace_api(
         )
 
     return TraceResponse(session_id=session_id, runs=runs)
+
+@router.get("/skills",response_model=list[SkillSummary])
+def list_skills_api()->list[SkillSummary]:
+
+    return list_skills()

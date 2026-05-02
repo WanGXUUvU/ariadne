@@ -65,6 +65,7 @@ class AgentInput(BaseModel):
     agent_name: Optional[str] = None
     session_id: str = Field(min_length=1)
     user_input: str = Field(min_length=1)
+    skill_name: Optional[str]=None # 显式指定本轮要加载的 skill；不传时只给摘要目录
 
 
 class ResetInput(BaseModel):
@@ -140,3 +141,12 @@ class TraceResponse(BaseModel):
 
     session_id: str
     runs: list[TraceRunSummary]
+
+class SkillSummary(BaseModel):
+    """skill 列表使用的轻量元数据"""
+
+    name:str
+    description:Optional[str]=None #skill摘要
+    path:str #裁剪后的安全路径
+    enabled:bool=True
+    error:Optional[str]=None #skill损坏 返回的错误信息

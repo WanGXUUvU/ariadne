@@ -17,7 +17,8 @@ from ..core.schemas import AgentInput, AgentOutput, AgentState, ResetInput
 from ..storage.session_store import SqliteSessionStore
 from .agent import Agent
 from .agent_loader import load_agent_definition
-
+from .skill_loader import list_skills,load_skill_content
+from .prompt_builder  import build_skill_catalog_prompt,build_runtime_system_prompt
 
 def build_reply_preview(reply: str, max_len: int = 120) -> str:
     """生成 session 列表里展示用的回复摘要。"""
@@ -40,9 +41,20 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
 
     effective_agent_name = agent_input.agent_name or "default"
     definition = load_agent_definition(effective_agent_name, db)
+    skills=list_skills()# 先拿到所有本地 skill 的摘要列表
+    skill_catalog_prompt=build_skill_catalog_prompt(skills)# 把摘要列表拼成给模型看的 skill 目录
+    selected_skill_content=None# 默认这轮不加载任何 skill 正文
+    if agent_input.skill_name:  # 如果这轮请求显式指定了某个 skill
+        selected_skill_content=load_skill_content(agent_input.skill_name)#在加载SKILL.md
+    runtime_system_prompt=build_runtime_system_prompt(
+        definition.system_prompt,skill_catalog_prompt,selected_skill_content,
+    )
+    runtime_definition = definition.model_copy(
+        update={"system_prompt": runtime_system_prompt}  # 复制一个本轮临时 definition，只替换 system prompt
+    )
     agent = Agent(
         state=state,
-        definition=definition,
+        definition=runtime_definition,
         allow_tool_names=definition.tool_names,
     )
 
@@ -58,14 +70,14 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
             agent_input.session_id,
             state=output.state,
             last_agent_name=effective_agent_name,
-            last_skill_name=None,
+            last_skill_name=agent_input.skill_name,
             last_reply_preview=build_reply_preview(output.reply),
         )
         store.save_run_trace(
             session_id=agent_input.session_id,
             run_id=run_id,
             agent_name=effective_agent_name,
-            skill_name=None,
+            skill_name=agent_input.skill_name,
             user_input=agent_input.user_input,
             reply=output.reply,
             events=output.events,
