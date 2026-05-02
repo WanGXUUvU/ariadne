@@ -12,6 +12,7 @@ from agent_prototype.core.agent_definition import AgentDefinition
 from agent_prototype.storage.agent_definition_store import SqliteAgentDefinitionStore
 from agent_prototype.api.app import app
 from agent_prototype.runtime.agent_loader import load_agent_definition
+from agent_prototype.runtime.skill_loader import list_skills
 from agent_prototype.runtime.tool_registry import build_default_tool_registry
 from agent_prototype.storage.db import Base, get_db
 from agent_prototype.storage.models import SessionRecord, SessionRunEventRecord, SessionRunRecord
@@ -338,6 +339,57 @@ class TestAgent(unittest.TestCase):
         self.assertEqual(mock_call_llm.call_count, 2)
 
 
+class TestSkillLoader(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root_path = Path(self.temp_dir.name)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def _write_skill(self, source_dir: Path, skill_name: str, content: str):
+        skill_dir = source_dir / skill_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+
+    def test_list_skills_returns_enabled_and_disabled_entries(self):
+        project_skills_root = self.root_path / "project-skills"
+        user_skills_root = self.root_path / "user-skills"
+
+        self._write_skill(
+            project_skills_root,
+            "alpha-skill",
+            "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
+        )
+        self._write_skill(
+            user_skills_root,
+            "broken-skill",
+            "name: Broken Skill\n# Missing frontmatter\n",
+        )
+
+        results = list_skills(
+            [
+                ("project-opencode", project_skills_root),
+                ("user-codex", user_skills_root),
+            ]
+        )
+
+        self.assertEqual(len(results), 2)
+
+        by_name = {item.name: item for item in results}
+
+        self.assertIn("Alpha Skill", by_name)
+        self.assertTrue(by_name["Alpha Skill"].enabled)
+        self.assertEqual(by_name["Alpha Skill"].description, "Alpha summary")
+        self.assertEqual(by_name["Alpha Skill"].path, "project-opencode/alpha-skill/SKILL.md")
+        self.assertIsNone(by_name["Alpha Skill"].error)
+
+        self.assertIn("broken-skill", by_name)
+        self.assertFalse(by_name["broken-skill"].enabled)
+        self.assertEqual(by_name["broken-skill"].path, "user-codex/broken-skill/SKILL.md")
+        self.assertIn("Missing frontmatter", by_name["broken-skill"].error)
+
+
 class TestAgentApi(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -361,6 +413,11 @@ class TestAgentApi(unittest.TestCase):
         app.dependency_overrides.clear()
         self.engine.dispose()
         self.temp_dir.cleanup()
+
+    def _write_skill(self, source_dir: Path, skill_name: str, content: str):
+        skill_dir = source_dir / skill_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "mock reply"})
     def test_run_endpoint(self, mock_call_llm):
@@ -440,6 +497,109 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.json()["state"]["messages"][0]["role"], "user")
         self.assertEqual(response.json()["state"]["messages"][1]["role"], "assistant")
 
+    @patch("agent_prototype.runtime.services.load_skill_content", return_value="---\nname: openai-docs\ndescription: 查文档\n---\nFULL SKILL BODY")
+    @patch("agent_prototype.runtime.services.list_skills")
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "skill reply"})
+    def test_run_endpoint_loads_selected_skill_content_into_system_prompt(
+        self,
+        mock_call_llm,
+        mock_list_skills,
+        mock_load_skill_content,
+    ):
+        from agent_prototype.core.schemas import SkillSummary
+
+        mock_list_skills.return_value = [
+            SkillSummary(
+                name="openai-docs",
+                description="查 OpenAI 官方文档",
+                path="user-codex/openai-docs/SKILL.md",
+                enabled=True,
+            )
+        ]
+
+        response = self.client.post(
+            "/run",
+            json={
+                "session_id": "session-skill",
+                "user_input": "帮我查文档",
+                "skill_name": "openai-docs",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_load_skill_content.assert_called_once_with("openai-docs")
+
+        messages = mock_call_llm.call_args.args[0]
+        system_prompt = messages[0]["content"]
+
+        self.assertIn("Available skills:", system_prompt)
+        self.assertIn("openai-docs: 查 OpenAI 官方文档", system_prompt)
+        self.assertIn("Selected skill instructions:", system_prompt)
+        self.assertIn("FULL SKILL BODY", system_prompt)
+
+        db = self.session_local()
+        try:
+            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-skill").first()
+            run_record = db.query(SessionRunRecord).filter(SessionRunRecord.session_id == "session-skill").first()
+
+            self.assertIsNotNone(record)
+            self.assertEqual(record.last_skill_name, "openai-docs")
+            self.assertIsNotNone(run_record)
+            self.assertEqual(run_record.skill_name, "openai-docs")
+        finally:
+            db.close()
+
+    @patch("agent_prototype.runtime.services.load_skill_content")
+    @patch("agent_prototype.runtime.services.list_skills")
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "catalog reply"})
+    def test_run_endpoint_without_skill_name_only_includes_catalog_prompt(
+        self,
+        mock_call_llm,
+        mock_list_skills,
+        mock_load_skill_content,
+    ):
+        from agent_prototype.core.schemas import SkillSummary
+
+        mock_list_skills.return_value = [
+            SkillSummary(
+                name="openai-docs",
+                description="查 OpenAI 官方文档",
+                path="user-codex/openai-docs/SKILL.md",
+                enabled=True,
+            )
+        ]
+
+        response = self.client.post(
+            "/run",
+            json={
+                "session_id": "session-catalog-only",
+                "user_input": "帮我查文档",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_load_skill_content.assert_not_called()
+
+        messages = mock_call_llm.call_args.args[0]
+        system_prompt = messages[0]["content"]
+
+        self.assertIn("Available skills:", system_prompt)
+        self.assertIn("openai-docs: 查 OpenAI 官方文档", system_prompt)
+        self.assertNotIn("Selected skill instructions:", system_prompt)
+        self.assertNotIn("FULL SKILL BODY", system_prompt)
+
+        db = self.session_local()
+        try:
+            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-catalog-only").first()
+            run_record = db.query(SessionRunRecord).filter(SessionRunRecord.session_id == "session-catalog-only").first()
+
+            self.assertIsNotNone(record)
+            self.assertIsNone(record.last_skill_name)
+            self.assertIsNotNone(run_record)
+            self.assertIsNone(run_record.skill_name)
+        finally:
+            db.close()
+
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "first reply"})
     def test_list_sessions_endpoint_returns_summaries(self, mock_call_llm):
         self.client.post("/run", json={"session_id": "session-b", "user_input": "你好"})
@@ -487,6 +647,44 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Session not found")
+
+    @patch("agent_prototype.runtime.skill_loader.get_default_skill_roots")
+    def test_list_skills_endpoint_returns_summaries(self, mock_get_default_skill_roots):
+        project_skills_root = Path(self.temp_dir.name) / "project-skills"
+        user_skills_root = Path(self.temp_dir.name) / "user-skills"
+
+        self._write_skill(
+            project_skills_root,
+            "alpha-skill",
+            "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
+        )
+        self._write_skill(
+            user_skills_root,
+            "broken-skill",
+            "name: Broken Skill\n# Missing frontmatter\n",
+        )
+
+        mock_get_default_skill_roots.return_value = [
+            ("project-opencode", project_skills_root),
+            ("user-codex", user_skills_root),
+        ]
+
+        response = self.client.get("/skills")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2)
+
+        by_name = {item["name"]: item for item in data}
+
+        self.assertEqual(by_name["Alpha Skill"]["description"], "Alpha summary")
+        self.assertEqual(by_name["Alpha Skill"]["path"], "project-opencode/alpha-skill/SKILL.md")
+        self.assertTrue(by_name["Alpha Skill"]["enabled"])
+        self.assertIsNone(by_name["Alpha Skill"]["error"])
+
+        self.assertFalse(by_name["broken-skill"]["enabled"])
+        self.assertEqual(by_name["broken-skill"]["path"], "user-codex/broken-skill/SKILL.md")
+        self.assertIn("Missing frontmatter", by_name["broken-skill"]["error"])
 
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "trace reply"})
     def test_trace_endpoint_returns_runs_in_order(self, mock_call_llm):

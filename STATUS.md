@@ -1,13 +1,14 @@
 # STATUS
 
 ## Current Status
-- Phase: 规划
-- Task: specs/TASK-017.md
-- Gate: 实现审批
-- Allowed Now: start-implementation
+- Phase: Review
+- Task: specs/TASK-018.md
+- Gate: Sync Review
+- Allowed Now: sync-review
 - Lane: Fast
 - Blocked: None
-- Next action: 按轻量流程推进；开始 `TASK-017` 的 Skill 索引元数据。
+- Next action: 复核 `TASK-018` 是否接受当前“显式 skill_name 触发全文加载”的最小闭环，然后决定是否收口。
+
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -60,3 +61,10 @@
 | 2026-05-02 | 补充教练式拆任务方法 | planning | `AGENTS.md` 新增 6 行拆解模板和按层分析规则，后续任务先拆再写。 |
 | 2026-05-02 | 强化大代码量教学节奏 | planning | `AGENTS.md` 补充“只看当前任务主链路、先定义任务再画链路再按层读”的规则，后续新会话默认按这个节奏带。 |
 | 2026-05-02 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-017`，进入 Skill 索引元数据阶段。 |
+| 2026-05-02 | 拆解 `TASK-017` 主链路 | planning | 确认先做 skill 索引最小闭环：测试夹具 -> metadata schema -> loader 列表函数 -> API/测试。 |
+| 2026-05-02 | 升级教练闭环 | planning | `AGENTS.md` 增加“讲完即提问、复述检查、答偏先纠偏再推进”的规则，后续默认按教练闭环带学。 |
+| 2026-05-02 | 强制分层串行实现 | planning | `AGENTS.md` 补充“进入实现后一次只推进一层，不一次性给出多层完整代码”的规则。 |
+| 2026-05-02 | `TASK-017` 验证完成 | Verify | Skill metadata schema、loader、`GET /skills` 和坏 skill 容错测试已补齐，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-05-02 | `TASK-017` 收口 | Review | 接受当前 skill 扫描实现，切到下一张任务卡 `TASK-018`。 |
+| 2026-05-02 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-018`，进入渐进式 Skill 加载阶段。 |
+| 2026-05-03 | `TASK-018` 验证完成 | Verify | 已接入 skill catalog prompt、`skill_name` 显式全文加载和对应 API 测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
