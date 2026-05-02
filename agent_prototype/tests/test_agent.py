@@ -14,7 +14,7 @@ from agent_prototype.api.app import app
 from agent_prototype.runtime.agent_loader import load_agent_definition
 from agent_prototype.runtime.tool_registry import build_default_tool_registry
 from agent_prototype.storage.db import Base, get_db
-from agent_prototype.storage.models import SessionRecord
+from agent_prototype.storage.models import SessionRecord, SessionRunEventRecord, SessionRunRecord
 from agent_prototype.core.schemas import AgentInput
 
 
@@ -368,6 +368,7 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
+        self.assertTrue(data["run_id"])
         self.assertEqual(data["reply"], "mock reply")
         self.assertEqual(data["state"]["step"], 1)
         self.assertEqual(
@@ -438,6 +439,98 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.json()["reply"], "review reply")
         self.assertEqual(response.json()["state"]["messages"][0]["role"], "user")
         self.assertEqual(response.json()["state"]["messages"][1]["role"], "assistant")
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "first reply"})
+    def test_list_sessions_endpoint_returns_summaries(self, mock_call_llm):
+        self.client.post("/run", json={"session_id": "session-b", "user_input": "你好"})
+        self.client.post("/run", json={"session_id": "session-a", "user_input": "你好"})
+        import time
+        time.sleep(1)
+        self.client.post("/run", json={"session_id": "session-b", "user_input": "再来一次"})
+
+        response = self.client.get("/sessions")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["session_id"], "session-b")
+        self.assertEqual(data[1]["session_id"], "session-a")
+        self.assertNotIn("state_json", data[0])
+        self.assertEqual(data[0]["message_count"], 4)
+        self.assertEqual(data[0]["last_reply_preview"], "first reply")
+        self.assertEqual(data[0]["last_agent_name"], "default")
+        self.assertIn("created_at", data[0])
+        self.assertIn("updated_at", data[0])
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "detail reply"})
+    def test_read_session_endpoint_returns_detail(self, mock_call_llm):
+        self.client.post("/run", json={"session_id": "session-detail", "user_input": "你好"})
+
+        response = self.client.get("/sessions/session-detail")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["session_id"], "session-detail")
+        self.assertEqual(data["session_name"], "session-detail")
+        self.assertEqual(data["message_count"], 2)
+        self.assertEqual(data["state"]["step"], 1)
+        self.assertEqual(
+            data["state"]["messages"],
+            [
+                {"role": "user", "content": "你好", "tool_calls": None, "tool_call_id": None},
+                {"role": "assistant", "content": "detail reply", "tool_calls": None, "tool_call_id": None},
+            ],
+        )
+
+    def test_read_session_endpoint_returns_404_for_missing_session(self):
+        response = self.client.get("/sessions/missing-session")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Session not found")
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "trace reply"})
+    def test_trace_endpoint_returns_runs_in_order(self, mock_call_llm):
+        first_response = self.client.post("/run", json={"session_id": "trace-session", "user_input": "第一轮"})
+        second_response = self.client.post("/run", json={"session_id": "trace-session", "user_input": "第二轮"})
+
+        response = self.client.get("/sessions/trace-session/trace")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["session_id"], "trace-session")
+        self.assertEqual([run["run_id"] for run in data["runs"]], [first_response.json()["run_id"], second_response.json()["run_id"]])
+        self.assertEqual([run["user_input"] for run in data["runs"]], ["第一轮", "第二轮"])
+        self.assertEqual(data["runs"][0]["event_count"], 1)
+        self.assertEqual(data["runs"][0]["events"][0]["type"], "final_answer")
+        self.assertEqual(data["runs"][0]["events"][0]["content"], "trace reply")
+        self.assertIn("created_at", data["runs"][0])
+        self.assertIn("finished_at", data["runs"][0])
+
+        db = self.session_local()
+        try:
+            self.assertEqual(db.query(SessionRunRecord).count(), 2)
+            self.assertEqual(db.query(SessionRunEventRecord).count(), 2)
+        finally:
+            db.close()
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "filtered trace reply"})
+    def test_trace_endpoint_supports_run_id_filter(self, mock_call_llm):
+        first_response = self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第一轮"})
+        self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第二轮"})
+
+        response = self.client.get(f"/sessions/trace-filter/trace?run_id={first_response.json()['run_id']}")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["runs"]), 1)
+        self.assertEqual(data["runs"][0]["run_id"], first_response.json()["run_id"])
+        self.assertEqual(data["runs"][0]["user_input"], "第一轮")
+
+    def test_trace_endpoint_returns_404_for_missing_trace(self):
+        response = self.client.get("/sessions/missing-session/trace")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Trace not found")
 
 
 class TestToolRegistry(unittest.TestCase):

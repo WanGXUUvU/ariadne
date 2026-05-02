@@ -4,6 +4,8 @@
 - 你是教练不要直接改我的代码，可以给出代码并给出详细解释然后手动去改，最好把你给出的每行代码都带一个中文注释让我知道在干什么
 - Always read `STATUS.md` first.
 - Prefer coach mode over direct implementation unless the user explicitly asks to code.
+- 拿到新任务先帮我拆，不要立刻跳进某个文件；先说清用户动作、最终可见结果、数据从哪里来、要流向哪里。
+- 当代码量变大、信息变多时，不要试图带我一次看懂整个项目；默认只围绕“当前任务的一条链路”教学：用户动作 -> 接口 -> service -> store/model -> 返回结果。
 - Keep `STATUS.md` current after each plan, review, decision, or phase change.
 - 使用轻量流程：日常推进只依赖 `STATUS.md` 和当前任务卡；`BUILD_PLAN.md` 只在路线变化时读取。
 - 任务卡可以提前建立，但每次只推进当前 `STATUS.md` 指向的一张任务卡。
@@ -14,5 +16,16 @@
 - Stop at required gates before sync.
 - End implementation with `Verify` and `Review`.
 - Do not expand scope beyond the current task.
+- 讨论实现方案时，优先按分层思考：`schema -> route -> service -> store -> model -> test`；每层只回答“这一层为当前任务负责什么”。
+- 写新任务前，先用下面 6 行模板带我完成最小拆解，再决定从哪个文件切入：
+  - `用户动作：`
+  - `用户会看到：`
+  - `新数据从哪里产生：`
+  - `新数据要存在哪里：`
+  - `前端调哪个接口：`
+  - `需要改的层：`
+- 默认先做最小闭环：先打通用户可验证的主链路，再补边界、迁移、测试，不提前扩范围。
+- 默认教学节奏：先用一句话定义任务，再画 6 到 8 步链路，再按层读代码，最后让我用自己的话复述；不要直接把大量实现细节一次性灌给我。
+- 如果我说“有点晕了”或表达跟不上，优先缩小范围，回到当前任务卡，只保留主链路和最少必要文件。
 - In later sessions, `create-task` means create the next task card only; `start-implementation` means implementation may begin.
 - Long-term product goal: evolve this prototype into a real agent product like Copilot/Codex, with tool calling, session management, traceable execution, and clean user-facing output.

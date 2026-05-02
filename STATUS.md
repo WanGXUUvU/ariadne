@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: 规划
-- Task: specs/TASK-015.md
+- Task: specs/TASK-017.md
 - Gate: 实现审批
 - Allowed Now: start-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按轻量流程推进；开始 `TASK-015` 的 Session 列表和读取接口。
+- Next action: 按轻量流程推进；开始 `TASK-017` 的 Skill 索引元数据。
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
@@ -53,3 +53,10 @@
 | 2026-04-28 | 模块结构整理完成 | Review | 将 `agent_prototype/` 按 api/core/runtime/storage/tools_defs 分层，旧入口路径已清理，新入口可从 `agent_prototype.api.app` 启动。 |
 | 2026-04-28 | `TASK-014` 验证完成 | Verify | Session 元数据已接入 `session_records`，创建/更新时间、最近 agent、消息数和回复预览都通过测试。 |
 | 2026-04-29 | `TASK-014` 收口 | Review | Session 元数据已完成，进入 Session 列表与读取接口阶段。 |
+| 2026-04-29 | `TASK-015` 验证完成 | Verify | Session 列表、详情和 404 路径已补齐，API 测试通过。 |
+| 2026-04-29 | `TASK-015` 收口 | Review | Session API 已具备列表与读取能力，下一步进入 Trace 回放接口。 |
+| 2026-05-02 | `TASK-016` 验证完成 | Verify | Trace 落库、`GET /sessions/{session_id}/trace`、`run_id` 过滤和顺序测试通过。 |
+| 2026-05-02 | `TASK-016` 收口 | Review | Trace 回放接口已打通，并补齐 Alembic 迁移。 |
+| 2026-05-02 | 补充教练式拆任务方法 | planning | `AGENTS.md` 新增 6 行拆解模板和按层分析规则，后续任务先拆再写。 |
+| 2026-05-02 | 强化大代码量教学节奏 | planning | `AGENTS.md` 补充“只看当前任务主链路、先定义任务再画链路再按层读”的规则，后续新会话默认按这个节奏带。 |
+| 2026-05-02 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-017`，进入 Skill 索引元数据阶段。 |
