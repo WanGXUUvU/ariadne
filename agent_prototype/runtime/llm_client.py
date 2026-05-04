@@ -1,23 +1,26 @@
 import os
-import requests 
+import requests
 
-BASE_URL = "https://api.bltcy.ai"
-API_KEY = "sk-if5ozW27udBQVVuHtRKoALsbc4Ob0qu7RxEaDGLniCIGVr1U"
-MODEL = "MiniMax-M2.5-lightning"
-
+BASE_URL = "https://token.sensenova.cn/v1"
+MODEL = "deepseek-v4-flash"
 
 def call_llm(messages,tools=None):
+    """输入：消息列表、可选工具 schema 列表。输出：LLM 返回的完整 assistant message 字典。"""
     # 这里返回完整的 assistant message，而不是只返回 content。
     # 这样上层才能判断模型有没有发出 tool_calls。
-    url=f"{BASE_URL}/v1/chat/completions"
+    api_key = os.environ.get("SENSENOVA_API_KEY")
+    if not api_key:
+        raise RuntimeError("Missing SENSENOVA_API_KEY")
+    url=f"{BASE_URL}/chat/completions"
     headers ={
         "Accept":"application/json",
-        "Authorization":f"Bearer {API_KEY}",
+        "Authorization":f"Bearer {api_key}",
         "Content-Type":"application/json"
     }
     payload={
         "model":MODEL,
         "messages":messages,
+        "thinking": {"type": "disabled"},
     }
 
     if tools:

@@ -21,7 +21,7 @@ from .skill_loader import list_skills,load_skill_content
 from .prompt_builder  import build_skill_catalog_prompt,build_runtime_system_prompt
 
 def build_reply_preview(reply: str, max_len: int = 120) -> str:
-    """生成 session 列表里展示用的回复摘要。"""
+    """输入：完整回复文本、最大长度。输出：单行回复摘要字符串。"""
 
     # `split()` 会按任意空白拆分；再用空格 join，可把多余换行压成单行文本。
     text = " ".join(reply.split())
@@ -29,7 +29,7 @@ def build_reply_preview(reply: str, max_len: int = 120) -> str:
 
 
 def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
-    """执行一次 agent run，并负责把结果持久化。
+    """输入：AgentInput 请求对象、数据库会话。输出：AgentOutput 结果对象。
 
     这是 `/run` 的主业务入口，负责把：
     请求输入 -> agent 执行 -> session 快照 -> trace 落库
@@ -45,7 +45,18 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
     skill_catalog_prompt=build_skill_catalog_prompt(skills)# 把摘要列表拼成给模型看的 skill 目录
     selected_skill_content=None# 默认这轮不加载任何 skill 正文
     if agent_input.skill_name:  # 如果这轮请求显式指定了某个 skill
-        selected_skill_content=load_skill_content(agent_input.skill_name)#在加载SKILL.md
+        selected_skill=next(#从当前skill列表查找指定的skill
+            (skill for skill in skills if skill.name==agent_input.skill_name),
+            None,
+        )
+        if selected_skill is None:
+            raise ValueError(f"Skill not found:{agent_input.skill_name}")
+        
+        if not selected_skill.enabled:
+            raise ValueError(f"Skill is disabled:{agent_input.skill_name}")
+        
+        selected_skill_content=load_skill_content(agent_input.skill_name)
+        
     runtime_system_prompt=build_runtime_system_prompt(
         definition.system_prompt,skill_catalog_prompt,selected_skill_content,
     )
@@ -92,8 +103,9 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
 
 
 def reset_session_service(payload: ResetInput, db: Session) -> dict[str, bool]:
-    """删除某个 session 的持久化记录。"""
+    """输入：ResetInput 请求对象、数据库会话。输出：是否删除成功的结果字典。"""
 
     store = SqliteSessionStore(db)
     store.delete(payload.session_id)
     return {"ok": True}
+

@@ -30,30 +30,31 @@ from ..runtime.services import reset_session_service, run_agent_service
 from ..storage.db import get_db
 from ..storage.session_store import SqliteSessionStore
 from ..runtime.skill_loader import list_skills
+from ..runtime.skill_service import disable_skill_service,enable_skill_service
 router = APIRouter()
 
 
 @router.post("/run", response_model=AgentOutput)
 def run_agent_api(agent_input: AgentInput, db: Session = Depends(get_db)) -> AgentOutput:
-    """执行一次 agent run 并返回本次结果。
+    """输入：AgentInput 请求对象、数据库会话。输出：AgentOutput 响应对象。"""
 
-    `Depends(get_db)` 是 FastAPI 的依赖注入写法：
-    框架会在调用路由前先执行 `get_db()`，把数据库会话对象传进来。
-    """
+    try:
+        return run_agent_service(agent_input, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
-    return run_agent_service(agent_input, db)
 
 
 @router.post("/reset")
 def reset_session(payload: ResetInput, db: Session = Depends(get_db)) -> dict[str, bool]:
-    """清空某个 session 的持久化状态。"""
+    """输入：ResetInput 请求对象、数据库会话。输出：是否重置成功的结果字典。"""
 
     return reset_session_service(payload, db)
 
 
 @router.get("/sessions", response_model=list[SessionSummary])
 def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:
-    """返回所有 session 的摘要列表。
+    """输入：数据库会话。输出：SessionSummary 列表。
 
     这里故意只返回 summary，不把完整 state_json 暴露给前端。
     """
@@ -77,7 +78,7 @@ def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:
 
 @router.get("/sessions/{session_id}", response_model=SessionDetail)
 def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionDetail:
-    """返回单个 session 的详情和完整状态。"""
+    """输入：session_id、数据库会话。输出：单个 session 的详情对象。"""
 
     store = SqliteSessionStore(db)
     record = store.read_session_record(session_id)
@@ -107,7 +108,7 @@ def read_session_trace_api(
     run_id: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> TraceResponse:
-    """按 session 读取历史 trace。
+    """输入：session_id、可选 run_id、数据库会话。输出：TraceResponse 回放结果。
 
     如果传了 `run_id`，只返回该次 run。
     否则返回该 session 下的全部 run，顺序由 store 层保证稳定。
@@ -157,5 +158,22 @@ def read_session_trace_api(
 
 @router.get("/skills",response_model=list[SkillSummary])
 def list_skills_api()->list[SkillSummary]:
+    """输入：无。输出：当前可见的 SkillSummary 列表。"""
 
     return list_skills()
+
+@router.post("/skills/{skill_name}/disable",response_model=SkillSummary)
+def disable_skill_api(skill_name:str)->SkillSummary:
+    """输入skill name 输出 金庸后的SkillSummary"""
+    try:
+        return disable_skill_service(skill_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=str(exc))
+
+@router.post("/skills/{skill_name}/enable", response_model=SkillSummary)
+def enable_skill_api(skill_name: str) -> SkillSummary:
+    """输入：skill 名称。输出：启用后的 SkillSummary。"""
+    try:
+        return enable_skill_service(skill_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

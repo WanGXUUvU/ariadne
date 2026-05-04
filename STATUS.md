@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: Review
-- Task: specs/TASK-018.md
-- Gate: Sync Review
-- Allowed Now: sync-review
+- Phase: Verify
+- Task: specs/TASK-019.md
+- Gate: Verify
+- Allowed Now: verify-review
 - Lane: Fast
 - Blocked: None
-- Next action: 复核 `TASK-018` 是否接受当前“显式 skill_name 触发全文加载”的最小闭环，然后决定是否收口。
+- Next action: Review `TASK-019` 的 skill 配置闭环，确认是否收口并切到下一张任务卡。
 
 
 ## 遗留项
@@ -68,3 +68,6 @@
 | 2026-05-02 | `TASK-017` 收口 | Review | 接受当前 skill 扫描实现，切到下一张任务卡 `TASK-018`。 |
 | 2026-05-02 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-018`，进入渐进式 Skill 加载阶段。 |
 | 2026-05-03 | `TASK-018` 验证完成 | Verify | 已接入 skill catalog prompt、`skill_name` 显式全文加载和对应 API 测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-05-03 | `TASK-018` 收口 | Review | 接受当前渐进式 Skill 加载最小闭环，切到下一张任务卡 `TASK-019`。 |
+| 2026-05-03 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-019`，进入 Skill 启用和禁用配置阶段。 |
+| 2026-05-05 | `TASK-019` 验证完成 | Verify | 已补充 skill disabled 配置、enable/disable API、disabled skill 运行时拦截测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |

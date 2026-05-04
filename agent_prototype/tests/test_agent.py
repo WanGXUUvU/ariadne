@@ -16,7 +16,7 @@ from agent_prototype.runtime.skill_loader import list_skills
 from agent_prototype.runtime.tool_registry import build_default_tool_registry
 from agent_prototype.storage.db import Base, get_db
 from agent_prototype.storage.models import SessionRecord, SessionRunEventRecord, SessionRunRecord
-from agent_prototype.core.schemas import AgentInput
+from agent_prototype.core.schemas import AgentInput, SkillSummary
 
 
 class TestAgentLoader(unittest.TestCase):
@@ -389,6 +389,26 @@ class TestSkillLoader(unittest.TestCase):
         self.assertEqual(by_name["broken-skill"].path, "user-codex/broken-skill/SKILL.md")
         self.assertIn("Missing frontmatter", by_name["broken-skill"].error)
 
+    def test_list_skills_applies_disabled_config(self):
+        project_skills_root = self.root_path / "project-skills"
+        config_path = self.root_path / "skill-config.json"
+
+        self._write_skill(
+            project_skills_root,
+            "alpha-skill",
+            "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
+        )
+        config_path.write_text('{"disabled": ["Alpha Skill"]}', encoding="utf-8")
+
+        results = list_skills(
+            [("project-opencode", project_skills_root)],
+            config_path=config_path,
+        )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].name, "Alpha Skill")
+        self.assertFalse(results[0].enabled)
+
 
 class TestAgentApi(unittest.TestCase):
     def setUp(self):
@@ -506,8 +526,6 @@ class TestAgentApi(unittest.TestCase):
         mock_list_skills,
         mock_load_skill_content,
     ):
-        from agent_prototype.core.schemas import SkillSummary
-
         mock_list_skills.return_value = [
             SkillSummary(
                 name="openai-docs",
@@ -558,8 +576,6 @@ class TestAgentApi(unittest.TestCase):
         mock_list_skills,
         mock_load_skill_content,
     ):
-        from agent_prototype.core.schemas import SkillSummary
-
         mock_list_skills.return_value = [
             SkillSummary(
                 name="openai-docs",
@@ -599,6 +615,35 @@ class TestAgentApi(unittest.TestCase):
             self.assertIsNone(run_record.skill_name)
         finally:
             db.close()
+
+    @patch("agent_prototype.runtime.services.load_skill_content")
+    @patch("agent_prototype.runtime.services.list_skills")
+    def test_run_endpoint_rejects_disabled_skill_before_loading_content(
+        self,
+        mock_list_skills,
+        mock_load_skill_content,
+    ):
+        mock_list_skills.return_value = [
+            SkillSummary(
+                name="openai-docs",
+                description="查 OpenAI 官方文档",
+                path="user-codex/openai-docs/SKILL.md",
+                enabled=False,
+            )
+        ]
+
+        response = self.client.post(
+            "/run",
+            json={
+                "session_id": "session-disabled-skill",
+                "user_input": "帮我查文档",
+                "skill_name": "openai-docs",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Skill is disabled:openai-docs")
+        mock_load_skill_content.assert_not_called()
 
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "first reply"})
     def test_list_sessions_endpoint_returns_summaries(self, mock_call_llm):
@@ -685,6 +730,41 @@ class TestAgentApi(unittest.TestCase):
         self.assertFalse(by_name["broken-skill"]["enabled"])
         self.assertEqual(by_name["broken-skill"]["path"], "user-codex/broken-skill/SKILL.md")
         self.assertIn("Missing frontmatter", by_name["broken-skill"]["error"])
+
+    @patch("agent_prototype.runtime.skill_loader.get_default_skill_config_path")
+    @patch("agent_prototype.runtime.skill_loader.get_default_skill_roots")
+    def test_disable_and_enable_skill_endpoints_update_config(
+        self,
+        mock_get_default_skill_roots,
+        mock_get_default_skill_config_path,
+    ):
+        project_skills_root = Path(self.temp_dir.name) / "project-skills"
+        config_path = Path(self.temp_dir.name) / ".agent" / "skill-config.json"
+
+        self._write_skill(
+            project_skills_root,
+            "alpha-skill",
+            "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
+        )
+        mock_get_default_skill_roots.return_value = [("project-opencode", project_skills_root)]
+        mock_get_default_skill_config_path.return_value = config_path
+
+        disable_response = self.client.post("/skills/Alpha Skill/disable")
+
+        self.assertEqual(disable_response.status_code, 200)
+        self.assertFalse(disable_response.json()["enabled"])
+        self.assertEqual(config_path.read_text(encoding="utf-8"), '{\n  "disabled": [\n    "Alpha Skill"\n  ]\n}')
+
+        list_response = self.client.get("/skills")
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertFalse(list_response.json()[0]["enabled"])
+
+        enable_response = self.client.post("/skills/Alpha Skill/enable")
+
+        self.assertEqual(enable_response.status_code, 200)
+        self.assertTrue(enable_response.json()["enabled"])
+        self.assertEqual(config_path.read_text(encoding="utf-8"), '{\n  "disabled": []\n}')
 
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "trace reply"})
     def test_trace_endpoint_returns_runs_in_order(self, mock_call_llm):
