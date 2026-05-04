@@ -4,6 +4,7 @@ from ..core.tool_types import ToolDefinition  # 导入工具定义
 
 
 def read_file(path: str) -> str:  # 真正读文件的函数
+    """输入：文件路径字符串。输出：该文件的 UTF-8 文本内容。"""
     target = Path(path)  # 把字符串路径转成 Path 对象
 
     if not target.exists():  # 文件不存在
@@ -36,6 +37,7 @@ READ_FILE_SCHEMA = {  # 给模型看的说明
 
 
 def build_read_file_tool_definition() -> ToolDefinition:  # 构造注册对象
+    """输入：无。输出：read_file 对应的 ToolDefinition。"""
     return ToolDefinition(
         name="read_file",  # 工具名
         schema=READ_FILE_SCHEMA,  # schema

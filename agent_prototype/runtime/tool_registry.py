@@ -12,12 +12,15 @@ from ..tools_defs.fs_search import build_search_text_definition
 
 class ToolRegistry:  # 工具注册中心
     def __init__(self) -> None:
+        """输入：无。输出：初始化后的 ToolRegistry 实例。"""
         self._tools: dict[str, ToolDefinition] = {}  # 用名字保存所有工具
     #注册时会把完整的ToolDefiniton注册进去
     def register(self, tool: ToolDefinition) -> None:
+        """输入：一个 ToolDefinition。输出：无，副作用是把工具注册进内存字典。"""
         self._tools[tool.name] = tool  # 注册工具
     #把注册的tool的schema 抽出来 组成一个列表
     def get_tool_schemas(self, tool_names: Optional[list[str]] = None) -> list[dict]:
+        """输入：可选的工具名列表。输出：给模型使用的工具 schema 列表。"""
         if tool_names is None:
             tools = self._tools.values()  # 返回全部工具
         else:
@@ -26,6 +29,7 @@ class ToolRegistry:  # 工具注册中心
         return [tool.schema for tool in tools]  # 只返回 schema 列表
 
     def execute_tool_call(self, name: str, arguments: str) -> ToolResult:
+        """输入：工具名、JSON 字符串参数。输出：统一的 ToolResult。"""
         tool = self._tools.get(name)  # 按名字找工具
         if tool is None:
             return ToolResult(  
@@ -71,6 +75,7 @@ class ToolRegistry:  # 工具注册中心
         )
 
 def build_default_tool_registry() -> ToolRegistry:
+    """输入：无。输出：预注册默认工具后的 ToolRegistry。"""
     registry = ToolRegistry()  # 创建默认 registry
 
     registry.register(build_read_file_tool_definition())

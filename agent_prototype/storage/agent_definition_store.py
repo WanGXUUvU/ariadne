@@ -7,9 +7,11 @@ from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
 
 class SqliteAgentDefinitionStore:
     def __init__(self,db:Session):
+        """输入：数据库会话。输出：初始化后的 SqliteAgentDefinitionStore 实例。"""
         self.db=db
 
     def get(self,agent_id:str)->Optional[AgentDefinition]:
+        """输入：agent_id。输出：匹配到的 AgentDefinition，找不到时返回 None。"""
         record=(
             self.db.query(AgentDefinitionRecord)
             .filter(AgentDefinitionRecord.agent_id==agent_id)
@@ -21,6 +23,7 @@ class SqliteAgentDefinitionStore:
         return AgentDefinition.model_validate(data)
     
     def save(self,definition:AgentDefinition)->None:
+        """输入：AgentDefinition 对象。输出：无，副作用是把定义写入数据库。"""
         definition_json=json.dumps(#把字典转换成json
             definition.model_dump(),#先把Pydantic对象转换成字典
             ensure_ascii=False
@@ -41,6 +44,7 @@ class SqliteAgentDefinitionStore:
         
 
     def get_or_default(self)->AgentDefinition:
+        """输入：无。输出：default 的 AgentDefinition，不存在时返回内存默认定义。"""
         definition =self.get("default")
 
         if definition is not None:

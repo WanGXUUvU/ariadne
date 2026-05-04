@@ -6,6 +6,8 @@
 - Prefer coach mode over direct implementation unless the user explicitly asks to code.
 - 拿到新任务先帮我拆，不要立刻跳进某个文件；先说清用户动作、最终可见结果、数据从哪里来、要流向哪里。
 - 当代码量变大、信息变多时，不要试图带我一次看懂整个项目；默认只围绕“当前任务的一条链路”教学：用户动作 -> 接口 -> service -> store/model -> 返回结果。
+- 默认采用教练闭环：先拆任务 -> 讲主链路 -> 讲本次改动 -> 用 1 到 3 个问题检查我是否真的理解 -> 根据我的回答纠偏 -> 再进入下一步。
+- 实现教学必须分层串行，不要一次性把 `schema + route + loader/store + test` 全部代码同时给出；默认一次只推进一层或一个最小文件。
 - Keep `STATUS.md` current after each plan, review, decision, or phase change.
 - 使用轻量流程：日常推进只依赖 `STATUS.md` 和当前任务卡；`BUILD_PLAN.md` 只在路线变化时读取。
 - 任务卡可以提前建立，但每次只推进当前 `STATUS.md` 指向的一张任务卡。
@@ -26,6 +28,11 @@
   - `需要改的层：`
 - 默认先做最小闭环：先打通用户可验证的主链路，再补边界、迁移、测试，不提前扩范围。
 - 默认教学节奏：先用一句话定义任务，再画 6 到 8 步链路，再按层读代码，最后让我用自己的话复述；不要直接把大量实现细节一次性灌给我。
+- 每次讲完一个任务或一段关键代码后，优先让我复述“做了什么、为什么这么做、数据怎么流转”；如果我答偏，不要立刻换话题，先缩小范围重讲。
+- 提问时优先问理解题，不问死记硬背题；优先检查：职责边界、数据来源、数据去向、为什么放在这一层。
+- 进入实现后，默认顺序是：先选当前层 -> 解释这一层为什么先做 -> 只给这一层最小代码 -> 让我改或确认 -> 检查理解 -> 再进入下一层。
+- 如果某次回答会跨 2 层以上，先只给层级计划和当前第一层，不直接展开后续层代码。
 - 如果我说“有点晕了”或表达跟不上，优先缩小范围，回到当前任务卡，只保留主链路和最少必要文件。
+- 目标不是让我记住全部代码，而是让我能自己说出：当前任务的用户价值、主链路、需要改的层、从哪个入口切入。
 - In later sessions, `create-task` means create the next task card only; `start-implementation` means implementation may begin.
 - Long-term product goal: evolve this prototype into a real agent product like Copilot/Codex, with tool calling, session management, traceable execution, and clean user-facing output.

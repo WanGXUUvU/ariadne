@@ -4,6 +4,7 @@ from ..core.tool_types import ToolDefinition  # 导入工具定义
 
 
 def write_file(path: str, content: str) -> str:  # 把内容写入文件
+    """输入：目标文件路径、要写入的文本内容。输出：写入结果摘要字符串。"""
     target = Path(path)  # 把字符串路径转成 Path 对象
 
     if target.exists() and target.is_dir():  # 如果路径已经存在，而且是目录
@@ -41,6 +42,7 @@ WRITE_FILE_SCHEMA = {  # 给模型看的工具说明
 
 
 def build_write_file_tool_definition() -> ToolDefinition:  # 构造 registry 需要的工具对象
+    """输入：无。输出：write_file 对应的 ToolDefinition。"""
     return ToolDefinition(
         name="write_file",  # 工具名
         schema=WRITE_FILE_SCHEMA,  # schema

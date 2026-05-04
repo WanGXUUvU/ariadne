@@ -21,10 +21,11 @@ class SqliteSessionStore:
     """围绕 session 相关数据的 SQLite store。"""
 
     def __init__(self, db: Session):
+        """输入：数据库会话。输出：初始化后的 SqliteSessionStore 实例。"""
         self.db = db
 
     def get(self, session_id: str) -> Optional[AgentState]:
-        """兼容旧调用方式，返回某个 session 的状态快照。"""
+        """输入：session_id。输出：该 session 的 AgentState，找不到时返回 None。"""
 
         return self.read_session_state(session_id)
 
@@ -37,7 +38,7 @@ class SqliteSessionStore:
         last_skill_name: Optional[str] = None,
         last_reply_preview: Optional[str] = None,
     ) -> SessionRecord:
-        """插入或更新 session 快照。
+        """输入：session 标识、状态快照和若干元数据。输出：插入或更新后的 SessionRecord。
 
         `upsert` 的意思是：
         - 有旧记录就更新
@@ -84,7 +85,7 @@ class SqliteSessionStore:
         reply: str,
         events: list[AgentEvent],
     ) -> SessionRunRecord:
-        """保存一次 run 的摘要和逐条事件。"""
+        """输入：一次 run 的摘要字段和事件列表。输出：新建的 SessionRunRecord。"""
 
         run_record = SessionRunRecord(
             session_id=session_id,
@@ -119,7 +120,7 @@ class SqliteSessionStore:
         return run_record
 
     def delete(self, session_id: str) -> None:
-        """删除某个 session 的主记录。"""
+        """输入：session_id。输出：无，副作用是删除这个 session 的主记录。"""
 
         record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
         if record:
@@ -127,7 +128,7 @@ class SqliteSessionStore:
             self.db.commit()
 
     def list_run_records(self, session_id: str, run_id: Optional[str] = None) -> list[SessionRunRecord]:
-        """列出某个 session 的 run 记录，可按 run_id 过滤。"""
+        """输入：session_id、可选 run_id。输出：按顺序排列的 SessionRunRecord 列表。"""
 
         query = self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == session_id)
         if run_id is not None:
@@ -135,7 +136,7 @@ class SqliteSessionStore:
         return query.order_by(SessionRunRecord.created_at.asc(), SessionRunRecord.id.asc()).all()
 
     def list_run_events(self, run_id: str) -> list[SessionRunEventRecord]:
-        """列出某次 run 的全部事件，并按事件顺序返回。"""
+        """输入：run_id。输出：该次 run 的全部事件记录列表。"""
 
         return (
             self.db.query(SessionRunEventRecord)
@@ -145,7 +146,7 @@ class SqliteSessionStore:
         )
 
     def list_sessions(self) -> list[SessionRecord]:
-        """返回 session 摘要列表。"""
+        """输入：无。输出：按更新时间倒序排列的 SessionRecord 列表。"""
 
         return (
             self.db.query(SessionRecord)
@@ -154,7 +155,7 @@ class SqliteSessionStore:
         )
 
     def read_session_record(self, session_id: str) -> Optional[SessionRecord]:
-        """读取 session 主记录。"""
+        """输入：session_id。输出：SessionRecord，找不到时返回 None。"""
 
         return (
             self.db.query(SessionRecord)
@@ -163,7 +164,7 @@ class SqliteSessionStore:
         )
 
     def read_session_state(self, session_id: str) -> Optional[AgentState]:
-        """读取并反序列化 session 状态。"""
+        """输入：session_id。输出：反序列化后的 AgentState，找不到时返回 None。"""
 
         record = self.read_session_record(session_id)
         if not record:

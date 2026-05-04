@@ -3,6 +3,7 @@ from ..core.tool_types import ToolDefinition
 from pathlib import Path
 
 def search_text(query: str, path: str = ".") -> str:  # 在目录里搜索文本
+    """输入：搜索关键字、可选目录路径。输出：匹配结果文本或无匹配提示。"""
     target = Path(path)  # 把字符串路径转成 Path 对象
 
     if not target.exists():  # 如果路径不存在
@@ -54,6 +55,7 @@ SEARCH_TEXT_SCHEMA = {  # 给模型看的工具说明
 }
 
 def build_search_text_definition()->ToolDefinition:
+    """输入：无。输出：search_text 对应的 ToolDefinition。"""
     return ToolDefinition(
         name="search_text",
         schema=SEARCH_TEXT_SCHEMA,

@@ -5,6 +5,7 @@ from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
 from ..storage.agent_definition_store import SqliteAgentDefinitionStore
 
 def load_agent_definition(agent_name: str, db: Session) -> AgentDefinition:  # 按名字加载 agent 定义
+    """输入：agent 名称、数据库会话。输出：匹配到的 AgentDefinition。"""
     store = SqliteAgentDefinitionStore(db)  # 创建定义存储器
 
     definition = store.get(agent_name)  # 只查一次数据库

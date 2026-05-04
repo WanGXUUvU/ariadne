@@ -19,7 +19,7 @@ from .tool_registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
 
 
 def strip_think(content: str) -> str:
-    """去掉模型可能返回的思维链包裹内容，只保留用户可见部分。"""
+    """输入：模型原始回复文本。输出：去掉 think 包裹后的用户可见文本。"""
 
     if "</think>" not in content:
         return content.strip()
@@ -45,13 +45,14 @@ class Agent:
         tool_registry: Optional[ToolRegistry] = None,
         allow_tool_names: Optional[list[str]] = None,
     ):
+        """输入：可选 state、agent 定义、工具注册表、允许工具名列表。输出：初始化后的 Agent 实例。"""
         self.state = state or AgentState()
         self.definition = definition or DEFAULT_AGENT_DEFINITION
         self.tool_registry = tool_registry or DEFAULT_TOOL_REGISTRY
         self.allow_tool_names = allow_tool_names if allow_tool_names is not None else self.definition.tool_names
 
     def run(self, agent_input: AgentInput) -> AgentOutput:
-        """执行一次 run，返回 reply、state 和结构化 events。"""
+        """输入：AgentInput 请求对象。输出：包含 reply、state、events 的 AgentOutput。"""
 
         events = []
         event_index = 0

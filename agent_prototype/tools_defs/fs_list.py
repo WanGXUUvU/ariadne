@@ -3,6 +3,7 @@ from ..core.tool_types import ToolDefinition
 from pathlib import Path
 
 def list_dir(path:str)->str:
+    """输入：目录路径字符串。输出：该目录下子项名称组成的换行文本。"""
     target=Path(path)
 
     if not target.exists():
@@ -34,6 +35,7 @@ LIST_DIR_SCHEMA = {  # 给模型看的工具说明
 
 
 def build_list_dir_definition()->ToolDefinition:
+    """输入：无。输出：list_dir 对应的 ToolDefinition。"""
     return ToolDefinition(
         name="list_dir",
         schema=LIST_DIR_SCHEMA,
