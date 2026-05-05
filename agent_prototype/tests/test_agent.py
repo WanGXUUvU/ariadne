@@ -446,9 +446,13 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data["run_id"])
         self.assertEqual(data["reply"], "mock reply")
         self.assertEqual(data["state"]["step"], 1)
+        self.assertIn("metadata", data)
+        self.assertEqual(data["metadata"]["session_id"], "session-a")
+        self.assertTrue(data["metadata"]["run_id"])
+        self.assertEqual(data["metadata"]["agent_name"], "default")
+        self.assertIsNone(data["metadata"]["skill_name"])
         self.assertEqual(
             data["state"]["messages"],
             [
@@ -469,6 +473,55 @@ class TestAgentApi(unittest.TestCase):
                 }
             ],
         )
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "skill reply"})
+    def test_run_endpoint_returns_metadata_with_explicit_agent_and_skill(self, mock_call_llm):
+        db = self.session_local()
+        try:
+            store = SqliteAgentDefinitionStore(db)
+            store.save(
+                AgentDefinition(
+                    id="reviewer",
+                    name="Reviewer Agent",
+                    system_prompt="你是一个严格的代码审查助手",
+                    description="review mode",
+                    tool_names=[],
+                )
+            )
+            db.commit()
+        finally:
+            db.close()
+
+        with patch(
+            "agent_prototype.runtime.services.list_skills",
+            return_value=[
+                SkillSummary(
+                    name="openai-docs",
+                    description="查 OpenAI 官方文档",
+                    path="user-codex/openai-docs/SKILL.md",
+                    enabled=True,
+                )
+            ],
+        ), patch(
+            "agent_prototype.runtime.services.load_skill_content",
+            return_value="FULL SKILL BODY",
+        ):
+            response = self.client.post(
+                "/run",
+                json={
+                    "session_id": "session-with-metadata",
+                    "user_input": "帮我审查并查文档",
+                    "agent_name": "reviewer",
+                    "skill_name": "openai-docs",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["metadata"]["session_id"], "session-with-metadata")
+        self.assertTrue(data["metadata"]["run_id"])
+        self.assertEqual(data["metadata"]["agent_name"], "reviewer")
+        self.assertEqual(data["metadata"]["skill_name"], "openai-docs")
 
     @patch("agent_prototype.runtime.services.call_llm", return_value={"role": "assistant", "content": "中段历史摘要"})
     def test_compact_endpoint_returns_compacted_state(self, mock_call_llm):
@@ -748,6 +801,23 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "Skill is disabled:openai-docs")
         mock_load_skill_content.assert_not_called()
+
+    @patch("agent_prototype.runtime.services.list_skills", return_value=[])
+    def test_run_endpoint_returns_structured_error_when_skill_not_found(self, mock_list_skills):
+        response = self.client.post(
+            "/run",
+            json={
+                "session_id": "session-missing-skill",
+                "user_input": "帮我查文档",
+                "skill_name": "openai-docs",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["detail"]["error"]["code"], "bad_request")
+        self.assertEqual(data["detail"]["error"]["message"], "Skill not found:openai-docs")
+        mock_list_skills.assert_called_once()
 
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "first reply"})
     def test_list_sessions_endpoint_returns_summaries(self, mock_call_llm):

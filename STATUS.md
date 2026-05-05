@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: planning
-- Task: specs/TASK-020.md
+- Task: specs/TASK-021.md
 - Gate: planning
 - Allowed Now: planning-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按“LLM 压缩中段 + 保留前锚点与最近原文”的路线推进 `TASK-020`，先定义三段式切分规则和 compact prompt，再进入实现。
+- Next action: 按 `TASK-021` 先审查当前 `/run` 返回结构，拆清 `reply / state / events / metadata / error` 各自职责，再决定从 `schema` 还是 `route` 层切入。
 
 
 ## 遗留项
@@ -73,3 +73,6 @@
 | 2026-05-05 | `TASK-019` 验证完成 | Verify | 已补充 skill disabled 配置、enable/disable API、disabled skill 运行时拦截测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
 | 2026-05-05 | 重写 `TASK-020` 拆解 | planning | 按 OpenAI/Codex compact 机制重写任务卡，明确“主动 compact + 自动 compact + 共享核心 + 第一版规则摘要”主线。 |
 | 2026-05-05 | 调整 `TASK-020` 路线 | planning | 将 `TASK-020` 改为“LLM 压缩中段核心历史 + 保留前锚点与最近原文”的标准 compact 方案。 |
+| 2026-05-05 | `TASK-020` 验证完成 | Verify | 手动 `/compact` 与 `/run` 自动 compact 测试已通过，LLM 压缩中段历史链路已打通。 |
+| 2026-05-05 | `TASK-020` 收口 | Review | 接受当前 compact 最小闭环实现，下一步切到 `TASK-021` 做 `/run` 输出整理。 |
+| 2026-05-05 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-021`，进入 `/run` 响应结构整理阶段。 |

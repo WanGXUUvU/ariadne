@@ -13,7 +13,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from ..core.schemas import AgentInput, AgentOutput, AgentState, ResetInput,CompactInput,CompactOutput
+from ..core.schemas import AgentInput, AgentOutput, AgentState, ResetInput,CompactInput,CompactOutput,RunMetadata
 from ..storage.session_store import SqliteSessionStore
 from .agent import Agent
 from .agent_loader import load_agent_definition
@@ -88,9 +88,16 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
     run_id = uuid.uuid4().hex
 
     output = agent.run(agent_input)
-    output = output.model_copy(update={"run_id": run_id})
     output.state.agent_name = effective_agent_name
 
+    metadata=RunMetadata(
+        session_id=agent_input.session_id,
+        run_id=run_id,
+        agent_name=effective_agent_name,
+        skill_name=agent_input.skill_name,
+    )
+    output=output.model_copy(update={"metadata":metadata})
+    
     try:
         store.upsert_session_snapshot(
             agent_input.session_id,

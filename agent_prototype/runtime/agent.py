@@ -13,7 +13,7 @@
 from typing import Optional
 
 from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
-from ..core.schemas import AgentEvent, AgentInput, AgentOutput, AgentState, ChatMessage, ToolCall
+from ..core.schemas import AgentEvent, AgentInput, AgentOutput, AgentState, ChatMessage, ToolCall,RunMetadata
 from .llm_client import call_llm
 from .tool_registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
 
@@ -153,4 +153,11 @@ class Agent:
             assistant_message = ChatMessage(role="assistant", content=raw_reply)
             messages.append(assistant_message)
             self.state.messages.append(assistant_message)
-            return AgentOutput(reply=reply, state=self.state, events=events)
+            return AgentOutput(
+            reply=reply,  # 最终回复正文
+            state=self.state,  # 本轮运行后的最新状态
+            events=events,  # 本轮结构化事件列表
+            metadata=RunMetadata(
+                session_id=agent_input.session_id,  # 先用当前请求的 session_id 填一个最小合法 metadata
+            ),  # 这里先保证 AgentOutput 结构合法；真正完整的 metadata 由外层 service 再覆盖
+        )

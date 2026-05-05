@@ -97,14 +97,21 @@ class AgentEvent(BaseModel):
     tool_call_id: Optional[str] = None
     tool_result: Optional[ToolResult] = None
 
+class RunMetadata(BaseModel):
+    """一次 /run 的轻量元信息。"""  # 这个模型专门承载前端/CLI/测试最常读的运行标识信息
+    session_id:str
+    run_id:str=""
+    agent_name:Optional[str]=None
+    skill_name:Optional[str]=None
+
 
 class AgentOutput(BaseModel):
     """`/run` 响应体。"""
 
-    run_id: str = ""
     reply: str
     state: AgentState
     events: list[AgentEvent]
+    metadata:RunMetadata
 
 class CompactOutput(BaseModel):
     """/compact 响应体"""
@@ -112,6 +119,18 @@ class CompactOutput(BaseModel):
     state:AgentState
     did_compact:bool
     removed_count:int=0 #一共折叠了多少条旧消息
+
+class ApiError(BaseModel):
+    """统一的业务错误内容。"""  # 这个模型只负责描述“错误本身长什么样”
+
+    code: str  # 错误代码，给前端和测试一个稳定的机器可读标识
+    message: str  # 错误信息，给用户界面直接展示的可读文本
+
+
+class ErrorResponse(BaseModel):
+    """统一的错误响应体。"""  # 这个模型表示 HTTP 错误返回时，整个 JSON 的外层结构
+
+    error: ApiError  # 把具体错误信息统一收进 error 对象里，避免继续散在顶层
 
 
 class SessionSummary(BaseModel):

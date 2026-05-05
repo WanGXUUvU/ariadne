@@ -18,8 +18,10 @@ from ..core.schemas import (
     AgentEvent,
     AgentInput,
     AgentOutput,
+    ApiError,
     CompactInput,
     CompactOutput,
+    ErrorResponse,
     ResetInput,
     SessionDetail,
     SessionSummary,
@@ -38,12 +40,21 @@ router = APIRouter()
 
 @router.post("/run", response_model=AgentOutput)
 def run_agent_api(agent_input: AgentInput, db: Session = Depends(get_db)) -> AgentOutput:
-    """输入：AgentInput 请求对象、数据库会话。输出：AgentOutput 响应对象。"""
+    """输入：AgentInput 请求对象、数据库会话。输出：AgentOutput 响应对象。"""  # /run 正常成功时仍然返回 AgentOutput
 
     try:
-        return run_agent_service(agent_input, db)
+        return run_agent_service(agent_input, db)  # 正常路径仍然直接复用 service 层结果
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,  # 这类是业务错误，不是请求体格式错误
+            detail=ErrorResponse(
+                error=ApiError(
+                    code="bad_request",  # 第一版先统一用 bad_request，后面再细分成 skill_disabled / agent_not_found 等
+                    message=str(exc),  # 具体人类可读错误信息，直接沿用当前 ValueError 文本
+                )
+            ).model_dump()  # 先把统一错误模型转成普通 dict，再交给 FastAPI 作为 detail 返回
+        )
+
 
 
 
