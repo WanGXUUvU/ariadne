@@ -11,8 +11,9 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+from fastapi.responses import JSONResponse
 
 from ..core.schemas import (
     AgentEvent,
@@ -37,6 +38,18 @@ from ..runtime.skill_loader import list_skills
 from ..runtime.skill_service import disable_skill_service,enable_skill_service
 router = APIRouter()
 
+def error_response(status_code:int,code:str,message:str)->JSONResponse:
+    """输入：HTTP状态码、错误代码、错误文案。输出：统一错误响应格式"""
+    
+    return JSONResponse(
+        status_code=status_code,
+        content=ErrorResponse(
+            error=ApiError(
+                code=code,
+                message=message,
+            )
+        ).model_dump()
+    )
 
 @router.post("/run", response_model=AgentOutput)
 def run_agent_api(agent_input: AgentInput, db: Session = Depends(get_db)) -> AgentOutput:
@@ -45,14 +58,10 @@ def run_agent_api(agent_input: AgentInput, db: Session = Depends(get_db)) -> Age
     try:
         return run_agent_service(agent_input, db)  # 正常路径仍然直接复用 service 层结果
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,  # 这类是业务错误，不是请求体格式错误
-            detail=ErrorResponse(
-                error=ApiError(
-                    code="bad_request",  # 第一版先统一用 bad_request，后面再细分成 skill_disabled / agent_not_found 等
-                    message=str(exc),  # 具体人类可读错误信息，直接沿用当前 ValueError 文本
-                )
-            ).model_dump()  # 先把统一错误模型转成普通 dict，再交给 FastAPI 作为 detail 返回
+        return error_response(  # 统一返回顶层 error，不再抛 HTTPException(detail=...)
+            status.HTTP_400_BAD_REQUEST,  # 这类错误仍然是 400
+            "bad_request",  # 第一版先统一用 bad_request，后面再细分
+            str(exc),  # 直接沿用当前业务错误文本
         )
 
 
@@ -96,12 +105,19 @@ def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionD
     store = SqliteSessionStore(db)
     record = store.read_session_record(session_id)
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        return error_response(  # session 记录不存在时返回统一 404 错误结构
+            status.HTTP_404_NOT_FOUND,  # HTTP 状态码保持 404
+            "session_not_found",  # 给前端稳定错误代码
+            "Session not found",  # 给人看的错误文案
+        )
 
     state = store.read_session_state(session_id)
     if state is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
+        return error_response(  # state 丢失时也统一成同一个错误结构
+            status.HTTP_404_NOT_FOUND,  # 仍然返回 404
+            "session_not_found",  # 第一版先和上面共用同一错误码
+            "Session not found",  # 保持相同文案，避免前端处理分叉
+        )
     return SessionDetail(
         session_id=record.session_id,
         session_name=record.session_name,
@@ -131,7 +147,11 @@ def read_session_trace_api(
     run_records = store.list_run_records(session_id, run_id=run_id)
 
     if not run_records:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trace not found")
+        return error_response(  # trace 查不到时也走统一错误响应
+            status.HTTP_404_NOT_FOUND,  # 资源不存在，返回 404
+            "trace_not_found",  # 给 trace 场景单独的机器可读错误码
+            "Trace not found",  # 给用户/CLI 的可读提示
+        )
 
     runs = []
     for run_record in run_records:
@@ -181,7 +201,11 @@ def disable_skill_api(skill_name:str)->SkillSummary:
     try:
         return disable_skill_service(skill_name)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=str(exc))
+        return error_response(  # skill 业务错误统一成结构化响应
+            status.HTTP_400_BAD_REQUEST,  # 非法 skill 请求仍然是 400
+            "bad_request",  # 第一版先统一错误码
+            str(exc),  # 保留当前 service 抛出的具体原因
+        )
 
 @router.post("/skills/{skill_name}/enable", response_model=SkillSummary)
 def enable_skill_api(skill_name: str) -> SkillSummary:
@@ -189,7 +213,11 @@ def enable_skill_api(skill_name: str) -> SkillSummary:
     try:
         return enable_skill_service(skill_name)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        return error_response(  # skill 业务错误统一成结构化响应
+            status.HTTP_400_BAD_REQUEST,  # 非法 skill 请求仍然是 400
+            "bad_request",  # 第一版先统一错误码
+            str(exc),  # 保留当前 service 抛出的具体原因
+        )
     
 @router.post("/compact",response_model=CompactOutput)
 def compact_session_api(payload:CompactInput,db:Session=Depends(get_db))->CompactOutput:
@@ -198,4 +226,8 @@ def compact_session_api(payload:CompactInput,db:Session=Depends(get_db))->Compac
     try:
         return compact_session_service(payload,db)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=str(exc))
+        return error_response(  # compact 的业务错误也统一走同一套格式
+            status.HTTP_400_BAD_REQUEST,  # 当前 compact 失败仍按 400 处理
+            "bad_request",  # 第一版保持简单统一
+            str(exc),  # 直接带出 service 的错误信息
+        )

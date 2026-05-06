@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: planning
-- Task: specs/TASK-021.md
+- Task: specs/TASK-022.md
 - Gate: planning
 - Allowed Now: planning-implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按 `TASK-021` 先审查当前 `/run` 返回结构，拆清 `reply / state / events / metadata / error` 各自职责，再决定从 `schema` 还是 `route` 层切入。
+- Next action: 按 `TASK-022` 先拆最小 CLI 主链路，明确参数入口、service 复用点、默认输出和 `--events` 输出边界，再决定先从 `cli.py` 还是测试切入。
 
 
 ## 遗留项
@@ -76,3 +76,7 @@
 | 2026-05-05 | `TASK-020` 验证完成 | Verify | 手动 `/compact` 与 `/run` 自动 compact 测试已通过，LLM 压缩中段历史链路已打通。 |
 | 2026-05-05 | `TASK-020` 收口 | Review | 接受当前 compact 最小闭环实现，下一步切到 `TASK-021` 做 `/run` 输出整理。 |
 | 2026-05-05 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-021`，进入 `/run` 响应结构整理阶段。 |
+| 2026-05-06 | 拆解 `TASK-021` 主链路 | planning | 已确认当前 `/run` 已有 `reply/state/events/metadata`，并决定保留完整 `state`，下一步统一错误响应与测试。 |
+| 2026-05-06 | `TASK-021` 验证完成 | Verify | 已统一业务错误响应为顶层 `error`，并更新 `/run`、session、trace、skill、compact 相关测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-05-06 | `TASK-021` 收口 | Review | 确认 `/run` 继续保留完整 `state`，并将顶层 `error` 确认为当前统一业务错误响应格式，任务完成。 |
+| 2026-05-06 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-022`，进入最小 CLI 入口阶段。 |

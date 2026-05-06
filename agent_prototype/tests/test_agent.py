@@ -566,7 +566,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["state"]["messages"][0]["content"], "最初任务目标")
         self.assertEqual(data["state"]["messages"][1]["role"], "system")
         self.assertIn("中段历史摘要", data["state"]["messages"][1]["content"])
-        self.assertEqual(data["state"]["messages"][-2]["content"], "tool result: Responses API docs")
+        self.assertEqual(data["state"]["messages"][-2]["content"], "自动 compact 会在 /run 前触发")
         self.assertEqual(data["state"]["messages"][-1]["content"], "现在开始做 compact")
         mock_call_llm.assert_called_once()
 
@@ -799,7 +799,8 @@ class TestAgentApi(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Skill is disabled:openai-docs")
+        self.assertEqual(response.json()["error"]["code"], "bad_request")
+        self.assertEqual(response.json()["error"]["message"], "Skill is disabled:openai-docs")
         mock_load_skill_content.assert_not_called()
 
     @patch("agent_prototype.runtime.services.list_skills", return_value=[])
@@ -815,8 +816,8 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data["detail"]["error"]["code"], "bad_request")
-        self.assertEqual(data["detail"]["error"]["message"], "Skill not found:openai-docs")
+        self.assertEqual(data["error"]["code"], "bad_request")
+        self.assertEqual(data["error"]["message"], "Skill not found:openai-docs")
         mock_list_skills.assert_called_once()
 
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "first reply"})
@@ -865,7 +866,8 @@ class TestAgentApi(unittest.TestCase):
         response = self.client.get("/sessions/missing-session")
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Session not found")
+        self.assertEqual(response.json()["error"]["code"], "session_not_found")
+        self.assertEqual(response.json()["error"]["message"], "Session not found")
 
     @patch("agent_prototype.runtime.skill_loader.get_default_skill_roots")
     def test_list_skills_endpoint_returns_summaries(self, mock_get_default_skill_roots):
@@ -950,7 +952,10 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["session_id"], "trace-session")
-        self.assertEqual([run["run_id"] for run in data["runs"]], [first_response.json()["run_id"], second_response.json()["run_id"]])
+        self.assertEqual(
+            [run["run_id"] for run in data["runs"]],
+            [first_response.json()["metadata"]["run_id"], second_response.json()["metadata"]["run_id"]],
+        )
         self.assertEqual([run["user_input"] for run in data["runs"]], ["第一轮", "第二轮"])
         self.assertEqual(data["runs"][0]["event_count"], 1)
         self.assertEqual(data["runs"][0]["events"][0]["type"], "final_answer")
@@ -970,19 +975,22 @@ class TestAgentApi(unittest.TestCase):
         first_response = self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第一轮"})
         self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第二轮"})
 
-        response = self.client.get(f"/sessions/trace-filter/trace?run_id={first_response.json()['run_id']}")
+        response = self.client.get(
+            f"/sessions/trace-filter/trace?run_id={first_response.json()['metadata']['run_id']}"
+        )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data["runs"]), 1)
-        self.assertEqual(data["runs"][0]["run_id"], first_response.json()["run_id"])
+        self.assertEqual(data["runs"][0]["run_id"], first_response.json()["metadata"]["run_id"])
         self.assertEqual(data["runs"][0]["user_input"], "第一轮")
 
     def test_trace_endpoint_returns_404_for_missing_trace(self):
         response = self.client.get("/sessions/missing-session/trace")
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Trace not found")
+        self.assertEqual(response.json()["error"]["code"], "trace_not_found")
+        self.assertEqual(response.json()["error"]["message"], "Trace not found")
 
 
 class TestToolRegistry(unittest.TestCase):
