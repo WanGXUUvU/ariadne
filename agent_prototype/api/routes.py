@@ -22,6 +22,7 @@ from ..core.schemas import (
     ApiError,
     CompactInput,
     CompactOutput,
+    CreateSessionInput,
     ErrorResponse,
     ResetInput,
     SessionDetail,
@@ -31,7 +32,7 @@ from ..core.schemas import (
     TraceRunSummary,
     SkillSummary,
 )
-from ..runtime.services import reset_session_service, run_agent_service,compact_session_service
+from ..runtime.services import reset_session_service, run_agent_service,compact_session_service,create_session_service
 from ..storage.db import get_db
 from ..storage.session_store import SqliteSessionStore
 from ..runtime.skill_loader import list_skills
@@ -72,6 +73,13 @@ def reset_session(payload: ResetInput, db: Session = Depends(get_db)) -> dict[st
     """输入：ResetInput 请求对象、数据库会话。输出：是否重置成功的结果字典。"""
 
     return reset_session_service(payload, db)
+
+
+@router.post("/sessions", response_model=SessionSummary)
+def create_session_api(payload: CreateSessionInput, db: Session = Depends(get_db)) -> SessionSummary:
+    """输入：CreateSessionInput 请求对象、数据库会话。输出：新建 session 的摘要信息。"""  # 这个接口只负责创建空白 session，不负责发第一条消息
+
+    return create_session_service(payload, db)  # 直接把请求交给 service 层，保持 route 层只做 HTTP 适配
 
 
 @router.get("/sessions", response_model=list[SessionSummary])

@@ -12,8 +12,9 @@
 import uuid
 
 from sqlalchemy.orm import Session
+from datetime import datetime
 
-from ..core.schemas import AgentInput, AgentOutput, AgentState, ResetInput,CompactInput,CompactOutput,RunMetadata
+from ..core.schemas import AgentInput, AgentOutput, AgentState, ResetInput,CompactInput,CompactOutput,RunMetadata,CreateSessionInput,SessionSummary
 from ..storage.session_store import SqliteSessionStore
 from .agent import Agent
 from .agent_loader import load_agent_definition
@@ -29,7 +30,38 @@ def build_reply_preview(reply: str, max_len: int = 120) -> str:
     text = " ".join(reply.split())
     return text[:max_len]
 
+def create_session_service(payload:CreateSessionInput,db:Session)->SessionSummary:
+    """输入：CreateSessionInput 请求对象、数据库会话。输出：新建 session 的摘要信息。"""  # 这个 service 负责创建空白 session，但不运行 agent
 
+    store = SqliteSessionStore(db)
+    session_id=uuid.uuid4().hex
+    state=AgentState()
+
+    try:
+        record = store.upsert_session_snapshot(
+            session_id,  # 把新生成的 session_id 写入主表
+            state=state,  # 先存空 state，后续第一次 /run 再把消息填进去
+            session_name=payload.session_name,  # 如果前端传了名字就用它；不传时 store 会回退到 session_id
+            last_agent_name=None,  # 新建空会话时还没有运行过 agent
+            last_skill_name=None,  # 新建空会话时也还没有使用任何 skill
+            last_reply_preview=None,  # 没有回复，自然没有 reply preview
+        )
+        db.commit()  # 把新 session 真正提交到数据库
+        db.refresh(record)  # 刷新 ORM 对象，确保 created_at / updated_at 等数据库字段可读
+    except Exception:
+        db.rollback()  # 如果创建失败，回滚这次事务，避免留下半成品
+        raise
+
+    return SessionSummary(
+        session_id=record.session_id,  # 返回新建好的 session_id，前端后续靠它继续操作
+        session_name=record.session_name,  # 返回最终生效的会话名；不传时通常会等于 session_id
+        created_at=record.created_at,  # 返回创建时间，给列表页直接使用
+        updated_at=record.updated_at,  # 新建时更新时间通常等于创建时间
+        last_agent_name=record.last_agent_name,  # 空会话还没有最近 agent，应该是 None
+        last_skill_name=record.last_skill_name,  # 空会话还没有最近 skill，应该是 None
+        message_count=record.message_count,  # 空会话消息数应为 0
+        last_reply_preview=record.last_reply_preview,  # 空会话没有最后回复摘要
+    )
 def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
     """输入：AgentInput 请求对象、数据库会话。输出：AgentOutput 结果对象。
 

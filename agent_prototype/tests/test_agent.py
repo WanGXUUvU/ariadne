@@ -820,6 +820,48 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["error"]["message"], "Skill not found:openai-docs")
         mock_list_skills.assert_called_once()
 
+    def test_create_session_endpoint_returns_summary_and_persists_empty_session(self):
+        response = self.client.post(
+            "/sessions",
+            json={"session_name": "新会话"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        self.assertTrue(data["session_id"])
+        self.assertEqual(data["session_name"], "新会话")
+        self.assertEqual(data["message_count"], 0)
+        self.assertIsNone(data["last_agent_name"])
+        self.assertIsNone(data["last_skill_name"])
+        self.assertIsNone(data["last_reply_preview"])
+        self.assertIn("created_at", data)
+        self.assertIn("updated_at", data)
+
+        list_response = self.client.get("/sessions")
+        self.assertEqual(list_response.status_code, 200)
+
+        sessions = list_response.json()
+        created_session = next(
+            item for item in sessions if item["session_id"] == data["session_id"]
+        )
+
+        self.assertEqual(created_session["session_name"], "新会话")
+        self.assertEqual(created_session["message_count"], 0)
+        self.assertIsNone(created_session["last_reply_preview"])
+
+        db = self.session_local()
+        try:
+            record = db.query(SessionRecord).filter(SessionRecord.session_id == data["session_id"]).first()
+            self.assertIsNotNone(record)
+            self.assertEqual(record.session_name, "新会话")
+            self.assertEqual(record.message_count, 0)
+            self.assertIsNone(record.last_agent_name)
+            self.assertIsNone(record.last_skill_name)
+            self.assertIsNone(record.last_reply_preview)
+        finally:
+            db.close()
+
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "first reply"})
     def test_list_sessions_endpoint_returns_summaries(self, mock_call_llm):
         self.client.post("/run", json={"session_id": "session-b", "user_input": "你好"})

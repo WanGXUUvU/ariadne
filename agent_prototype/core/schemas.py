@@ -67,6 +67,12 @@ class AgentInput(BaseModel):
     user_input: str = Field(min_length=1)
     skill_name: Optional[str]=None # 显式指定本轮要加载的 skill；不传时只给摘要目录
 
+class CreateSessionInput(BaseModel):
+    """/session 创建请求体"""
+    session_name:Optional[str]= Field(
+        default=None,
+        min_length=1
+    )
 
 class ResetInput(BaseModel):
     """`/reset` 请求体。"""

@@ -1,41 +1,71 @@
-# TASK-022 - 最小 CLI 入口
+# TASK-022 - 前端规划任务卡
 
 ## 目标
-提供一个最小命令行入口，可以发送消息、指定 session、指定 agent，必要时指定 skill。
+在正式写 UI 前，确定前端最小产品范围和接口契约，避免前端和后端互相返工。
 
 ## 产品层
-CLI
+Frontend Planning
 
 ## 范围内
-- 新增 `python -m agent_prototype.cli`
-- 参数：message、session-id、agent-name、skill-name
-- 打印 reply
-- 可选打印 events
-- 复用 service 层，不直接调 FastAPI
+- 确认页面结构
+- 确认需要的后端 API
+- 确认 session、message、trace 的前端数据模型
+- 生成后续 UI 任务卡
 
 ## 范围外
-- 交互式 TUI
-- slash command 全集
-- 彩色复杂输出
+- 实现 UI
+- 设计系统
+- 登录注册
 
 ## 实现步骤
-1. 新建 `cli.py`。
-2. 用 argparse 定义参数。
-3. 调用现有 service。
-4. 默认只打印最终回答。
-5. `--events` 时打印结构化事件摘要。
-6. 写最小测试或手动验证命令。
+1. 列出首版 UI 页面：Chat、Sessions、Trace。
+2. 对照当前 API，标记缺口。
+3. 定义前端需要的数据类型。
+4. 把 UI 实现拆到后续任务卡。
+5. 更新 `BUILD_PLAN.md` 中 UI 阶段。
 
 ## 完成标准
-- 不启动 HTTP 服务也能运行 agent。
-- CLI 和 API 行为一致。
-- 参数错误有清晰提示。
+- 前端第一版范围清楚。
+- 每个页面需要什么 API 清楚。
+- 可以进入 UI 基础壳实现。
+
+## 结论
+
+### 第一版页面范围
+- Chat：发送消息、展示当前会话消息、展示本轮 reply 和事件摘要。
+- Sessions：展示会话列表、支持切换当前会话、提供“新建会话”入口。
+- Trace：查看某个 session 的历史 runs 和单轮 events。
+
+### 页面与 API 对照
+- Chat
+  - `POST /run`
+  - `GET /sessions/{session_id}`
+- Sessions
+  - `GET /sessions`
+  - 缺口：`POST /sessions`
+- Trace
+  - `GET /sessions/{session_id}/trace`
+
+### 前端最小数据模型
+- SessionSummary：`session_id`、`session_name`、`updated_at`、`last_agent_name`、`last_skill_name`、`message_count`、`last_reply_preview`
+- SessionDetail：在 `SessionSummary` 基础上增加完整 `state`
+- RunTrace：`run_id`、`user_input`、`reply`、`event_count`、`created_at`、`finished_at`、`events`
+- RunOutput：`reply`、`state`、`events`、`metadata`
+
+### 已确认缺口
+- 需要独立的 `POST /sessions`，让前端先创建空白会话，再发送第一条消息。
+- `POST /sessions` 已拆到 `TASK-023`，不在本卡内实现。
+
+### 后续任务拆分
+- `TASK-023`：新建 Session 接口
+- 后续新增 UI 基础壳任务卡：布局、路由、API client、最小状态管理
+- 后续新增 Chat 主链路任务卡：发送消息、展示 reply/state、基础错误态
+- 后续新增 Sessions / Trace 任务卡：会话切换、trace 查看
 
 ## 验证
-- `python -m agent_prototype.cli "hello" --session-id cli-test`
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- 仅 Review。
 
 ## Review 检查点
-- CLI 是否没有复制业务逻辑。
-- 输出是否适合人读。
-- 是否不强依赖真实 API Key 测试。
+- UI 范围是否过大。
+- 是否基于已有 API，而不是幻想完整后端。
+- 是否保留 trace 作为核心差异点。

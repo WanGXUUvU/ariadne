@@ -1,39 +1,40 @@
-# TASK-023 - 前端规划任务卡
+# TASK-023 - 新建 Session 接口
 
 ## 目标
-在正式写 UI 前，确定前端最小产品范围和接口契约，避免前端和后端互相返工。
+补一个独立的新建 session 接口，让前端可以先创建空白会话，再进入聊天，而不是把“创建会话”和“发送第一条消息”绑在一起。
 
 ## 产品层
-Frontend Planning
+API
 
 ## 范围内
-- 确认页面结构
-- 确认需要的后端 API
-- 确认 session、message、trace 的前端数据模型
-- 生成后续 UI 任务卡
+- 新增 `POST /sessions`
+- 生成新 `session_id`
+- 初始化空 `state`
+- 返回新 session 的基础信息
+- 补最小测试
 
 ## 范围外
-- 实现 UI
-- 设计系统
-- 登录注册
+- 会话重命名
+- 会话删除
+- 前端 UI
+- 会话模板
 
 ## 实现步骤
-1. 列出首版 UI 页面：Chat、Sessions、Trace。
-2. 对照当前 API，标记缺口。
-3. 定义前端需要的数据类型。
-4. 把 UI 实现拆到后续任务卡。
-5. 更新 `BUILD_PLAN.md` 中 UI 阶段。
+1. 定义创建 session 的 request/response schema。
+2. 在 route 层新增 `POST /sessions`。
+3. 在 service/store 层复用现有 session 持久化能力创建空快照。
+4. 返回 `SessionSummary` 或等价最小响应。
+5. 补 API 测试。
 
 ## 完成标准
-- 前端第一版范围清楚。
-- 每个页面需要什么 API 清楚。
-- 可以进入 UI 基础壳实现。
+- 前端不发第一条消息也能先拿到一个合法 session。
+- 新 session 能在 `GET /sessions` 里出现。
+- 后续 `POST /run` 可以直接复用这个 session。
 
 ## 验证
-- 仅 Review。
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- UI 范围是否过大。
-- 是否基于已有 API，而不是幻想完整后端。
-- 是否保留 trace 作为核心差异点。
-
+- 是否没有把创建 session 和首次运行耦合。
+- 返回结构是否复用现有 session 模型。
+- 是否没有复制已有持久化逻辑。
