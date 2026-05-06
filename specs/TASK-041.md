@@ -1,40 +1,39 @@
-# TASK-041 - Git diff 读取能力
+# TASK-041 - Token 与上下文使用统计
 
 ## 目标
-让系统能读取当前工作区 diff，为 Review 模式和用户确认改动打基础。
+记录每次运行的模型、输入输出 token、消息数量和耗时，让产品能显示运行成本和上下文压力。
 
 ## 产品层
-Git / Review
+Observability
 
 ## 范围内
-- 新增 git service
-- 读取 `git status --short`
-- 读取 `git diff`
-- 读取 staged diff
-- 提供 API 或工具输出
+- 在 model adapter 返回 usage 信息
+- run record 保存 usage
+- API 输出展示 usage summary
+- 没有 usage 时允许为空
 
 ## 范围外
-- 自动 commit
-- 自动 push
-- 冲突解决
+- 精确成本计算
+- 多供应商价格表
+- 自动截断
 
 ## 实现步骤
-1. 新建 `git_service.py`。
-2. 用 subprocess 非交互调用 git。
-3. 设置超时和最大输出长度。
-4. 在 API 中暴露 status 和 diff。
-5. 写测试时 mock subprocess。
+1. 扩展模型调用返回对象，加入 usage。
+2. 从 OpenAI 返回中读取 token usage。
+3. 写入 run record。
+4. API 返回 `usage` 字段。
+5. 测试 mock usage 能被保存。
 
 ## 完成标准
-- 用户能看到当前改动摘要。
-- 大 diff 不会无限输出。
-- git 不可用时返回清晰错误。
+- 每次成功模型调用尽量记录 usage。
+- usage 缺失不导致请求失败。
+- 前端和 CLI 可以直接显示 usage。
 
 ## 验证
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 是否避免 destructive git 命令。
-- subprocess 是否有超时。
-- 输出截断是否可解释。
+- usage 字段是否兼容不同模型供应商。
+- 是否避免把统计逻辑散落在 agent 主循环。
+- 是否清楚区分估算和官方返回。
 

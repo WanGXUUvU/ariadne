@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: planning
-- Task: specs/TASK-022.md
-- Gate: planning
-- Allowed Now: planning-implementation
+- Task: specs/TASK-023.md
+- Gate: Verify
+- Allowed Now: review
 - Lane: Fast
 - Blocked: None
-- Next action: 按 `TASK-022` 先拆最小 CLI 主链路，明确参数入口、service 复用点、默认输出和 `--events` 输出边界，再决定先从 `cli.py` 还是测试切入。
+- Next action: 对 `TASK-023` 做 Review；完成后切到新的 `TASK-024` Web UI 基础壳，开始前端最小闭环实现。
 
 
 ## 遗留项
@@ -79,4 +79,11 @@
 | 2026-05-06 | 拆解 `TASK-021` 主链路 | planning | 已确认当前 `/run` 已有 `reply/state/events/metadata`，并决定保留完整 `state`，下一步统一错误响应与测试。 |
 | 2026-05-06 | `TASK-021` 验证完成 | Verify | 已统一业务错误响应为顶层 `error`，并更新 `/run`、session、trace、skill、compact 相关测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
 | 2026-05-06 | `TASK-021` 收口 | Review | 确认 `/run` 继续保留完整 `state`，并将顶层 `error` 确认为当前统一业务错误响应格式，任务完成。 |
-| 2026-05-06 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-022`，进入最小 CLI 入口阶段。 |
+| 2026-05-06 | 删除任务卡 | planning | 删除旧 `TASK-022` 最小 CLI 入口任务卡。 |
+| 2026-05-06 | 调整任务卡编号 | planning | 将前端规划任务卡改回 `TASK-022`，并新建 `TASK-023` 专门承载“新建 session 接口”。 |
+| 2026-05-06 | 拆解 `TASK-022` 主链路 | planning | 先围绕 Chat / Sessions / Trace 三页梳理最小前端范围、现有 API 对齐情况与缺口，再决定后续 UI 任务卡。 |
+| 2026-05-06 | 确认 `TASK-022` API 缺口 | planning | 已确认“创建新 session” 需要独立接口，不再只依赖前端自己生成 `session_id` 后首次调用 `/run`；缺口拆到 `TASK-023`。 |
+| 2026-05-06 | `TASK-022` 收口 | Review | 已确认第一版前端范围为 Chat / Sessions / Trace，现有 API 基本够用，唯独缺少独立 `POST /sessions`，已拆到 `TASK-023`。 |
+| 2026-05-06 | 开始 `TASK-023` | planning | 已按 `schema -> route -> service -> test` 打通独立新建会话主链路。 |
+| 2026-05-06 | `TASK-023` 验证完成 | Verify | `POST /sessions` 已可创建空白会话、返回 `SessionSummary`、出现在 `GET /sessions` 中，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-05-06 | 重排后续任务卡 | planning | 将 `Web UI 基础壳` 和 `Trace 时间线面板` 前移为 `TASK-024`、`TASK-025`；原 `TASK-024` 到 `TASK-043` 顺延两位，路线图同步为“先前端闭环，再平台边界”。 |

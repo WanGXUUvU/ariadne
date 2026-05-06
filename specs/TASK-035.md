@@ -1,39 +1,43 @@
-# TASK-035 - Skill 草稿创建流程
+# TASK-035 - Slash Command 解析器
 
 ## 目标
-提供创建 skill 草稿的后端流程，让系统能生成一个可编辑的 `SKILL.md`。
+支持 `/status`、`/reset`、`/skills`、`/agents` 这类命令入口，为 CLI 和 UI 共用命令系统打基础。
 
 ## 产品层
-Skill Authoring
+Command Layer
+
+## 背景
+Codex CLI 有大量 slash commands。我们先做解析器和少量命令，不直接追求完整功能。
 
 ## 范围内
-- 新增 create skill draft 函数
-- 输入 name、description、instructions
-- 创建目录和 `SKILL.md`
-- 防止覆盖已有 skill
-- 基础名称校验
+- 新建 command parser
+- 支持识别普通用户输入和 slash command
+- 实现 `/status`
+- 统一已有 `/reset` 的语义
+- 预留 `/skills`、`/agents`、`/model`、`/permissions`
 
 ## 范围外
-- 让 LLM 自动生成 skill
-- UI 编辑器
-- 插件打包
+- 复杂参数解析
+- shell 命令
+- UI 命令面板
 
 ## 实现步骤
-1. 定义 skill name 规则，只允许安全字符。
-2. 实现目录创建。
-3. 根据模板写入 `SKILL.md`。
-4. 如果目录已存在，返回错误。
-5. 写测试覆盖成功、重名、非法名称。
+1. 新建 `commands.py`。
+2. 定义 `CommandResult` schema。
+3. 解析以 `/` 开头的输入。
+4. 在 service 层先分流 command 和 normal chat。
+5. 给未知命令返回清晰错误。
 
 ## 完成标准
-- 可以创建一个新的本地 skill 草稿。
-- 不会覆盖已有 skill。
-- 新 skill 能被 `list_skills()` 发现。
+- 普通聊天不受影响。
+- `/status` 能返回当前 session 基本状态。
+- 未知命令不会进入 LLM。
 
 ## 验证
+- 测试普通输入、已知命令、未知命令。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 文件名是否安全。
-- 模板是否和 loader 格式一致。
-- 是否避免自动生成过多复杂内容。
+- command 层是否独立于 FastAPI。
+- 是否为 CLI/UI 复用预留结构。
+- 是否避免把命令解析写死在路由里。

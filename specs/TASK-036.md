@@ -1,39 +1,40 @@
-# TASK-036 - 运行配置与人格配置
+# TASK-036 - Session fork / resume / new
 
 ## 目标
-把 model、temperature、personality、default agent、default skill、permission profile 这类运行配置集中管理。
+支持从一个已有 session 派生新 session，并能恢复已有 session，让会话管理更接近真实 agent 产品。
 
 ## 产品层
-Config / Runtime
+Session Control
 
 ## 范围内
-- 新增配置对象
-- 支持项目级默认配置
-- 支持 session 覆盖配置
-- API 能读取当前 effective config
-- 预留 `/model`、`/personality`、`/agents`、`/skills` 命令入口
+- 新增 `fork_session`
+- 新增 `resume_session` 或读取已有 session 的清晰 API
+- 新增 `new_session`
+- 记录 parent session id
+- fork 后复制 state，但后续互不影响
 
 ## 范围外
-- 完整配置文件热加载
-- 多用户配置
-- UI 设置页
+- 分支可视化 UI
+- 自动合并分支
+- 多 agent 协作
 
 ## 实现步骤
-1. 新建 `config.py` 或 `runtime_config.py`。
-2. 定义 default config。
-3. 在 session metadata 中保存 overrides。
-4. 实现 `get_effective_config(session_id)`。
-5. 写测试确认默认值和覆盖值合并正确。
+1. 给 session metadata 增加 `parent_session_id`。
+2. 实现新建空 session。
+3. 实现 fork：复制 state_json 到新 session。
+4. 实现 resume：读取已有 session 并返回 metadata。
+5. 写测试确认 fork 后两个 session 独立。
 
 ## 完成标准
-- 配置来源清晰。
-- session 可以覆盖少量配置。
-- 现有 LLM 调用能读取 model 配置但行为不变。
+- 用户可以从任意 session fork 新 session。
+- fork 后 parent 和 child 的消息互不污染。
+- session 列表能看到 parent 信息。
 
 ## 验证
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 配置是否集中。
-- 是否避免环境变量、常量、session 状态多处混杂。
-- 默认配置是否适合学习阶段。
+- fork 是否复制必要字段但不复制运行中状态。
+- parent id 是否允许为空。
+- API 命名是否清晰。
+

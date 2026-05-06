@@ -1,43 +1,40 @@
-# TASK-044 - Web UI 基础壳
+# TASK-044 - Review 模式
 
 ## 目标
-建立最小 Web UI：左侧 session 列表，中间对话区，右侧预留 trace/detail 区。
+实现一个专门审查代码变更的模式，优先找 bug、回归风险和缺失测试，而不是泛泛总结。
 
 ## 产品层
-Frontend
+Review / Agent Behavior
 
 ## 范围内
-- 选择前端技术栈并记录理由
-- 实现基础布局
-- 能创建或选择 session
-- 能发送消息到 `/run`
-- 能显示 assistant reply
+- 新增 review agent 或 review mode
+- 读取 git diff
+- 生成 review prompt
+- 输出 findings、questions、testing gaps
+- 不自动修改代码
 
 ## 范围外
-- 完整设计系统
-- trace 时间线
-- skill 管理
-- 权限审批弹窗
+- 自动修复
+- PR 评论机器人
+- 多文件复杂静态分析
 
 ## 实现步骤
-1. 确认前端目录，例如 `frontend/`。
-2. 建立基础项目。
-3. 封装 API client。
-4. 实现 session sidebar。
-5. 实现 chat input 和 message list。
-6. 跑通一次真实 `/run`。
+1. 定义 review mode 的输出格式。
+2. 将 git diff 作为上下文输入。
+3. 增加 `/review` command。
+4. 如果采用 skill 形态，则只把它当作可选 review skill，不作为系统核心。
+5. 测试 command 不会进入普通聊天路径。
 
 ## 完成标准
-- 用户不用 curl 也能和 agent 对话。
-- session 切换不混乱。
-- 移动端至少不崩。
+- `/review` 能基于 diff 输出审查结果。
+- 没有 diff 时返回“无可审查改动”。
+- 输出优先列问题，不先夸代码。
 
 ## 验证
-- 前端构建命令通过。
-- 手动打开页面发送一条消息。
+- 用一个 mock diff 测试 review 输入构造。
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- UI 是否清楚区分 session 和 message。
-- API 错误是否可见。
-- 是否没有把业务逻辑都写进组件。
-
+- review prompt 是否具体。
+- 是否避免自动修改文件。
+- 输出是否适合用户直接阅读。

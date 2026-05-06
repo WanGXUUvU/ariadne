@@ -1,40 +1,40 @@
-# TASK-034 - Session fork / resume / new
+# TASK-034 - 审批与文件操作审计日志
 
 ## 目标
-支持从一个已有 session 派生新 session，并能恢复已有 session，让会话管理更接近真实 agent 产品。
+记录关键安全动作，让用户之后可以追踪 agent 做过什么、谁审批了什么、哪些文件被访问或提议修改。
 
 ## 产品层
-Session Control
+Audit / Safety
 
 ## 范围内
-- 新增 `fork_session`
-- 新增 `resume_session` 或读取已有 session 的清晰 API
-- 新增 `new_session`
-- 记录 parent session id
-- fork 后复制 state，但后续互不影响
+- 新增 audit log 数据表或 JSON 存储结构
+- 记录工具审批、文件读取、文件修改草案
+- 每条日志包含时间、session、action、target、result
+- 提供查询接口
 
 ## 范围外
-- 分支可视化 UI
-- 自动合并分支
-- 多 agent 协作
+- 企业级审计
+- 多用户身份系统
+- 日志导出
 
 ## 实现步骤
-1. 给 session metadata 增加 `parent_session_id`。
-2. 实现新建空 session。
-3. 实现 fork：复制 state_json 到新 session。
-4. 实现 resume：读取已有 session 并返回 metadata。
-5. 写测试确认 fork 后两个 session 独立。
+1. 设计 `AuditLogRecord` 数据模型。
+2. 增加 Alembic migration。
+3. 在审批流程和文件工具中写入 audit log。
+4. 新增 `/audit` 查询接口，先按 session 过滤。
+5. 写测试确认关键动作会留下日志。
 
 ## 完成标准
-- 用户可以从任意 session fork 新 session。
-- fork 后 parent 和 child 的消息互不污染。
-- session 列表能看到 parent 信息。
+- 审批和文件访问有可追踪记录。
+- 日志不会影响主流程失败。
+- 查询结果按时间排序。
 
 ## 验证
+- `alembic upgrade head`
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- fork 是否复制必要字段但不复制运行中状态。
-- parent id 是否允许为空。
-- API 命名是否清晰。
+- 日志是否稳定且字段少。
+- 是否避免记录敏感完整内容。
+- 写日志失败是否会破坏主流程。
 

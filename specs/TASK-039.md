@@ -1,39 +1,41 @@
-# TASK-039 - Token 与上下文使用统计
+# TASK-039 - 后台任务表
 
 ## 目标
-记录每次运行的模型、输入输出 token、消息数量和耗时，让产品能显示运行成本和上下文压力。
+为长时间运行的 agent 请求建立后台任务记录，让运行状态可以被查询。
 
 ## 产品层
-Observability
+Task Runtime / Observability
 
 ## 范围内
-- 在 model adapter 返回 usage 信息
-- run record 保存 usage
-- API 输出展示 usage summary
-- 没有 usage 时允许为空
+- 新增 task/run record 数据模型
+- 字段包含 `run_id`、`session_id`、`status`、`started_at`、`finished_at`
+- `/run` 时创建记录
+- 完成或失败时更新状态
+- 提供按 session 查询 runs 的接口
 
 ## 范围外
-- 精确成本计算
-- 多供应商价格表
-- 自动截断
+- 真正异步执行
+- 队列系统
+- worker 进程
 
 ## 实现步骤
-1. 扩展模型调用返回对象，加入 usage。
-2. 从 OpenAI 返回中读取 token usage。
-3. 写入 run record。
-4. API 返回 `usage` 字段。
-5. 测试 mock usage 能被保存。
+1. 新增 ORM model 和 Alembic migration。
+2. 在 service 层包装 agent run。
+3. run 开始写 `running`。
+4. run 成功写 `completed`，异常写 `failed`。
+5. 新增查询 API 和测试。
 
 ## 完成标准
-- 每次成功模型调用尽量记录 usage。
-- usage 缺失不导致请求失败。
-- 前端和 CLI 可以直接显示 usage。
+- 每次 `/run` 都有 run record。
+- 失败也能被记录。
+- 查询接口能看到历史 runs。
 
 ## 验证
+- `alembic upgrade head`
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- usage 字段是否兼容不同模型供应商。
-- 是否避免把统计逻辑散落在 agent 主循环。
-- 是否清楚区分估算和官方返回。
+- run 状态是否枚举清晰。
+- 异常路径是否也更新状态。
+- 是否和 session trace 能关联。
 

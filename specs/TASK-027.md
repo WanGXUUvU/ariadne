@@ -1,42 +1,41 @@
-# TASK-027 - Responses API 迁移计划
+# TASK-027 - Plugin 包格式
 
 ## 目标
-制定从当前 Chat Completions 风格迁移到 Responses API 的计划。
+设计项目自己的插件包格式，向 OpenCode 的插件分发思路靠拢。
 
 ## 产品层
-Model Adapter / Runtime
-
-## 背景
-当前写法不是白写，它是 agent runtime 的基础。Responses API 迁移应该发生在 adapter 层，不能推翻 Skill、Tool、Session、Trace 的结构。
+Plugin Platform
 
 ## 范围内
-- 对比当前 adapter 和 Responses adapter 的输入输出
-- 明确 tool call / tool output 映射
-- 明确 session state 是否继续本地管理
-- 创建迁移实施卡
+- 定义 `.agent-plugin/plugin.json`
+- 插件内可包含 skills
+- 插件内可包含 agents
+- 插件内可包含 MCP 配置占位
+- 插件内可包含 assets 占位
+- 本地加载插件 metadata
 
 ## 范围外
-- 直接迁移代码
-- 删除现有 adapter
-- 改 UI
-- 改 skill / extension 格式
+- 远程安装
+- marketplace
+- 安全签名
+- 插件版本升级
 
 ## 实现步骤
-1. 列出当前 Chat Completions adapter 输入输出。
-2. 阅读 Responses API 官方工具调用格式。
-3. 写字段映射表：messages、instructions、tools、tool calls、tool outputs、usage。
-4. 标记风险：streaming、state 管理、错误格式、测试 mock。
-5. 根据映射结果拆出具体实现卡。
+1. 设计 plugin manifest 字段：name、version、description、skills、agents。
+2. 创建示例插件目录。
+3. 实现本地 plugin metadata loader。
+4. 将插件 skills 和 agents 加入索引。
+5. 测试坏 manifest 不影响主流程。
 
 ## 完成标准
-- 迁移风险清楚。
-- 字段映射清楚。
-- 可以进入小步实现。
+- 本地插件可以被发现。
+- 插件里的 skill 和 agent 可以进入对应列表。
+- manifest 格式简单可扩展。
 
 ## 验证
-- 仅 Review。
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 是否保留旧 adapter 作为回退。
-- 是否避免一次性重写 runtime。
-- 是否把迁移边界放在 model adapter 层。
+- 是否和普通 skill 机制复用。
+- manifest 是否过度复杂。
+- 插件路径是否安全。

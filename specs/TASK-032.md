@@ -1,40 +1,46 @@
-# TASK-032 - 审批与文件操作审计日志
+# TASK-032 - 文件工作区只读工具
 
 ## 目标
-记录关键安全动作，让用户之后可以追踪 agent 做过什么、谁审批了什么、哪些文件被访问或提议修改。
+加入最小文件工作区能力，让 agent 能安全读取项目文件，但暂时不能写文件。
 
 ## 产品层
-Audit / Safety
+Workspace / Tools
+
+## 背景
+Codex 类产品的核心能力之一是理解代码库。第一步不做写入，只做可控的 list/read/search。
 
 ## 范围内
-- 新增 audit log 数据表或 JSON 存储结构
-- 记录工具审批、文件读取、文件修改草案
-- 每条日志包含时间、session、action、target、result
-- 提供查询接口
+- 定义 workspace root，默认是项目根目录
+- 新增 `list_files` 工具
+- 新增 `read_file` 工具
+- 新增 `search_text` 工具
+- 阻止访问 workspace root 之外的路径
+- 把文件读取事件写入 trace
 
 ## 范围外
-- 企业级审计
-- 多用户身份系统
-- 日志导出
+- 写文件
+- 删除文件
+- shell 命令
+- 大文件智能截断策略的完整实现
 
 ## 实现步骤
-1. 设计 `AuditLogRecord` 数据模型。
-2. 增加 Alembic migration。
-3. 在审批流程和文件工具中写入 audit log。
-4. 新增 `/audit` 查询接口，先按 session 过滤。
-5. 写测试确认关键动作会留下日志。
+1. 新建 `workspace.py`，集中处理路径安全。
+2. 实现 `resolve_workspace_path`，禁止 `../` 逃逸。
+3. 在 Tool Registry 中注册只读文件工具。
+4. 给每个工具设置清晰 JSON schema。
+5. 为大文件设置简单最大字符数限制。
+6. 写测试覆盖正常读取、找不到文件、路径逃逸。
 
 ## 完成标准
-- 审批和文件访问有可追踪记录。
-- 日志不会影响主流程失败。
-- 查询结果按时间排序。
+- agent 可以通过工具读取项目内文件。
+- agent 不能读取项目外路径。
+- 工具结果格式和错误格式稳定。
 
 ## 验证
-- `alembic upgrade head`
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 日志是否稳定且字段少。
-- 是否避免记录敏感完整内容。
-- 写日志失败是否会破坏主流程。
+- 路径安全是否集中处理。
+- 工具是否只读。
+- 错误信息是否不会泄漏过多本机路径。
 

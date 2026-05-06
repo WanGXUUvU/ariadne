@@ -1,45 +1,45 @@
-# TASK-031 - 文件写入草案与 diff
+# TASK-031 - 工具审批流程
 
 ## 目标
-让 agent 可以提出文件修改草案，但默认不直接写入，先生成 diff 供用户审查。
+在工具执行前加入最小审批状态，让高风险工具可以先返回“需要审批”，而不是直接执行。
 
 ## 产品层
-Workspace / Review
+Permission / Tool Runtime
 
 ## 背景
-真实代码 agent 需要能改文件，但学习阶段应该先建立“计划、diff、审批、应用”的安全闭环。
+Codex 类产品会区分自动允许、需要确认、拒绝执行。本任务先实现后端状态流，不做 UI。
 
 ## 范围内
-- 新增 `propose_file_change` 工具
-- 输入包含目标文件路径和新内容
-- 系统生成 unified diff
-- diff 作为 trace 事件返回
-- 保存待应用的 patch 草案
+- 为 tool call 增加审批判断入口
+- 当权限为 `ask` 时，返回 `approval_required` 事件
+- 保存待审批 tool call 的基本信息
+- 提供一个最小 API 用于 approve / reject
+- approve 后允许继续执行对应工具
 
 ## 范围外
-- 自动应用 patch
-- 复杂三方合并
-- git commit
-- UI diff viewer
+- 前端审批界面
+- shell 工具
+- 文件写入工具
+- 多轮复杂恢复
 
 ## 实现步骤
-1. 新增 patch proposal schema。
-2. 读取旧文件内容并和新内容生成 diff。
-3. 把 proposal 保存到 session 关联状态。
-4. 新增 trace 事件 `file_change_proposed`。
-5. 写测试确认不会直接改文件。
+1. 在事件 schema 中新增 `approval_required` 和 `approval_result` 类型。
+2. 新增 pending approval 数据结构，记录 `session_id`、`tool_name`、`arguments`、`status`。
+3. 在 tool runtime 执行前检查权限。
+4. 如果需要审批，不执行工具，只保存 pending 状态并返回事件。
+5. 新增 approve/reject API，先用最小实现跑通状态变化。
 
 ## 完成标准
-- 工具调用后磁盘文件不变。
-- API 返回可读 diff。
-- proposal 可以被后续任务读取。
+- 需要审批的工具不会被直接执行。
+- 审批状态可以被查询。
+- 拒绝后 trace 中能看到拒绝事件。
 
 ## 验证
-- 测试前后读取文件内容，确认没有被修改。
+- 单元测试覆盖 allow / ask / deny 三种路径。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 是否把“生成 diff”和“应用修改”严格分开。
-- proposal 是否包含足够上下文。
-- 大文件 diff 是否有基础限制。
+- pending approval 是否能和 session 对齐。
+- reject 后是否不会继续执行工具。
+- 是否为后续 UI 留出清晰字段。
 

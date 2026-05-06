@@ -1,40 +1,41 @@
-# TASK-045 - Trace 时间线面板
+# TASK-045 - Verify 命令运行器
 
 ## 目标
-在 UI 中展示 agent 的执行轨迹：assistant tool call、tool result、final answer、error、approval。
+把测试、lint、迁移检查等验证命令封装成可追踪的 verify runner。
 
 ## 产品层
-Frontend / Trace
+Verification
 
 ## 范围内
-- 读取 `/trace` 或 `/run` 返回的 events
-- 右侧显示时间线
-- 不同事件类型有不同视觉区分
-- 工具参数和结果可以展开查看
+- 定义 verify command 配置
+- 默认支持 unittest 命令
+- 运行命令并记录 stdout、stderr、exit code
+- trace 中展示验证结果
+- 设置超时
 
 ## 范围外
-- 实时 streaming
-- 图形化 DAG
-- 高级过滤器
+- 任意 shell 全开放
+- CI 系统
+- 自动修复失败测试
 
 ## 实现步骤
-1. 定义前端 Event 类型。
-2. 实现 TracePanel。
-3. 按事件类型渲染不同块。
-4. 长内容默认折叠。
-5. 给空状态和错误状态做基本处理。
+1. 新建 `verify_runner.py`。
+2. 定义允许执行的 verify 命令列表。
+3. 用 subprocess 运行命令并设置 timeout。
+4. 将结果写入 run record 或 trace。
+5. 增加 `/verify` command。
 
 ## 完成标准
-- 用户能看懂 agent 为什么给出最终回答。
-- 工具调用链路可追踪。
-- 长内容不会把页面撑爆。
+- 用户可以一键运行项目默认测试。
+- 失败结果能被清楚返回。
+- 不允许执行未配置的任意命令。
 
 ## 验证
-- 用包含 tool call 的 session 手动验证。
-- 前端构建命令通过。
+- 测试成功命令、失败命令、未知命令。
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 时间线是否和后端 event schema 对齐。
-- 是否保留原始调试信息入口。
-- 是否避免 UI 过度复杂。
+- 命令白名单是否清楚。
+- 超时是否合理。
+- 输出是否有长度限制。
 

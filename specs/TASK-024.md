@@ -1,39 +1,43 @@
-# TASK-024 - MCP 边界设计
+# TASK-024 - Web UI 基础壳
 
 ## 目标
-定义 MCP 在本项目里的边界，明确什么时候接入、怎么映射到 Tool Registry。
+建立最小 Web UI：左侧 session 列表，中间对话区，右侧预留 trace/detail 区。
 
 ## 产品层
-MCP / Tool Platform
+Frontend
 
 ## 范围内
-- 设计 MCP server 配置结构
-- 设计 MCP tool 到本地 ToolDefinition 的映射
-- 明确错误、权限、trace 的映射方式
-- 产出后续实现任务卡
+- 选择前端技术栈并记录理由
+- 实现基础布局
+- 能创建或选择 session
+- 能发送消息到 `/run`
+- 能显示 assistant reply
 
 ## 范围外
-- 真正接入 MCP server
-- UI 管理 MCP
-- 插件 marketplace
+- 完整设计系统
+- trace 时间线
+- skill 管理
+- 权限审批弹窗
 
 ## 实现步骤
-1. 阅读当前 Tool Registry 结构。
-2. 定义 MCP 工具最小字段：server、name、schema、description。
-3. 设计映射到 `ToolDefinition` 的方式。
-4. 明确权限判断发生在 registry 之前还是之后。
-5. 写成设计说明并创建后续任务卡。
+1. 确认前端目录，例如 `frontend/`。
+2. 建立基础项目。
+3. 封装 API client。
+4. 实现 session sidebar。
+5. 实现 chat input 和 message list。
+6. 跑通一次真实 `/run`。
 
 ## 完成标准
-- MCP 接入点清楚。
-- 不需要推翻 Tool Registry。
-- 后续能小步实现。
+- 用户不用 curl 也能和 agent 对话。
+- session 切换不混乱。
+- 移动端至少不崩。
 
 ## 验证
-- 仅 Review。
+- 前端构建命令通过。
+- 手动打开页面发送一条消息。
 
 ## Review 检查点
-- 是否没有把 MCP 直接塞进 Agent。
-- 是否保留本地工具和 MCP 工具统一入口。
-- 权限和 trace 是否考虑到。
+- UI 是否清楚区分 session 和 message。
+- API 错误是否可见。
+- 是否没有把业务逻辑都写进组件。
 

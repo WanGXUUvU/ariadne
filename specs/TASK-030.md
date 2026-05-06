@@ -1,46 +1,44 @@
-# TASK-030 - 文件工作区只读工具
+# TASK-030 - 权限配置数据结构
 
 ## 目标
-加入最小文件工作区能力，让 agent 能安全读取项目文件，但暂时不能写文件。
+建立最小权限模型，让系统能描述当前 agent 允许做什么，为后续工具审批、文件读写和命令执行打基础。
 
 ## 产品层
-Workspace / Tools
+Permission / Safety
 
 ## 背景
-Codex 类产品的核心能力之一是理解代码库。第一步不做写入，只做可控的 list/read/search。
+Codex 类产品通常不会让 agent 无限制执行所有动作，而是通过 sandbox、approval policy、tool allowlist 等方式控制风险。本任务只做数据结构，不做真实拦截。
 
 ## 范围内
-- 定义 workspace root，默认是项目根目录
-- 新增 `list_files` 工具
-- 新增 `read_file` 工具
-- 新增 `search_text` 工具
-- 阻止访问 workspace root 之外的路径
-- 把文件读取事件写入 trace
+- 新增权限配置对象，例如 `PermissionProfile`
+- 支持至少三个字段：`filesystem`、`network`、`shell`
+- 支持简单等级：`deny`、`read_only`、`ask`、`allow`
+- 给 session 保存当前 permission profile 名称
+- 提供默认配置：学习阶段默认保守
 
 ## 范围外
-- 写文件
-- 删除文件
-- shell 命令
-- 大文件智能截断策略的完整实现
+- 真正阻止工具执行
+- UI 审批弹窗
+- 操作系统级 sandbox
+- 多用户权限
 
 ## 实现步骤
-1. 新建 `workspace.py`，集中处理路径安全。
-2. 实现 `resolve_workspace_path`，禁止 `../` 逃逸。
-3. 在 Tool Registry 中注册只读文件工具。
-4. 给每个工具设置清晰 JSON schema。
-5. 为大文件设置简单最大字符数限制。
-6. 写测试覆盖正常读取、找不到文件、路径逃逸。
+1. 先在 `schemas.py` 定义权限相关 Pydantic schema。
+2. 在 session state 或 session metadata 中保存当前 permission profile。
+3. 在服务层给新 session 设置默认权限。
+4. 暂时不改变任何工具行为，只让权限配置可以被读取。
+5. 补一个单元测试，确认默认 session 有权限配置。
 
 ## 完成标准
-- agent 可以通过工具读取项目内文件。
-- agent 不能读取项目外路径。
-- 工具结果格式和错误格式稳定。
+- 权限配置可以随 session 保存和读取。
+- 默认权限清晰，不依赖隐藏常量。
+- 不影响现有 `/run`、`/reset` 行为。
 
 ## 验证
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 路径安全是否集中处理。
-- 工具是否只读。
-- 错误信息是否不会泄漏过多本机路径。
+- 权限 schema 是否过度复杂。
+- 默认值是否保守。
+- 是否把权限判断提前塞进太多地方。
 

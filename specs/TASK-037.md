@@ -1,41 +1,39 @@
-# TASK-037 - 后台任务表
+# TASK-037 - Skill 草稿创建流程
 
 ## 目标
-为长时间运行的 agent 请求建立后台任务记录，让运行状态可以被查询。
+提供创建 skill 草稿的后端流程，让系统能生成一个可编辑的 `SKILL.md`。
 
 ## 产品层
-Task Runtime / Observability
+Skill Authoring
 
 ## 范围内
-- 新增 task/run record 数据模型
-- 字段包含 `run_id`、`session_id`、`status`、`started_at`、`finished_at`
-- `/run` 时创建记录
-- 完成或失败时更新状态
-- 提供按 session 查询 runs 的接口
+- 新增 create skill draft 函数
+- 输入 name、description、instructions
+- 创建目录和 `SKILL.md`
+- 防止覆盖已有 skill
+- 基础名称校验
 
 ## 范围外
-- 真正异步执行
-- 队列系统
-- worker 进程
+- 让 LLM 自动生成 skill
+- UI 编辑器
+- 插件打包
 
 ## 实现步骤
-1. 新增 ORM model 和 Alembic migration。
-2. 在 service 层包装 agent run。
-3. run 开始写 `running`。
-4. run 成功写 `completed`，异常写 `failed`。
-5. 新增查询 API 和测试。
+1. 定义 skill name 规则，只允许安全字符。
+2. 实现目录创建。
+3. 根据模板写入 `SKILL.md`。
+4. 如果目录已存在，返回错误。
+5. 写测试覆盖成功、重名、非法名称。
 
 ## 完成标准
-- 每次 `/run` 都有 run record。
-- 失败也能被记录。
-- 查询接口能看到历史 runs。
+- 可以创建一个新的本地 skill 草稿。
+- 不会覆盖已有 skill。
+- 新 skill 能被 `list_skills()` 发现。
 
 ## 验证
-- `alembic upgrade head`
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- run 状态是否枚举清晰。
-- 异常路径是否也更新状态。
-- 是否和 session trace 能关联。
-
+- 文件名是否安全。
+- 模板是否和 loader 格式一致。
+- 是否避免自动生成过多复杂内容。

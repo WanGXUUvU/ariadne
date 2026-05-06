@@ -1,41 +1,40 @@
-# TASK-040 - Debug config 与 health 接口
+# TASK-040 - 停止和取消运行
 
 ## 目标
-提供最小诊断接口，方便排查模型配置、数据库、技能索引、工具注册是否正常。
+提供最小取消机制，为后续 UI 的 stop 按钮和 CLI `/stop` 命令打基础。
 
 ## 产品层
-Debug / Operations
+Task Runtime
 
 ## 范围内
-- 新增 `/health`
-- 新增 `/debug/config`
-- 检查数据库可用性
-- 检查 skill 索引是否可读
-- 检查 Tool Registry 注册数量
-- 检查 plugin registry 状态
-- 隐藏 API Key 等敏感信息
+- run record 支持 `cancel_requested`
+- 新增 cancel API
+- agent 主循环在安全点检查取消状态
+- 被取消时返回 `cancelled` 事件
 
 ## 范围外
-- 完整监控系统
-- 鉴权
-- 日志聚合
+- 强杀线程或进程
+- 分布式任务队列
+- 取消外部正在执行的不可中断请求
 
 ## 实现步骤
-1. 新建 health service。
-2. 实现数据库 ping。
-3. 读取 skill index、plugin registry 和 tool registry 概况。
-4. 返回 sanitized config。
-5. 写测试确认敏感字段不会出现。
+1. 扩展 run record 字段。
+2. 新增 `/runs/{run_id}/cancel`。
+3. 在每轮 LLM 调用和工具调用前检查 cancel 标记。
+4. 标记取消后停止后续步骤。
+5. 测试取消状态转换。
 
 ## 完成标准
-- `/health` 能用于快速判断服务是否可用。
-- `/debug/config` 能帮助开发排错。
-- 不泄漏密钥。
+- 已请求取消的 run 不再继续进入下一步。
+- trace 中有取消事件。
+- cancel API 对已完成任务返回清晰状态。
 
 ## 验证
+- 单元测试覆盖 running、completed、missing run。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 输出是否足够短。
-- 是否包含敏感字段。
-- 是否依赖外部网络。
+- 是否只在安全点取消。
+- 状态流是否简单。
+- 是否没有假装能取消所有外部请求。
+
