@@ -83,6 +83,22 @@ const formatContent = (text: string | null) => {
   // Italic: *text* → <em>（单个 *，不碰 **）
   html = html.replace(/(?<!\*)\*(?!\*)([^*]+)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
 
+  // Unordered lists: 连续的 - 开头行 → <ul><li>
+  html = html.replace(/((?:^- .+$\n?)+)/gm, (block) => {
+    const items = block.trim().split('\n')
+      .filter(l => l.trim().startsWith('- '))
+      .map(l => `<li>${l.replace(/^- /, '')}</li>`);
+    return `<ul class="md-list">${items.join('')}</ul>`;
+  });
+
+  // Ordered lists: 连续的 数字. 开头行 → <ol><li>
+  html = html.replace(/((?:^\d+\. .+$\n?)+)/gm, (block) => {
+    const items = block.trim().split('\n')
+      .filter(l => /^\d+\. /.test(l.trim()))
+      .map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`);
+    return `<ol class="md-list">${items.join('')}</ol>`;
+  });
+
   return html;
 };
 </script>
@@ -308,6 +324,33 @@ const formatContent = (text: string | null) => {
 
 .message-text :deep(.md-table tbody tr:hover) {
   background: var(--bg-hover);
+}
+
+.message-text :deep(.md-list) {
+  margin: 8px 0;
+  padding-left: 20px;
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+
+.message-text :deep(.md-list li) {
+  margin-bottom: 4px;
+}
+
+.message-text :deep(strong) {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.message-text :deep(em) {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.message-text :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border-dim);
+  margin: 16px 0;
 }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }

@@ -113,7 +113,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 .composer-input:focus {
   outline: none;
-  border-color: var(--border-strong);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-subtle, rgba(255,255,255,0.06));
+}
+
+.composer-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .composer-input::placeholder {

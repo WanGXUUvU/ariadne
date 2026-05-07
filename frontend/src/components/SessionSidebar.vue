@@ -45,11 +45,18 @@ const formatTime = (date: string | Date) => {
     </div>
 
     <div class="session-list">
+      <div v-if="filteredSessions.length === 0" class="session-empty">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="1.5" fill="none" style="margin-bottom: 8px;">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <div class="mono-label" style="color: var(--text-muted); font-size: 10px;">NO SESSIONS YET</div>
+      </div>
       <div 
-        v-for="session in filteredSessions" 
+        v-for="(session, idx) in filteredSessions" 
         :key="session.session_id"
         class="session-item"
         :class="{ active: activeId === session.session_id }"
+        :style="{ animationDelay: `${idx * 30}ms` }"
         @click="$emit('select', session.session_id)"
       >
         <div class="session-info">
@@ -93,6 +100,15 @@ const formatTime = (date: string | Date) => {
   overflow-y: auto;
 }
 
+.session-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
 .session-item {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-dim);
@@ -101,6 +117,7 @@ const formatTime = (date: string | Date) => {
   align-items: center;
   cursor: pointer;
   transition: var(--transition-fast);
+  animation: fadeIn 0.3s ease both;
 }
 
 .session-item:hover {
@@ -108,7 +125,7 @@ const formatTime = (date: string | Date) => {
 }
 
 .session-item.active {
-  background: var(--bg-active);
+  background: var(--accent-subtle, rgba(255,255,255,0.06));
   border-left: 2px solid var(--accent);
   padding-left: 14px;
 }
@@ -117,12 +134,16 @@ const formatTime = (date: string | Date) => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .session-title {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .session-meta {
@@ -131,9 +152,15 @@ const formatTime = (date: string | Date) => {
 
 .session-time {
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .session-item.active .session-title {
   color: var(--accent);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
