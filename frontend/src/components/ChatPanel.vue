@@ -61,7 +61,6 @@ defineEmits<{
           class="tech-btn" 
           @click="$emit('compact')"
           :disabled="isCompacting || isLoading"
-          :style="(isCompacting || isLoading) ? 'opacity: 0.45; cursor: not-allowed; pointer-events: none;' : ''"
         >
           <!-- isCompacting 时显示闪烁动画，正常时显示图标+文字 -->
           <template v-if="isCompacting">
@@ -74,7 +73,11 @@ defineEmits<{
           </template>
         </button>
         
-        <button class="tech-btn" @click="$emit('reset')" style="color: #FF453A; border-color: rgba(255,69,58,0.3);">
+        <button 
+          class="tech-btn" 
+          @click="if (confirm('Delete this session? This cannot be undone.')) $emit('reset')" 
+          style="color: var(--danger, #FF453A); border-color: rgba(255,69,58,0.3);"
+        >
           Reset
         </button>
       </div>

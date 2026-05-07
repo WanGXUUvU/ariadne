@@ -6,6 +6,7 @@
   --bg-panel: #0A0A0A;
   --bg-hover: rgba(255, 255, 255, 0.04);
   --bg-active: rgba(255, 255, 255, 0.08);
+  --bg-elevated: #111111;
   
   --border-dim: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.15);
@@ -16,6 +17,9 @@
   
   --accent: #FFFFFF;
   --accent-glow: rgba(255, 255, 255, 0.2);
+  --accent-subtle: rgba(255, 255, 255, 0.06);
+  --success: #50E3C2;
+  --danger: #FF453A;
   
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
@@ -24,8 +28,10 @@
   --radius-sm: 6px;
   
   --shadow-app: 0 0 0 1px rgba(255,255,255,0.05), 0 32px 64px rgba(0,0,0,0.8);
+  --shadow-glow: 0 0 20px rgba(255,255,255,0.03);
   
   --transition-fast: all 0.15s ease;
+  --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -60,6 +66,18 @@ button, input, textarea, select {
   justify-content: center;
 }
 
+.layout-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  animation: fadeIn 0.5s ease;
+}
+
 .app-layout {
   display: flex;
   width: 100%;
@@ -69,6 +87,7 @@ button, input, textarea, select {
   border: 1px solid var(--border-dim);
   box-shadow: var(--shadow-app);
   overflow: hidden;
+  animation: fadeIn 0.3s ease;
 }
 
 /* Base Panel Styles */
@@ -118,11 +137,23 @@ button, input, textarea, select {
   padding: 6px 12px;
   cursor: pointer;
   transition: var(--transition-fast);
+  user-select: none;
 }
 
 .tech-btn:hover {
   background: var(--bg-hover);
   border-color: var(--accent);
+}
+
+.tech-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tech-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .tech-btn.primary {
@@ -132,6 +163,19 @@ button, input, textarea, select {
 }
 .tech-btn.primary:hover {
   background: #E5E5E5;
+}
+.tech-btn.primary:disabled {
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+}
+
+/* Select dropdown dark theme */
+select.tech-btn {
+  background: var(--bg-app);
+}
+select.tech-btn option {
+  background: var(--bg-app);
+  color: var(--text-primary);
 }
 
 /* Typography Overrides */
@@ -151,4 +195,10 @@ button, input, textarea, select {
   justify-content: space-between;
   height: 56px;
   flex-shrink: 0;
+}
+
+/* Fade-in animation for layout transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

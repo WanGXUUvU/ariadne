@@ -126,6 +126,13 @@ watch(() => props.events.length, async () => {
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 13px;
+  transition: var(--transition-fast);
+  animation: traceSlideIn 0.25s ease both;
+}
+
+.event-item:hover {
+  background: var(--bg-hover);
+  box-shadow: var(--shadow-glow, 0 0 20px rgba(255,255,255,0.03));
 }
 
 .event-item.assistant_tool_call { border-left: 2px solid var(--accent); }
@@ -175,5 +182,10 @@ watch(() => props.events.length, async () => {
   color: var(--text-secondary);
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+@keyframes traceSlideIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 </style>

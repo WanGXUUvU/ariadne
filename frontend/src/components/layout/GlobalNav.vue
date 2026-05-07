@@ -91,8 +91,11 @@ const handleClick = (item: any) => {
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  transition: var(--transition-fast);
+  transition: color 0.2s ease, background 0.2s ease;
   position: relative;
+  border-radius: 8px;
+  margin: 0 8px;
+  width: calc(100% - 16px);
 }
 
 .nav-item:hover {
@@ -102,17 +105,24 @@ const handleClick = (item: any) => {
 
 .nav-item.is-active {
   color: var(--text-primary);
+  background: var(--accent-subtle, rgba(255,255,255,0.06));
 }
 
 .nav-item.is-active::before {
   content: '';
   position: absolute;
-  left: 0;
+  left: -8px;
   top: 12px;
   bottom: 12px;
   width: 2px;
   background: var(--accent);
   border-radius: 0 2px 2px 0;
+  animation: navIndicator 0.2s ease;
+}
+
+@keyframes navIndicator {
+  from { opacity: 0; transform: scaleY(0); }
+  to { opacity: 1; transform: scaleY(1); }
 }
 
 .user-avatar {
@@ -125,5 +135,10 @@ const handleClick = (item: any) => {
   justify-content: center;
   color: var(--text-secondary);
   background: var(--bg-hover);
+  transition: var(--transition-fast);
+}
+
+.user-avatar:hover {
+  border-color: var(--border-strong);
 }
 </style>
