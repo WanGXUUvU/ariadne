@@ -83,7 +83,7 @@ class CompactInput(BaseModel):
     """/compact 请求体"""
     session_id:str=Field(min_length=1)
     trigger_threshold:int=Field(default=12,ge=1)#触发compact的消息阈值 默认12 最小1
-    keep_recent_count:int=Field(default=4,ge=1)#压缩后保留最近几条原始消息 默认4 最小1
+    keep_recent_count:int=Field(default=2,ge=1)#压缩后保留最近几条原始消息 默认2 最小1
 
 class AgentState(BaseModel):
     """某个 session 的最新状态快照。"""

@@ -1,0 +1,139 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import type { SessionSummary } from '../types';
+
+const props = defineProps<{
+  sessions: SessionSummary[];
+  activeId: string | null;
+}>();
+
+defineEmits<{
+  (e: 'select', id: string): void;
+  (e: 'new'): void;
+}>();
+
+const searchQuery = ref('');
+
+const filteredSessions = computed(() => {
+  const normalized = searchQuery.value.trim().toLowerCase();
+  if (!normalized) return props.sessions;
+
+  return props.sessions.filter((session) => {
+    const title = (session.session_name || session.session_id).toLowerCase();
+    return title.includes(normalized);
+  });
+});
+
+const formatTime = (date: string | Date) => {
+  return new Date(date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+};
+</script>
+
+<template>
+  <aside class="session-sidebar">
+    <div class="panel-header" style="flex-direction: row; gap: 8px;">
+      <span class="mono-label" style="color: var(--text-primary);">SESSIONS</span>
+      <button class="tech-btn" @click="$emit('new')" style="padding: 4px 8px; font-size: 12px;">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        New
+      </button>
+    </div>
+
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input v-model="searchQuery" placeholder="Filter..." class="search-input" />
+    </div>
+
+    <div class="session-list">
+      <div 
+        v-for="session in filteredSessions" 
+        :key="session.session_id"
+        class="session-item"
+        :class="{ active: activeId === session.session_id }"
+        @click="$emit('select', session.session_id)"
+      >
+        <div class="session-info">
+          <div class="session-title">{{ session.session_name || session.session_id.substring(0, 8) }}</div>
+          <div class="session-meta mono-label">{{ session.message_count || 0 }} MSG</div>
+        </div>
+        <div class="session-time mono-label">{{ formatTime(session.updated_at || session.created_at) }}</div>
+      </div>
+    </div>
+  </aside>
+</template>
+
+<style scoped>
+.search-box {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-icon {
+  color: var(--text-muted);
+}
+
+.search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 100%;
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.session-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-dim);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.session-item:hover {
+  background: var(--bg-hover);
+}
+
+.session-item.active {
+  background: var(--bg-active);
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.session-meta {
+  color: var(--text-muted);
+}
+
+.session-time {
+  color: var(--text-muted);
+}
+
+.session-item.active .session-title {
+  color: var(--accent);
+}
+</style>

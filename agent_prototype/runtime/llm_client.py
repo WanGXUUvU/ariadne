@@ -26,7 +26,10 @@ def call_llm(messages,tools=None):
     if tools:
         payload["tools"]=tools
     response = requests.post(url, headers=headers, json=payload, timeout=60)
-    response.raise_for_status()
+    if not response:
+        print("STATUS:",response.status_code)
+        print("BODY:",response.text)    
+        response.raise_for_status()
     data = response.json()
     return data["choices"][0]["message"]
 
