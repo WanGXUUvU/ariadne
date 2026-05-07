@@ -16,7 +16,7 @@ defineProps<{
   activeAgentId: string;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'send', text: string): void;
   (e: 'errorDismiss'): void;
   (e: 'infoDismiss'): void; // 手动关闭 info 提示
@@ -24,6 +24,12 @@ defineEmits<{
   (e: 'compact'): void;
   (e: 'reset'): void;
 }>();
+
+const handleReset = () => {
+  if (confirm('Delete this session? This cannot be undone.')) {
+    emit('reset');
+  }
+};
 </script>
 
 <template>
@@ -75,7 +81,7 @@ defineEmits<{
         
         <button 
           class="tech-btn" 
-          @click="if (confirm('Delete this session? This cannot be undone.')) $emit('reset')" 
+          @click="handleReset" 
           style="color: var(--danger, #FF453A); border-color: rgba(255,69,58,0.3);"
         >
           Reset
