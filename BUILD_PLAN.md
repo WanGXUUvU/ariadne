@@ -100,14 +100,14 @@ frontend/         # 聊天助理 Web UI
 状态：进行中
 
 目标：
-打通聊天助理的完整用户闭环：Web UI + Streaming + Trace 面板 + 专属 Agent 定义。
+打通聊天助理的完整用户闭环：先把当前已有后端能力集中接入一个前端工作台，再进入 streaming 和专属 agent 定义阶段。
 
 任务（按执行顺序，数字即顺序）：
 - `TASK-021` API 输出整理 ✅
 - `TASK-022` 前端规划任务卡 ✅
-- `TASK-023` 新建 Session 接口（待 Review）
-- `TASK-024` Web UI 基础壳 【聊天助理】
-- `TASK-025` Trace 时间线面板 【聊天助理 — 同步版，不依赖 Streaming】
+- `TASK-023` 新建 Session 接口 ✅
+- `TASK-024` 现有后端能力前端整合 【聊天助理：chat + sessions + trace + skills + compact + reset】
+- `TASK-025` 已并入 `TASK-024`
 - `TASK-028` 模型适配层接口 【共享 — 重构模型调用层，为 Streaming 做准备】
 - `TASK-049` Streaming 后端 SSE 【共享 — 提前到此阶段】
 - `TASK-052` Streaming 前端接入 【聊天助理】

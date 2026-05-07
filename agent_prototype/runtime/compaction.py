@@ -31,21 +31,29 @@ def split_messages_for_compaction(
     return anchor_messages,middle_messages,recent_messages
 
 def build_compact_prompt(middle_messages:list[ChatMessage])->str:
-    """输入：中段消息。输出：发给模型的 compact prompt。"""#这个函数只负责构造压缩提示词
+    """输入：中段消息。输出：发给模型的 compact prompt。"""
 
-    lines = [COMPACT_SUMMARY_PREFIX,"","Conversation segment to compress:"]
+    lines = [
+        "你是一个对话历史压缩助手。",
+        "请将以下对话片段的核心内容压缩成简洁的摘要。",
+        "要求：",
+        "- 保留关键任务目标、重要约束、工具调用结果和未完成的工作",
+        "- 直接输出摘要内容，不要在摘要中包含 [COMPACT_SUMMARY] 标签或任何说明前缀",
+        "- 使用简洁流畅的语言，避免多余格式",
+        "",
+        "需要压缩的对话片段：",
+    ]
 
     for message in middle_messages:
         if message.tool_calls:
-            tool_names=",".join(tool_call.function.name for tool_call in message.tool_calls)
-            lines.append(f"- assistant requested tools: {tool_names}")
+            tool_names = ",".join(tc.function.name for tc in message.tool_calls)  # 只记录工具名，不展开参数
+            lines.append(f"- assistant 调用了工具: {tool_names}")
             continue
-
-        content = message.content or "(empty)"
+        content = message.content or "(空)"
         lines.append(f"- {message.role}: {content}")
 
-    lines.append("") #空一行 提升prompt可读性
-    lines.append("Return only the compact summary text.")
+    lines.append("")  # 空一行提升可读性
+    lines.append("请直接输出摘要，语言与对话保持一致，不要重复上面的指令：")
 
     return "\n".join(lines)
 
@@ -78,7 +86,7 @@ def compact_state_with_summary(
         keep_recent_count=keep_recent_count, #把 recent 保留数量传进去
     )
 
-    if not middle_messages:
+    if len(middle_messages) < 2:  # 中段消息少于 2 条时，内容太短，没有压缩价值，直接跳过
         return CompactOutput(state=state,did_compact=False,removed_count=0) #说明这次不需要 compact 原样返回
     
     summary_message = build_compact_summary_message(summary_text)

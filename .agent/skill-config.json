@@ -1,3 +1,13 @@
 {
-  "disabled": []
+  "disabled": [
+    "codex-native-lite-project-workflow",
+    "codex-native-project-workflow",
+    "device-point-import-builder",
+    "doc",
+    "find-skills",
+    "frontend-skill",
+    "officecli",
+    "playwright",
+    "technical-writing"
+  ]
 }

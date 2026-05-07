@@ -78,7 +78,7 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
             CompactInput(
                 session_id=agent_input.session_id,  # 自动 compact 仍然针对当前 session
                 trigger_threshold=12,  # 第一版先写死默认阈值，后面再考虑配置化
-                keep_recent_count=4,  # 第一版先写死默认 recent 保留数量
+                keep_recent_count=2,  # 压缩后只保留最近 2 条原始消息，上下文更精简
             ),
             db,
         )

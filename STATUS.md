@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: planning
-- Task: specs/TASK-023.md
-- Gate: Verify
-- Allowed Now: review
+- Phase: implementation
+- Task: specs/TASK-025.md
+- Gate: implementation
+- Allowed Now: implementation, verify
 - Lane: Fast
 - Blocked: None
-- Next action: 对 `TASK-023` 做 Review；完成后切到新的 `TASK-024` Web UI 基础壳，开始前端最小闭环实现。
+- Next action: 按 B1→B2→B3→B4 顺序逐个修复后端 Bug，前端部分已自动修完。
 
 
 ## 遗留项
@@ -77,7 +77,12 @@
 | 2026-05-05 | `TASK-020` 收口 | Review | 接受当前 compact 最小闭环实现，下一步切到 `TASK-021` 做 `/run` 输出整理。 |
 | 2026-05-05 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-021`，进入 `/run` 响应结构整理阶段。 |
 | 2026-05-06 | 拆解 `TASK-021` 主链路 | planning | 已确认当前 `/run` 已有 `reply/state/events/metadata`，并决定保留完整 `state`，下一步统一错误响应与测试。 |
-| 2026-05-06 | `TASK-021` 验证完成 | Verify | 已统一业务错误响应为顶层 `error`，并更新 `/run`、session、trace、skill、compact 相关测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-05-06 | `TASK-021` 收口 | Review | 统一业务错误响应为顶层 `error`，相关测试通过。 |
+| 2026-05-07 | `TASK-023` 验证完成 | Verify / Review | `POST /sessions` 已打通，空 session 可创建并出现在列表中，测试通过，Review 通过。 |
+| 2026-05-07 | 双产品路线规划 | planning | 确定同仓库共享内核方案，新增 TASK-052～059，BUILD_PLAN 重组为 M6～M9。 |
+| 2026-05-07 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-024` Web UI 基础壳。 |
+| 2026-05-07 | 同步路线文档冲突 | planning | 已修正 `BUILD_PLAN` 中 `TASK-023` 状态、统一 `TASK-058` CLI 路径到 `agent_prototype/cli/main.py`，并将 `TASK-053` 的默认工具描述改为不提前引用未实现的 `web_search`。 |
+| 2026-05-07 | 合并前端任务卡 | planning | 按“现有后端能力一次前端整合”的方向，将 `TASK-025` 并入 `TASK-024`，并把 `TASK-024` 扩展为 chat、sessions、trace、skills、compact、reset 的统一工作台任务卡。 |
 | 2026-05-06 | `TASK-021` 收口 | Review | 确认 `/run` 继续保留完整 `state`，并将顶层 `error` 确认为当前统一业务错误响应格式，任务完成。 |
 | 2026-05-06 | 删除任务卡 | planning | 删除旧 `TASK-022` 最小 CLI 入口任务卡。 |
 | 2026-05-06 | 调整任务卡编号 | planning | 将前端规划任务卡改回 `TASK-022`，并新建 `TASK-023` 专门承载“新建 session 接口”。 |
@@ -87,3 +92,8 @@
 | 2026-05-06 | 开始 `TASK-023` | planning | 已按 `schema -> route -> service -> test` 打通独立新建会话主链路。 |
 | 2026-05-06 | `TASK-023` 验证完成 | Verify | `POST /sessions` 已可创建空白会话、返回 `SessionSummary`、出现在 `GET /sessions` 中，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
 | 2026-05-06 | 重排后续任务卡 | planning | 将 `Web UI 基础壳` 和 `Trace 时间线面板` 前移为 `TASK-024`、`TASK-025`；原 `TASK-024` 到 `TASK-043` 顺延两位，路线图同步为“先前端闭环，再平台边界”。 |
+| 2026-05-07 | `TASK-024` 第一阶段 | implementation | 已建立 `useWorkspace` 核心状态层，接入 `GlobalNav` 全局侧边栏和 `TopControlBar` 顶部控制区（含 Agent 选择、Compact、Reset），完成三栏大布局壳子搭建与技能库 Mock 页面入口。 |
+| 2026-05-07 | `TASK-024` 视觉重构 | implementation | 彻底推翻初版 UI，完成 Linear/Vercel 风格的极简极客暗色主题重构（Monolithic App Shell、等宽字体、无气泡对话流、1px网格系统）。 |
+| 2026-05-07 | `TASK-024` 前端全链路闭环 | Verify | 完成 `MessageComposer` 额度监控与 IME 处理，完成 `MessageList` 的 Compact 骨架屏与系统提示块渲染，修复 setup 致命错误，所有现有后端能力 100% 映射到 UI。 |
+| 2026-05-07 | `TASK-024` (含 `TASK-025`) 收口 | Review | 单页工作台已达到预期，Session/Chat/Trace/Skill/Compact 五大核心功能彻底贯通，体验拉满。 |
+| 2026-05-07 | 切换到下一张任务卡 | planning | 进入 MCP 架构阶段，开始推进 `TASK-026` MCP 边界设计。 |

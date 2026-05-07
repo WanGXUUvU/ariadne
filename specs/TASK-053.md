@@ -10,7 +10,7 @@
 - 在 `agents_defs/` 目录创建 `assistant.yaml`（或 JSON）
 - 定义 name、description、system_prompt、tool_names、skill_names
 - system_prompt 体现"通用助理"人格：友好、简洁、诚实
-- 默认工具集：echo、web_search（占位）
+- 默认工具集：先仅使用已存在工具；`web_search` 等 `TASK-056` 完成后再加入
 - 确认 Agent Loader 能正确读取此定义
 - 写测试确认可以按名称加载
 
