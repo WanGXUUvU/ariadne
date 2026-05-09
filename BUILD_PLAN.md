@@ -42,7 +42,7 @@ frontend/         # 聊天助理 Web UI
 
 参考能力面：
 - OpenAI Codex Skills：`SKILL.md`、渐进加载、显式/隐式调用、可附带脚本和资源。
-- OpenAI Codex Plugins：插件作为分发单位，插件内可包含 skills、MCP、app 配置和 assets。
+- OpenAI Codex Plugins：插件作为分发单位，官方结构以 `.codex-plugin/plugin.json` 为入口，根目录可包含 `skills/`、`.mcp.json`、`.app.json`、`hooks/`、`assets/`。
 - OpenAI Codex CLI：slash commands、权限、diff/review、session fork/resume、model/personality、MCP、plugins、status/debug。
 
 ## M1 - 稳定 Agent Runtime

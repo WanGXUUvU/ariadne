@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: implementation
-- Task: specs/TASK-025.md
-- Gate: implementation
-- Allowed Now: implementation, verify
+- Phase: planning
+- Task: specs/TASK-026.md
+- Gate: review
+- Allowed Now: review
 - Lane: Fast
 - Blocked: None
-- Next action: 按 B1→B2→B3→B4 顺序逐个修复后端 Bug，前端部分已自动修完。
+- Next action: 先围绕 `runtime/tool_registry.py -> runtime/agent.py -> trace schema` 梳理当前统一工具入口，再产出 `TASK-026` 的 MCP 边界结论与后续实现拆分。
 
 
 ## 遗留项
@@ -16,6 +16,10 @@
 ## History
 | Date | Task | Gate Passed | Notes |
 |------|------|-------------|-------|
+| 2026-05-09 | 收紧 MCP / Plugin 任务卡到官方结构 | planning | 已按 Codex 官方方向重写 `TASK-026` 和 `TASK-027`：先定义 `mcp_servers.<id>` server 配置边界，插件结构改回 `.codex-plugin/plugin.json + .mcp.json + .app.json`。 |
+| 2026-05-09 | 切换到下一张任务卡 | planning | 顶部状态正式切到 `TASK-026`，当前进入 MCP 边界设计 review；先读 Tool Registry、执行链路与 trace，再收口设计结论。 |
+| 2026-05-09 | 推进 `TASK-025` 后端稳健性修复 | implementation | 已完成 B1-B4：删除事务边界、LLM HTTP/响应结构错误处理、自动 compact 不提前落库、session nullable 元数据哨兵更新；全量 `python3 -m unittest agent_prototype.tests.test_agent -v` 47 项通过。 |
+| 2026-05-09 | 调整 `TASK-025` 剩余范围 | planning | B5/B6 归并到后续工具专项：统一处理工具安全边界、深度/结果限制和新增工具能力，不再阻塞当前主链路收口。 |
 | 2026-04-24 | 完成第一个工具调用闭环 | Verify / Review | 已跑通 `tool_calls -> tool -> final`，并用 `curl` 验证。 |
 | 2026-04-24 | 规划会话隔离任务 | implementation | 已确认当前原型需要按 `session_id` 隔离状态，进入下一阶段。 |
 | 2026-04-24 | 实现会话隔离与重置 | implementation | 已改为按 `session_id` 读写内存会话状态，并提供 `/reset`。 |
