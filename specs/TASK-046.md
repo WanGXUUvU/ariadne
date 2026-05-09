@@ -1,44 +1,40 @@
-# TASK-046 - Skill / Plugin / Agent 管理界面
+# TASK-046 - 审批与文件操作审计日志
 
 ## 目标
-在 UI 中展示已发现的 skill、插件和 agent 信息，支持启用、禁用和查看 `SKILL.md` 摘要。
+记录关键安全动作，让用户之后可以追踪 agent 做过什么、谁审批了什么、哪些文件被访问或提议修改。
 
 ## 产品层
-Frontend / Extension Management
+Audit / Safety
 
 ## 范围内
-- Skill 列表页
-- Agent 列表页
-- 展示 name、description、enabled
-- 查看 Skill 详情
-- 查看 Agent 详情
-- 启用/禁用 Skill
-- 启用/禁用 Agent
-- 预留 Plugin 列表区域
+- 新增 audit log 数据表或 JSON 存储结构
+- 记录工具审批、文件读取、文件修改草案
+- 每条日志包含时间、session、action、target、result
+- 提供查询接口
 
 ## 范围外
-- 在线安装插件
-- 编辑完整 `SKILL.md`
-- marketplace
+- 企业级审计
+- 多用户身份系统
+- 日志导出
 
 ## 实现步骤
-1. 后端确认已有 skill index、agent index 和 plugin index API。
-2. 前端实现 ExtensionManager 页面。
-3. 增加 enable/disable 调用。
-4. 详情页展示 instructions 的安全摘要。
-5. 空状态提示如何添加本地 skill 或 agent。
+1. 设计 `AuditLogRecord` 数据模型。
+2. 增加 Alembic migration。
+3. 在审批流程和文件工具中写入 audit log。
+4. 新增 `/audit` 查询接口，先按 session 过滤。
+5. 写测试确认关键动作会留下日志。
 
 ## 完成标准
-- 用户能知道当前有哪些 skill、agent 和 plugin。
-- 用户能控制 skill 和 agent 是否启用。
-- UI 和配置文件状态一致。
+- 审批和文件访问有可追踪记录。
+- 日志不会影响主流程失败。
+- 查询结果按时间排序。
 
 ## 验证
-- 手动启用/禁用一个 skill。
-- 手动启用/禁用一个 agent。
-- 刷新页面后状态仍正确。
+- `alembic upgrade head`
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 是否避免一次性展示超长 instructions。
-- enabled 状态是否来自后端。
-- 是否为插件预留但不提前实现 marketplace。
+- 日志是否稳定且字段少。
+- 是否避免记录敏感完整内容。
+- 写日志失败是否会破坏主流程。
+

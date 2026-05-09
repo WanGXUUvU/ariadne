@@ -1,43 +1,43 @@
-# TASK-056 - Web 搜索工具
+# TASK-056 - MCP Tool Bridge 与运行时接入
 
 ## 目标
-为聊天助理添加网络搜索能力，让 agent 在需要最新信息时可以主动调用搜索，而不是依靠训练知识。
+把 discovered MCP tools 映射进现有统一工具入口，让 Agent 能像调用本地工具一样调用 MCP tools。
 
-## 产品线
-聊天助理
+## 产品层
+MCP / Runtime
+
+## 依赖
+- `TASK-055` MCP Server 配置加载与发现
 
 ## 范围内
-- 新增 `web_search` 工具定义
-- 接入一个搜索 API（优先 SerpAPI 或 Tavily，可配置）
-- 返回摘要列表（title、url、snippet），限制数量
-- 工具结果写入 trace
-- API Key 通过环境变量读取，不硬编码
+- 定义 discovered MCP tool 到统一 runtime tool surface 的映射
+- 保留 tool 来源信息，例如 `source_type`、`server_id`
+- 把 MCP tool 暴露给现有 `ToolRegistry`
+- 执行 MCP tool call，并返回统一 `ToolResult`
+- 把 timeout、错误和审批信息接入现有 trace
 
 ## 范围外
-- 自建爬虫
-- 图片搜索
-- 搜索结果缓存
-- 完整网页抓取
+- MCP `resources` / `prompts`
+- MCP OAuth 完整交互
+- 插件 marketplace
+- 多 server 并发优化
 
 ## 实现步骤
-1. 在 `tools_defs/` 新建 `web_search.py`。
-2. 定义 JSON schema：`query`（必填）、`num_results`（可选，默认 5）。
-3. 实现搜索 API 调用，读取环境变量 API Key。
-4. 返回 `ToolResult`，内容为搜索结果摘要列表。
-5. 在 Tool Registry 注册。
-6. 在 assistant agent 定义的 tool_names 中加入 `web_search`。
-7. 写测试 mock HTTP 调用，不依赖真实网络。
+1. 扩展统一工具定义，补齐来源信息。
+2. 定义 MCP tool bridge，把 discovered tool 包成可执行 runtime tool。
+3. 在执行链路里调用 MCP client，转换成统一 `ToolResult`。
+4. 在 `AgentEvent` / trace 中补齐 MCP 来源和错误信息。
+5. 写测试覆盖成功、tool error、timeout、server 不可用和 unknown tool。
 
 ## 完成标准
-- assistant agent 在需要时能主动搜索并引用结果。
-- API Key 缺失时返回清晰错误，不崩溃。
-- 搜索结果数量有上限，不会撑爆上下文。
+- Agent 能通过统一入口调用 MCP tools。
+- 本地工具和 MCP 工具共用同一套事件和错误结构。
+- trace 能区分工具来源，不再把 MCP tool 当成本地 handler。
 
 ## 验证
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
-- 手动问一个需要最新信息的问题，观察工具调用。
 
 ## Review 检查点
-- API Key 是否只从环境变量读取。
-- 搜索结果是否有字数/条数限制。
-- 搜索失败是否返回 `tool_error` 而不是崩溃。
+- 是否保留了统一工具入口。
+- MCP tool 来源信息是否完整。
+- 错误和 timeout 是否没有散落到多层。

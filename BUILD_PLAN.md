@@ -27,13 +27,13 @@ agent_prototype/
   storage/        # 共享 — Session, Trace, DB
   skills/         # 共享 — Skill 加载/索引/启用
   api/            # 共享 HTTP API
-  cli/            # 编码产品入口（TASK-058）
+  cli/            # 编码产品入口（TASK-051）
   agents_defs/    # 两个产品的 Agent 定义
     assistant.yaml  # 聊天助理
     coding.yaml     # 编码产品
   tools_defs/
     echo.py         # 通用
-    web_search.py   # 聊天助理专用（TASK-056）
+    web_search.py   # 聊天助理专用（TASK-035）
     fs_read.py      # 编码专用
     fs_write.py     # 编码专用
     shell_exec.py   # 编码专用（待实现）
@@ -108,31 +108,31 @@ frontend/         # 聊天助理 Web UI
 - `TASK-023` 新建 Session 接口 ✅
 - `TASK-024` 现有后端能力前端整合 【聊天助理：chat + sessions + trace + skills + compact + reset】
 - `TASK-025` 已并入 `TASK-024`
-- `TASK-028` 模型适配层接口 【共享 — 重构模型调用层，为 Streaming 做准备】
-- `TASK-049` Streaming 后端 SSE 【共享 — 提前到此阶段】
-- `TASK-052` Streaming 前端接入 【聊天助理】
-- `TASK-053` Chat Assistant Agent 定义 【聊天助理】
-- `TASK-054` 消息 Markdown / 代码块渲染 【聊天助理】
+- `TASK-026` 模型适配层接口 【共享 — 重构模型调用层，为 Streaming 做准备】
+- `TASK-027` Streaming 后端 SSE 【共享 — 提前到此阶段】
+- `TASK-028` Streaming 前端接入 【聊天助理】
+- `TASK-029` Chat Assistant Agent 定义 【聊天助理】
+- `TASK-030` 消息 Markdown / 代码块渲染 【聊天助理】
 
 ## M7 - 聊天助理完善
 
 状态：计划中
 
 目标：
-补齐会话管理、命令系统、搜索工具、Memory、多 Agent 等助理产品核心能力。
+补齐会话管理、命令系统、配置层、搜索、Memory、多 Agent 和扩展管理等助理产品核心能力。
 
 任务（按执行顺序，数字即顺序）：
-- `TASK-035` Slash Command 解析器 【共享】
-- `TASK-036` Session fork / resume / new 【共享】
-- `TASK-038` 运行配置与人格配置 【共享】
-- `TASK-039` 后台任务表 【共享】
-- `TASK-040` 停止和取消运行 【共享 — 依赖 TASK-039】
-- `TASK-041` Token 与上下文使用统计 【共享】
-- `TASK-046` Skill / Plugin / Agent 管理界面 【聊天助理】
-- `TASK-050` Memory 层 【聊天助理】
-- `TASK-051` 多 Agent 子任务模型 【聊天助理】
-- `TASK-055` Session 重命名与删除 【聊天助理】
-- `TASK-056` Web 搜索工具 【聊天助理】
+- `TASK-031` Slash Command 解析器 【共享】
+- `TASK-032` Session fork / resume / new 【共享】
+- `TASK-033` 配置层与项目信任 【共享】
+- `TASK-034` Token 与上下文使用统计 【共享】
+- `TASK-035` Web 搜索工具 【聊天助理】
+- `TASK-036` Session 重命名与删除 【聊天助理】
+- `TASK-037` 后台任务表 【共享】
+- `TASK-038` 停止和取消运行 【共享 — 依赖 TASK-037】
+- `TASK-039` Memory 层 【聊天助理】
+- `TASK-040` 多 Agent 子任务模型 【聊天助理】
+- `TASK-041` Skill / Plugin / Agent 管理界面 【聊天助理】
 
 ## M8 - 编码产品 MVP
 
@@ -142,30 +142,35 @@ frontend/         # 聊天助理 Web UI
 在聊天助理 MVP 完成后，启动编码产品主线：CLI 入口 + 文件工作区 + diff/review 审批闭环。
 
 任务（按执行顺序，数字即顺序）：
-- `TASK-030` 权限配置数据结构 【编码产品 — 权限基础】
-- `TASK-031` 工具审批流程 【编码产品 — 依赖 TASK-030】
-- `TASK-032` 文件工作区只读工具 【编码产品】
-- `TASK-033` 文件写入草案与 diff 【编码产品 — 依赖 TASK-032】
-- `TASK-034` 审批与文件操作审计日志 【编码产品 — 依赖 TASK-031 + TASK-032】
-- `TASK-043` Git diff 读取能力 【编码产品】
-- `TASK-044` Review 模式 【编码产品 — 依赖 TASK-043】
-- `TASK-045` Verify 命令运行器 【编码产品】
-- `TASK-047` 权限审批 UI 【编码产品 — 依赖 TASK-031】
-- `TASK-057` Coding Agent 定义 【编码产品 — 引用 TASK-032/033 的工具名】
-- `TASK-058` CLI 入口 【编码产品】
-- `TASK-059` Diff Viewer UI 面板 【编码产品 — 依赖 TASK-033】
+- `TASK-042` 权限配置与 Sandbox Profile 【编码产品 — 权限基础】
+- `TASK-043` 工具审批流程 【编码产品 — 依赖 TASK-042】
+- `TASK-044` 文件工作区只读工具 【编码产品】
+- `TASK-045` 文件写入草案与 diff 【编码产品 — 依赖 TASK-044】
+- `TASK-046` 审批与文件操作审计日志 【编码产品 — 依赖 TASK-043 + TASK-044】
+- `TASK-047` Git diff 读取能力 【编码产品】
+- `TASK-048` Review 模式 【编码产品 — 依赖 TASK-047】
+- `TASK-049` Verify 命令运行器 【编码产品】
+- `TASK-050` Coding Agent 定义 【编码产品 — 引用 `TASK-044` / `TASK-045` 的工具名】
+- `TASK-051` CLI 入口 【编码产品】
+- `TASK-052` 权限审批 UI 【编码产品 — 依赖 TASK-043】
+- `TASK-053` Diff Viewer UI 面板 【编码产品 — 依赖 TASK-045】
 
 ## M9 - 平台扩展（共享）
 
 状态：计划中
 
 目标：
-为 MCP、插件打包、多模型协议迁移做准备，不提前引入重复杂度。
+为 MCP、插件、apps/connectors、hooks、marketplace 和多模型协议迁移补齐平台扩展层。
 
 任务：
-- `TASK-026` MCP 边界设计 【共享】
-- `TASK-027` Plugin 包格式 【共享】
-- `TASK-029` Responses API 迁移计划 【共享】
-- `TASK-037` Skill 草稿创建流程 【共享】
-- `TASK-042` Debug config 与 health 接口 【共享】
-- `TASK-048` Responses API Adapter 实现 【共享】
+- `TASK-054` MCP 边界设计 【共享】
+- `TASK-055` MCP Server 配置加载与发现 【共享】
+- `TASK-056` MCP Tool Bridge 与运行时接入 【共享】
+- `TASK-057` Plugin 包格式 【共享】
+- `TASK-058` App / Connector 配置层 【共享】
+- `TASK-059` Hooks 生命周期配置与执行 【共享】
+- `TASK-060` Plugin Marketplace 与本地安装 【共享】
+- `TASK-061` Skill 草稿创建流程 【共享】
+- `TASK-062` Debug config 与 health 接口 【共享】
+- `TASK-063` Responses API 迁移计划 【共享】
+- `TASK-064` Responses API Adapter 实现 【共享】

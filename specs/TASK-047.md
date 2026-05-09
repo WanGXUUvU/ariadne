@@ -1,41 +1,40 @@
-# TASK-047 - 权限审批界面
+# TASK-047 - Git diff 读取能力
 
 ## 目标
-为 `approval_required` 事件提供 UI 审批入口，让用户可以允许或拒绝高风险动作。
+让系统能读取当前工作区 diff，为 Review 模式和用户确认改动打基础。
 
 ## 产品层
-Frontend / Permission
+Git / Review
 
 ## 范围内
-- 显示待审批动作
-- 展示 tool name、arguments、风险提示
-- 提供 approve / reject 按钮
-- 审批结果写回后端
-- trace 中更新结果
+- 新增 git service
+- 读取 `git status --short`
+- 读取 `git diff`
+- 读取 staged diff
+- 提供 API 或工具输出
 
 ## 范围外
-- 多用户审批
-- 企业策略
-- 批量审批
+- 自动 commit
+- 自动 push
+- 冲突解决
 
 ## 实现步骤
-1. 前端监听 run 返回的 approval 事件。
-2. 实现 ApprovalPanel 或 modal。
-3. 点击 approve/reject 调用后端 API。
-4. 更新 session trace。
-5. 处理审批已过期或已处理的状态。
+1. 新建 `git_service.py`。
+2. 用 subprocess 非交互调用 git。
+3. 设置超时和最大输出长度。
+4. 在 API 中暴露 status 和 diff。
+5. 写测试时 mock subprocess。
 
 ## 完成标准
-- 需要审批时用户能明确看到。
-- 拒绝后动作不会执行。
-- 允许后流程能继续或给出下一步提示。
+- 用户能看到当前改动摘要。
+- 大 diff 不会无限输出。
+- git 不可用时返回清晰错误。
 
 ## 验证
-- 用一个设置为 `ask` 的工具手动验证。
-- 前端构建命令通过。
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 风险信息是否足够清楚。
-- approve/reject 是否幂等。
-- UI 是否避免误点高风险动作。
+- 是否避免 destructive git 命令。
+- subprocess 是否有超时。
+- 输出截断是否可解释。
 

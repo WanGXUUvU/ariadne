@@ -1,44 +1,41 @@
-# TASK-030 - 权限配置数据结构
+# TASK-030 - 消息 Markdown / 代码块渲染
 
 ## 目标
-建立最小权限模型，让系统能描述当前 agent 允许做什么，为后续工具审批、文件读写和命令执行打基础。
+让聊天界面正确渲染 assistant 回复中的 Markdown 格式：标题、列表、粗体、代码块带语法高亮。
 
-## 产品层
-Permission / Safety
-
-## 背景
-Codex 类产品通常不会让 agent 无限制执行所有动作，而是通过 sandbox、approval policy、tool allowlist 等方式控制风险。本任务只做数据结构，不做真实拦截。
+## 产品线
+聊天助理
 
 ## 范围内
-- 新增权限配置对象，例如 `PermissionProfile`
-- 支持至少三个字段：`filesystem`、`network`、`shell`
-- 支持简单等级：`deny`、`read_only`、`ask`、`allow`
-- 给 session 保存当前 permission profile 名称
-- 提供默认配置：学习阶段默认保守
+- 引入 Markdown 渲染库（如 marked + highlight.js 或 react-markdown）
+- assistant 消息使用 Markdown 渲染，user 消息保持纯文本
+- 代码块显示语言标签和复制按钮
+- 内联代码、粗体、斜体正常显示
+- XSS 安全：渲染前过滤危险 HTML
 
 ## 范围外
-- 真正阻止工具执行
-- UI 审批弹窗
-- 操作系统级 sandbox
-- 多用户权限
+- LaTeX 数学公式
+- 图片上传预览
+- 自定义主题编辑器
 
 ## 实现步骤
-1. 先在 `schemas.py` 定义权限相关 Pydantic schema。
-2. 在 session state 或 session metadata 中保存当前 permission profile。
-3. 在服务层给新 session 设置默认权限。
-4. 暂时不改变任何工具行为，只让权限配置可以被读取。
-5. 补一个单元测试，确认默认 session 有权限配置。
+1. 安装 Markdown 渲染库。
+2. 封装 `<MarkdownMessage>` 组件。
+3. 替换消息列表中 assistant 消息的渲染方式。
+4. 为代码块加复制按钮。
+5. 确认 XSS 过滤（使用库的 sanitize 选项）。
+6. 手动测试包含代码块的回复。
 
 ## 完成标准
-- 权限配置可以随 session 保存和读取。
-- 默认权限清晰，不依赖隐藏常量。
-- 不影响现有 `/run`、`/reset` 行为。
+- 代码块有语法高亮和复制按钮。
+- 普通 Markdown 格式正确显示。
+- 不出现 `<script>` 等危险内容被渲染的情况。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- 手动让 assistant 返回包含 Python 代码块的回复，确认渲染正确。
+- 前端构建命令通过。
 
 ## Review 检查点
-- 权限 schema 是否过度复杂。
-- 默认值是否保守。
-- 是否把权限判断提前塞进太多地方。
-
+- 是否启用了 Markdown 库的 sanitize 选项。
+- 是否只对 assistant 消息渲染 Markdown，不对用户输入渲染。
+- 复制按钮是否在 HTTPS 和 HTTP 本地开发都能用。

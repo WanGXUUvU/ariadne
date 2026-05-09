@@ -1,42 +1,40 @@
-# TASK-029 - Responses API 迁移计划
+# TASK-029 - Chat Assistant Agent 定义
 
 ## 目标
-制定从当前 Chat Completions 风格迁移到 Responses API 的计划。
+为聊天助理创建专属的 Agent 定义文件，明确它的角色、能力边界和默认工具集，让它和未来的 Coding Agent 明确区分开。
 
-## 产品层
-Model Adapter / Runtime
-
-## 背景
-当前写法不是白写，它是 agent runtime 的基础。Responses API 迁移应该发生在 adapter 层，不能推翻 Skill、Tool、Session、Trace 的结构。
+## 产品线
+聊天助理
 
 ## 范围内
-- 对比当前 adapter 和 Responses adapter 的输入输出
-- 明确 tool call / tool output 映射
-- 明确 session state 是否继续本地管理
-- 创建迁移实施卡
+- 在 `agents_defs/` 目录创建 `assistant.yaml`（或 JSON）
+- 定义 name、description、system_prompt、tool_names、skill_names
+- system_prompt 体现"通用助理"人格：友好、简洁、诚实
+- 默认工具集：先仅使用已存在工具；`web_search` 等 `TASK-035` 完成后再加入
+- 确认 Agent Loader 能正确读取此定义
+- 写测试确认可以按名称加载
 
 ## 范围外
-- 直接迁移代码
-- 删除现有 adapter
-- 改 UI
-- 改 skill / extension 格式
+- 让 LLM 自动生成 system prompt
+- 多语言 prompt
+- 复杂人格配置 UI
 
 ## 实现步骤
-1. 列出当前 Chat Completions adapter 输入输出。
-2. 阅读 Responses API 官方工具调用格式。
-3. 写字段映射表：messages、instructions、tools、tool calls、tool outputs、usage。
-4. 标记风险：streaming、state 管理、错误格式、测试 mock。
-5. 根据映射结果拆出具体实现卡。
+1. 确认当前 `agents_defs/` 目录结构和 Agent Loader 格式。
+2. 创建 `assistant.yaml`，填写基础字段。
+3. 确认 Agent Loader 能扫描并加载它。
+4. 在数据库或内存中注册 assistant agent。
+5. 写测试：按 `agent_name=assistant` 运行一次，确认 system_prompt 正确注入。
 
 ## 完成标准
-- 迁移风险清楚。
-- 字段映射清楚。
-- 可以进入小步实现。
+- 通过 `agent_name=assistant` 可以启动聊天助理模式。
+- system_prompt 体现助理人格，而不是默认占位符。
+- 和未来 `coding` agent 定义文件格式一致。
 
 ## 验证
-- 仅 Review。
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 是否保留旧 adapter 作为回退。
-- 是否避免一次性重写 runtime。
-- 是否把迁移边界放在 model adapter 层。
+- YAML 格式是否和 loader 对齐。
+- system_prompt 是否清晰定义助理边界。
+- tool_names 是否只包含助理合适的工具。

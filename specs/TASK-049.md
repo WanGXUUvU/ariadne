@@ -1,40 +1,41 @@
-# TASK-049 - Streaming 事件输出
+# TASK-049 - Verify 命令运行器
 
 ## 目标
-让 API 可以流式返回 agent 运行事件，为前端实时体验打基础。
+把测试、lint、迁移检查等验证命令封装成可追踪的 verify runner。
 
 ## 产品层
-Runtime / API
+Verification
 
 ## 范围内
-- 新增 streaming endpoint
-- 逐步返回 assistant delta、tool call、tool result、final
-- 定义 SSE 或 WebSocket 方案
-- 保留普通 `/run` 不变
+- 定义 verify command 配置
+- 默认支持 unittest 命令
+- 运行命令并记录 stdout、stderr、exit code
+- trace 中展示验证结果
+- 设置超时
 
 ## 范围外
-- 多路并发 streaming 优化
-- 前端完整实时 UI
-- 音频或多模态
+- 任意 shell 全开放
+- CI 系统
+- 自动修复失败测试
 
 ## 实现步骤
-1. 选择 SSE 作为第一版方案。
-2. 定义 streaming event 格式。
-3. 修改 agent run 支持 yield events，或增加包装器。
-4. FastAPI endpoint 返回 EventSourceResponse 或等价实现。
-5. 写测试确认事件顺序稳定。
+1. 新建 `verify_runner.py`。
+2. 定义允许执行的 verify 命令列表。
+3. 用 subprocess 运行命令并设置 timeout。
+4. 将结果写入 run record 或 trace。
+5. 增加 `/verify` command。
 
 ## 完成标准
-- 客户端能边运行边收到事件。
-- 非 streaming API 不受影响。
-- tool call 和 final answer 顺序正确。
+- 用户可以一键运行项目默认测试。
+- 失败结果能被清楚返回。
+- 不允许执行未配置的任意命令。
 
 ## 验证
-- 用 curl 或浏览器手动观察 SSE。
+- 测试成功命令、失败命令、未知命令。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- streaming schema 是否复用已有 AgentEvent。
-- 断连时是否能安全结束。
-- 是否没有把 streaming 和业务逻辑耦死。
+- 命令白名单是否清楚。
+- 超时是否合理。
+- 输出是否有长度限制。
 

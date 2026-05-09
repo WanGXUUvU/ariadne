@@ -1,44 +1,40 @@
-# TASK-048 - Responses API Adapter 实现
+# TASK-048 - Review 模式
 
 ## 目标
-在不删除现有 Chat Completions adapter 的前提下，新增 Responses API adapter。
+实现一个专门审查代码变更的模式，优先找 bug、回归风险和缺失测试，而不是泛泛总结。
 
 ## 产品层
-Model Adapter
-
-## 背景
-当前代码可以继续保留，但长期要向官方更推荐的 Responses API 迁移。本任务只新增 adapter，不切默认路径。
+Review / Agent Behavior
 
 ## 范围内
-- 新建 Responses adapter 类
-- 映射 messages / instructions / tools
-- 映射 tool call 和 tool output
-- 支持通过配置选择 adapter
-- 保留旧 adapter 可回退
+- 新增 review agent 或 review mode
+- 读取 git diff
+- 生成 review prompt
+- 输出 findings、questions、testing gaps
+- 不自动修改代码
 
 ## 范围外
-- 全量切换默认模型协议
-- streaming
-- 删除旧代码
+- 自动修复
+- PR 评论机器人
+- 多文件复杂静态分析
 
 ## 实现步骤
-1. 先整理当前 `llm_client.py` 的输入输出。
-2. 定义统一 adapter interface。
-3. 新增 `responses_adapter.py`。
-4. 写 mock 测试，不依赖真实网络。
-5. 手动测试真实调用放到可选验证。
+1. 定义 review mode 的输出格式。
+2. 将 git diff 作为上下文输入。
+3. 增加 `/review` command。
+4. 如果采用 skill 形态，则只把它当作可选 review skill，不作为系统核心。
+5. 测试 command 不会进入普通聊天路径。
 
 ## 完成标准
-- 两个 adapter 可以共存。
-- Agent Runtime 不关心底层协议。
-- 测试不需要真实 API Key。
+- `/review` 能基于 diff 输出审查结果。
+- 没有 diff 时返回“无可审查改动”。
+- 输出优先列问题，不先夸代码。
 
 ## 验证
+- 用一个 mock diff 测试 review 输入构造。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
-- 可选：有 API Key 时手动跑一次真实 Responses 调用。
 
 ## Review 检查点
-- 是否避免一次性重写 agent 主循环。
-- tool call 映射是否清楚。
-- 旧 adapter 是否仍可运行。
-
+- review prompt 是否具体。
+- 是否避免自动修改文件。
+- 输出是否适合用户直接阅读。

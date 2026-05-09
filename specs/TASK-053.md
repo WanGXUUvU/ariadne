@@ -1,40 +1,48 @@
-# TASK-053 - Chat Assistant Agent 定义
+# TASK-053 - Diff Viewer UI 面板
 
 ## 目标
-为聊天助理创建专属的 Agent 定义文件，明确它的角色、能力边界和默认工具集，让它和未来的 Coding Agent 明确区分开。
+在编码产品的 UI 中展示 agent 提议的文件修改 diff，支持用户确认应用或拒绝，形成"提议 → 审查 → 应用"的安全闭环。
 
 ## 产品线
-聊天助理
+编码产品
+
+## 依赖
+- TASK-045 文件写入草案与 diff 已完成
+- TASK-043 工具审批流程已完成
 
 ## 范围内
-- 在 `agents_defs/` 目录创建 `assistant.yaml`（或 JSON）
-- 定义 name、description、system_prompt、tool_names、skill_names
-- system_prompt 体现"通用助理"人格：友好、简洁、诚实
-- 默认工具集：先仅使用已存在工具；`web_search` 等 `TASK-056` 完成后再加入
-- 确认 Agent Loader 能正确读取此定义
-- 写测试确认可以按名称加载
+- Trace 面板中识别 `file_change_proposed` 事件
+- 展示 unified diff（旧内容红色，新内容绿色）
+- 提供 Apply / Reject 按钮
+- Apply 后调用后端应用 patch 接口
+- 显示 apply 结果（成功/失败）
+- 支持展开/折叠大 diff
 
 ## 范围外
-- 让 LLM 自动生成 system prompt
-- 多语言 prompt
-- 复杂人格配置 UI
+- 三方合并界面
+- 多文件批量 apply
+- 行内编辑
+- git commit 集成
 
 ## 实现步骤
-1. 确认当前 `agents_defs/` 目录结构和 Agent Loader 格式。
-2. 创建 `assistant.yaml`，填写基础字段。
-3. 确认 Agent Loader 能扫描并加载它。
-4. 在数据库或内存中注册 assistant agent。
-5. 写测试：按 `agent_name=assistant` 运行一次，确认 system_prompt 正确注入。
+1. 后端确认已有 apply patch 接口（如无则先补一个简单的 `POST /patches/{patch_id}/apply`）。
+2. 前端在 Trace 面板增加 `DiffViewer` 组件。
+3. 解析后端返回的 unified diff 字符串并渲染红绿色。
+4. Apply 按钮调用后端接口，Reject 按钮标记为已拒绝。
+5. 处理文件已被外部修改导致 patch 无法应用的错误。
+6. 大 diff（超过 200 行）默认折叠。
 
 ## 完成标准
-- 通过 `agent_name=assistant` 可以启动聊天助理模式。
-- system_prompt 体现助理人格，而不是默认占位符。
-- 和未来 `coding` agent 定义文件格式一致。
+- 用户能清晰看到 agent 想改什么、改哪一行。
+- Apply 后文件内容确实发生变化。
+- Reject 后文件不被修改，trace 中有拒绝记录。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- 手动触发一次文件修改提议，在 UI 中 Apply，确认文件内容变化。
+- 手动 Reject，确认文件未修改。
+- 前端构建命令通过。
 
 ## Review 检查点
-- YAML 格式是否和 loader 对齐。
-- system_prompt 是否清晰定义助理边界。
-- tool_names 是否只包含助理合适的工具。
+- Apply 接口是否幂等（重复点击不会应用两次）。
+- 错误提示是否清楚（patch 冲突、文件不存在等）。
+- 是否避免在前端直接写文件（必须通过后端）。

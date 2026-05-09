@@ -1,41 +1,45 @@
-# TASK-045 - Verify 命令运行器
+# TASK-045 - 文件写入草案与 diff
 
 ## 目标
-把测试、lint、迁移检查等验证命令封装成可追踪的 verify runner。
+让 agent 可以提出文件修改草案，但默认不直接写入，先生成 diff 供用户审查。
 
 ## 产品层
-Verification
+Workspace / Review
+
+## 背景
+真实代码 agent 需要能改文件，但学习阶段应该先建立“计划、diff、审批、应用”的安全闭环。
 
 ## 范围内
-- 定义 verify command 配置
-- 默认支持 unittest 命令
-- 运行命令并记录 stdout、stderr、exit code
-- trace 中展示验证结果
-- 设置超时
+- 新增 `propose_file_change` 工具
+- 输入包含目标文件路径和新内容
+- 系统生成 unified diff
+- diff 作为 trace 事件返回
+- 保存待应用的 patch 草案
 
 ## 范围外
-- 任意 shell 全开放
-- CI 系统
-- 自动修复失败测试
+- 自动应用 patch
+- 复杂三方合并
+- git commit
+- UI diff viewer
 
 ## 实现步骤
-1. 新建 `verify_runner.py`。
-2. 定义允许执行的 verify 命令列表。
-3. 用 subprocess 运行命令并设置 timeout。
-4. 将结果写入 run record 或 trace。
-5. 增加 `/verify` command。
+1. 新增 patch proposal schema。
+2. 读取旧文件内容并和新内容生成 diff。
+3. 把 proposal 保存到 session 关联状态。
+4. 新增 trace 事件 `file_change_proposed`。
+5. 写测试确认不会直接改文件。
 
 ## 完成标准
-- 用户可以一键运行项目默认测试。
-- 失败结果能被清楚返回。
-- 不允许执行未配置的任意命令。
+- 工具调用后磁盘文件不变。
+- API 返回可读 diff。
+- proposal 可以被后续任务读取。
 
 ## 验证
-- 测试成功命令、失败命令、未知命令。
+- 测试前后读取文件内容，确认没有被修改。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 命令白名单是否清楚。
-- 超时是否合理。
-- 输出是否有长度限制。
+- 是否把“生成 diff”和“应用修改”严格分开。
+- proposal 是否包含足够上下文。
+- 大文件 diff 是否有基础限制。
 

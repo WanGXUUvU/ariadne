@@ -1,40 +1,46 @@
-# TASK-044 - Review 模式
+# TASK-044 - 文件工作区只读工具
 
 ## 目标
-实现一个专门审查代码变更的模式，优先找 bug、回归风险和缺失测试，而不是泛泛总结。
+加入最小文件工作区能力，让 agent 能安全读取项目文件，但暂时不能写文件。
 
 ## 产品层
-Review / Agent Behavior
+Workspace / Tools
+
+## 背景
+Codex 类产品的核心能力之一是理解代码库。第一步不做写入，只做可控的 list/read/search。
 
 ## 范围内
-- 新增 review agent 或 review mode
-- 读取 git diff
-- 生成 review prompt
-- 输出 findings、questions、testing gaps
-- 不自动修改代码
+- 定义 workspace root，默认是项目根目录
+- 新增 `list_files` 工具
+- 新增 `read_file` 工具
+- 新增 `search_text` 工具
+- 阻止访问 workspace root 之外的路径
+- 把文件读取事件写入 trace
 
 ## 范围外
-- 自动修复
-- PR 评论机器人
-- 多文件复杂静态分析
+- 写文件
+- 删除文件
+- shell 命令
+- 大文件智能截断策略的完整实现
 
 ## 实现步骤
-1. 定义 review mode 的输出格式。
-2. 将 git diff 作为上下文输入。
-3. 增加 `/review` command。
-4. 如果采用 skill 形态，则只把它当作可选 review skill，不作为系统核心。
-5. 测试 command 不会进入普通聊天路径。
+1. 新建 `workspace.py`，集中处理路径安全。
+2. 实现 `resolve_workspace_path`，禁止 `../` 逃逸。
+3. 在 Tool Registry 中注册只读文件工具。
+4. 给每个工具设置清晰 JSON schema。
+5. 为大文件设置简单最大字符数限制。
+6. 写测试覆盖正常读取、找不到文件、路径逃逸。
 
 ## 完成标准
-- `/review` 能基于 diff 输出审查结果。
-- 没有 diff 时返回“无可审查改动”。
-- 输出优先列问题，不先夸代码。
+- agent 可以通过工具读取项目内文件。
+- agent 不能读取项目外路径。
+- 工具结果格式和错误格式稳定。
 
 ## 验证
-- 用一个 mock diff 测试 review 输入构造。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- review prompt 是否具体。
-- 是否避免自动修改文件。
-- 输出是否适合用户直接阅读。
+- 路径安全是否集中处理。
+- 工具是否只读。
+- 错误信息是否不会泄漏过多本机路径。
+

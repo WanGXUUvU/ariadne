@@ -1,40 +1,39 @@
-# TASK-034 - 审批与文件操作审计日志
+# TASK-034 - Token 与上下文使用统计
 
 ## 目标
-记录关键安全动作，让用户之后可以追踪 agent 做过什么、谁审批了什么、哪些文件被访问或提议修改。
+记录每次运行的模型、输入输出 token、消息数量和耗时，让产品能显示运行成本和上下文压力。
 
 ## 产品层
-Audit / Safety
+Observability
 
 ## 范围内
-- 新增 audit log 数据表或 JSON 存储结构
-- 记录工具审批、文件读取、文件修改草案
-- 每条日志包含时间、session、action、target、result
-- 提供查询接口
+- 在 model adapter 返回 usage 信息
+- run record 保存 usage
+- API 输出展示 usage summary
+- 没有 usage 时允许为空
 
 ## 范围外
-- 企业级审计
-- 多用户身份系统
-- 日志导出
+- 精确成本计算
+- 多供应商价格表
+- 自动截断
 
 ## 实现步骤
-1. 设计 `AuditLogRecord` 数据模型。
-2. 增加 Alembic migration。
-3. 在审批流程和文件工具中写入 audit log。
-4. 新增 `/audit` 查询接口，先按 session 过滤。
-5. 写测试确认关键动作会留下日志。
+1. 扩展模型调用返回对象，加入 usage。
+2. 从 OpenAI 返回中读取 token usage。
+3. 写入 run record。
+4. API 返回 `usage` 字段。
+5. 测试 mock usage 能被保存。
 
 ## 完成标准
-- 审批和文件访问有可追踪记录。
-- 日志不会影响主流程失败。
-- 查询结果按时间排序。
+- 每次成功模型调用尽量记录 usage。
+- usage 缺失不导致请求失败。
+- 前端和 CLI 可以直接显示 usage。
 
 ## 验证
-- `alembic upgrade head`
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- 日志是否稳定且字段少。
-- 是否避免记录敏感完整内容。
-- 写日志失败是否会破坏主流程。
+- usage 字段是否兼容不同模型供应商。
+- 是否避免把统计逻辑散落在 agent 主循环。
+- 是否清楚区分估算和官方返回。
 

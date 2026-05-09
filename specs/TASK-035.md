@@ -1,43 +1,43 @@
-# TASK-035 - Slash Command 解析器
+# TASK-035 - Web 搜索工具
 
 ## 目标
-支持 `/status`、`/reset`、`/skills`、`/agents` 这类命令入口，为 CLI 和 UI 共用命令系统打基础。
+为聊天助理添加网络搜索能力，让 agent 在需要最新信息时可以主动调用搜索，而不是依靠训练知识。
 
-## 产品层
-Command Layer
-
-## 背景
-Codex CLI 有大量 slash commands。我们先做解析器和少量命令，不直接追求完整功能。
+## 产品线
+聊天助理
 
 ## 范围内
-- 新建 command parser
-- 支持识别普通用户输入和 slash command
-- 实现 `/status`
-- 统一已有 `/reset` 的语义
-- 预留 `/skills`、`/agents`、`/model`、`/permissions`
+- 新增 `web_search` 工具定义
+- 接入一个搜索 API（优先 SerpAPI 或 Tavily，可配置）
+- 返回摘要列表（title、url、snippet），限制数量
+- 工具结果写入 trace
+- API Key 通过环境变量读取，不硬编码
 
 ## 范围外
-- 复杂参数解析
-- shell 命令
-- UI 命令面板
+- 自建爬虫
+- 图片搜索
+- 搜索结果缓存
+- 完整网页抓取
 
 ## 实现步骤
-1. 新建 `commands.py`。
-2. 定义 `CommandResult` schema。
-3. 解析以 `/` 开头的输入。
-4. 在 service 层先分流 command 和 normal chat。
-5. 给未知命令返回清晰错误。
+1. 在 `tools_defs/` 新建 `web_search.py`。
+2. 定义 JSON schema：`query`（必填）、`num_results`（可选，默认 5）。
+3. 实现搜索 API 调用，读取环境变量 API Key。
+4. 返回 `ToolResult`，内容为搜索结果摘要列表。
+5. 在 Tool Registry 注册。
+6. 在 assistant agent 定义的 tool_names 中加入 `web_search`。
+7. 写测试 mock HTTP 调用，不依赖真实网络。
 
 ## 完成标准
-- 普通聊天不受影响。
-- `/status` 能返回当前 session 基本状态。
-- 未知命令不会进入 LLM。
+- assistant agent 在需要时能主动搜索并引用结果。
+- API Key 缺失时返回清晰错误，不崩溃。
+- 搜索结果数量有上限，不会撑爆上下文。
 
 ## 验证
-- 测试普通输入、已知命令、未知命令。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
+- 手动问一个需要最新信息的问题，观察工具调用。
 
 ## Review 检查点
-- command 层是否独立于 FastAPI。
-- 是否为 CLI/UI 复用预留结构。
-- 是否避免把命令解析写死在路由里。
+- API Key 是否只从环境变量读取。
+- 搜索结果是否有字数/条数限制。
+- 搜索失败是否返回 `tool_error` 而不是崩溃。

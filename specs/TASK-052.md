@@ -1,44 +1,41 @@
-# TASK-052 - Streaming 前端接入
+# TASK-052 - 权限审批界面
 
 ## 目标
-把 Web UI 的消息发送从同步 `/run` 改为对接 `/run/stream` SSE 接口，实现字流式输出体验。
+为 `approval_required` 事件提供 UI 审批入口，让用户可以允许或拒绝高风险动作。
 
-## 产品线
-聊天助理
-
-## 依赖
-- TASK-049 Streaming 后端 SSE 已完成
+## 产品层
+Frontend / Permission
 
 ## 范围内
-- 前端改用 EventSource 或 fetch + ReadableStream 接收 SSE
-- 消息列表实时追加 delta 内容
-- tool call / tool result 事件在 Trace 面板实时更新
-- 流式结束时锁定最终 reply
-- 连接失败时显示错误提示
+- 显示待审批动作
+- 展示 tool name、arguments、风险提示
+- 提供 approve / reject 按钮
+- 审批结果写回后端
+- trace 中更新结果
 
 ## 范围外
-- 断线重连自动恢复
-- 多路并发 streaming
-- 音频/多模态
+- 多用户审批
+- 企业策略
+- 批量审批
 
 ## 实现步骤
-1. 确认后端 SSE 事件格式（delta、tool_call、tool_result、final、error）。
-2. 封装 `streamRun(sessionId, input)` 前端函数。
-3. 用 `EventSource` 或 `fetch ReadableStream` 接收事件。
-4. 在消息列表中逐字追加 assistant 内容。
-5. 流式结束后更新 Trace 面板。
-6. 处理网络错误和 `error` 事件类型。
+1. 前端监听 run 返回的 approval 事件。
+2. 实现 ApprovalPanel 或 modal。
+3. 点击 approve/reject 调用后端 API。
+4. 更新 session trace。
+5. 处理审批已过期或已处理的状态。
 
 ## 完成标准
-- 发送消息后立即看到文字逐步出现，不再等待全部完成。
-- tool call 发生时 Trace 面板实时显示。
-- 页面刷新后历史消息仍可读取。
+- 需要审批时用户能明确看到。
+- 拒绝后动作不会执行。
+- 允许后流程能继续或给出下一步提示。
 
 ## 验证
-- 手动发送一条触发工具调用的消息，观察 streaming 和 trace 实时更新。
+- 用一个设置为 `ask` 的工具手动验证。
 - 前端构建命令通过。
 
 ## Review 检查点
-- 是否复用已有 AgentEvent schema。
-- 断流时 UI 状态是否稳定。
-- 是否没有把 SSE 逻辑散落在多个组件。
+- 风险信息是否足够清楚。
+- approve/reject 是否幂等。
+- UI 是否避免误点高风险动作。
+

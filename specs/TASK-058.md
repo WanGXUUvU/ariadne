@@ -1,44 +1,43 @@
-# TASK-058 - CLI 入口
+# TASK-058 - App / Connector 配置层
 
 ## 目标
-为编码产品提供命令行入口，让开发者可以在终端里和 Coding Agent 交互，不需要打开浏览器。
+对齐 Codex 官方 `apps` / `.app.json` 形态，定义本项目的 app 或 connector 配置模型和 metadata loader。
 
-## 产品线
-编码产品
+## 产品层
+App / Connector Platform
+
+## 依赖
+- `TASK-057` Plugin 包结构对齐
 
 ## 范围内
-- 在 `agent_prototype/cli/` 目录下实现入口
-- 实现 `agent_prototype/cli/main.py`，支持交互式 REPL 模式
-- 启动时显示当前 session_id、agent、workspace
-- 支持 `/exit`、`/new`、`/status` 等基础 slash command
-- 调用已有后端 API（不绕过 API，保持单一数据入口）
-- 支持 `--agent` 参数指定 agent_name
+- 定义 `.app.json` 的最小格式
+- 定义 `apps.<id>` 的 enabled / approval / tool override 配置边界
+- 读取插件里的 `.app.json`
+- 建立 app metadata index
+- 预留后续 app tools 进入 runtime 的接点
 
 ## 范围外
-- 离线运行（绕过 API）
-- 复杂 TUI 界面
-- 颜色主题配置
-- 历史命令补全（可做占位）
+- 真正执行 connector 工具
+- OAuth UI
+- 第三方账号管理
+- marketplace 发布
 
 ## 实现步骤
-1. 新建 `agent_prototype/cli/main.py`。
-2. 实现启动参数解析：`--agent`、`--session`、`--workspace`。
-3. 实现 REPL 主循环：读取输入 -> 调用 `POST /run` -> 打印 reply。
-4. Streaming 模式：对接 `POST /run/stream`，逐字打印。
-5. 实现 `/exit`、`/new`、`/status` slash command。
-6. 工具调用发生时在终端显示 `[tool: xxx]` 标记。
-7. 写基础启动测试（不依赖真实 API）。
+1. 定义 `.app.json` schema。
+2. 定义 app 级和 tool 级 enable / approval metadata。
+3. 读取插件 `.app.json` 并进入统一 app index。
+4. 提供最小 API 或内部查询接口读取 app metadata。
+5. 写测试覆盖坏格式、坏路径和禁用配置。
 
 ## 完成标准
-- 开发者可以 `python3 -m agent_prototype.cli.main --agent coding` 启动。
-- 能正常对话并看到工具调用标记。
-- `/exit` 优雅退出，不丢最后一条消息。
+- 插件里的 `.app.json` 可以被稳定读取。
+- app 和 tool 级 metadata 边界清楚。
+- 后续 app tool runtime 接入不需要重新改 manifest 结构。
 
 ## 验证
-- 手动启动 CLI，发送几条消息并触发工具调用。
 - `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- CLI 是否只调用 API，不直接访问数据库。
-- streaming 断流是否优雅处理。
-- 是否避免把业务逻辑写进 CLI 主循环。
+- 是否与官方 `apps.<id>` 配置层对齐。
+- 是否还没越界到真实 connector 执行。
+- app 级和 tool 级配置是否分层明确。

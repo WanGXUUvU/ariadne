@@ -1,40 +1,44 @@
-# TASK-028 - 模型适配层接口
+# TASK-028 - Streaming 前端接入
 
 ## 目标
-把模型调用从 Agent Runtime 中抽象出来，为 Chat Completions、Responses API 和未来其他模型供应商共存做准备。
+把 Web UI 的消息发送从同步 `/run` 改为对接 `/run/stream` SSE 接口，实现字流式输出体验。
 
-## 产品层
-Model Adapter
+## 产品线
+聊天助理
+
+## 依赖
+- TASK-027 Streaming 后端 SSE 已完成
 
 ## 范围内
-- 定义统一 `ModelAdapter` interface
-- 当前 OpenAI Chat Completions 调用实现为一个 adapter
-- Agent 只依赖 interface
-- 测试中可以 mock adapter
+- 前端改用 EventSource 或 fetch + ReadableStream 接收 SSE
+- 消息列表实时追加 delta 内容
+- tool call / tool result 事件在 Trace 面板实时更新
+- 流式结束时锁定最终 reply
+- 连接失败时显示错误提示
 
 ## 范围外
-- 立刻迁移 Responses API
-- 多供应商 UI
-- streaming
+- 断线重连自动恢复
+- 多路并发 streaming
+- 音频/多模态
 
 ## 实现步骤
-1. 审查当前 `llm_client.py`。
-2. 定义输入对象：messages、tools、instructions、model config。
-3. 定义输出对象：assistant message、tool calls、usage。
-4. 把现有调用包成 `ChatCompletionsAdapter`。
-5. 修改 Agent 通过 adapter 调用模型。
-6. 更新测试使用 fake adapter。
+1. 确认后端 SSE 事件格式（delta、tool_call、tool_result、final、error）。
+2. 封装 `streamRun(sessionId, input)` 前端函数。
+3. 用 `EventSource` 或 `fetch ReadableStream` 接收事件。
+4. 在消息列表中逐字追加 assistant 内容。
+5. 流式结束后更新 Trace 面板。
+6. 处理网络错误和 `error` 事件类型。
 
 ## 完成标准
-- Agent 不直接知道 OpenAI SDK 细节。
-- 旧模型调用行为不变。
-- 后续新增 Responses adapter 不需要重写 Agent。
+- 发送消息后立即看到文字逐步出现，不再等待全部完成。
+- tool call 发生时 Trace 面板实时显示。
+- 页面刷新后历史消息仍可读取。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- 手动发送一条触发工具调用的消息，观察 streaming 和 trace 实时更新。
+- 前端构建命令通过。
 
 ## Review 检查点
-- interface 是否贴近现有需求。
-- 是否避免过度抽象。
-- fake adapter 是否让测试更稳定。
-
+- 是否复用已有 AgentEvent schema。
+- 断流时 UI 状态是否稳定。
+- 是否没有把 SSE 逻辑散落在多个组件。

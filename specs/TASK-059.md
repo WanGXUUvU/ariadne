@@ -1,48 +1,43 @@
-# TASK-059 - Diff Viewer UI 面板
+# TASK-059 - Hooks 生命周期配置与执行
 
 ## 目标
-在编码产品的 UI 中展示 agent 提议的文件修改 diff，支持用户确认应用或拒绝，形成"提议 → 审查 → 应用"的安全闭环。
+支持 Codex 风格的 lifecycle hooks，让系统能在关键事件前后执行受控脚本或处理逻辑。
 
-## 产品线
-编码产品
+## 产品层
+Hooks / Runtime
 
 ## 依赖
-- TASK-033 文件写入草案与 diff 已完成
-- TASK-031 工具审批流程已完成
+- `TASK-033` 配置层与项目信任
+- `TASK-057` Plugin 包结构对齐
 
 ## 范围内
-- Trace 面板中识别 `file_change_proposed` 事件
-- 展示 unified diff（旧内容红色，新内容绿色）
-- 提供 Apply / Reject 按钮
-- Apply 后调用后端应用 patch 接口
-- 显示 apply 结果（成功/失败）
-- 支持展开/折叠大 diff
+- 支持读取 `hooks/hooks.json`
+- 支持项目配置中的 inline hooks
+- 定义最小 hook event：`SessionStart`、`UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop`
+- 先支持 command hook handler
+- 记录 hook 执行结果和失败信息
 
 ## 范围外
-- 三方合并界面
-- 多文件批量 apply
-- 行内编辑
-- git commit 集成
+- prompt hook / agent hook 的完整执行
+- 复杂条件表达式
+- 企业级 managed hooks
 
 ## 实现步骤
-1. 后端确认已有 apply patch 接口（如无则先补一个简单的 `POST /patches/{patch_id}/apply`）。
-2. 前端在 Trace 面板增加 `DiffViewer` 组件。
-3. 解析后端返回的 unified diff 字符串并渲染红绿色。
-4. Apply 按钮调用后端接口，Reject 按钮标记为已拒绝。
-5. 处理文件已被外部修改导致 patch 无法应用的错误。
-6. 大 diff（超过 200 行）默认折叠。
+1. 定义 hook schema 和 event 枚举。
+2. 读取插件 hooks 和项目 inline hooks。
+3. 在 session / tool runtime 的关键节点触发 hooks。
+4. 把 hook 执行结果写入 trace 或 debug 日志。
+5. 写测试覆盖缺文件、坏 schema、hook 执行失败和跳过逻辑。
 
 ## 完成标准
-- 用户能清晰看到 agent 想改什么、改哪一行。
-- Apply 后文件内容确实发生变化。
-- Reject 后文件不被修改，trace 中有拒绝记录。
+- hooks 可以被发现、加载和触发。
+- hook 失败不会把主流程静默吞掉。
+- 插件 hooks 和项目 hooks 的来源边界清楚。
 
 ## 验证
-- 手动触发一次文件修改提议，在 UI 中 Apply，确认文件内容变化。
-- 手动 Reject，确认文件未修改。
-- 前端构建命令通过。
+- `python3 -m unittest agent_prototype.tests.test_agent -v`
 
 ## Review 检查点
-- Apply 接口是否幂等（重复点击不会应用两次）。
-- 错误提示是否清楚（patch 冲突、文件不存在等）。
-- 是否避免在前端直接写文件（必须通过后端）。
+- event 选择是否最小且够用。
+- 是否先只支持 command hooks。
+- hook 执行是否有可观察性。
