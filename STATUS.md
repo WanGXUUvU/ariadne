@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: planning
-- Task: specs/TASK-026.md
-- Gate: review
-- Allowed Now: review
+- Phase: implementation
+- Task: specs/TASK-067.md
+- Gate: verify
+- Allowed Now: implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 先围绕 `runtime/tool_registry.py -> runtime/agent.py -> trace schema` 梳理当前统一工具入口，再产出 `TASK-026` 的 MCP 边界结论与后续实现拆分。
+- Next action: 只重构现有功能，不新增能力；按官方分层把 `runtime` 拆窄，把现有文件归到 `api / application / runtime / model / context / skills / tools / storage / core`。
 
 
 ## 遗留项
@@ -16,8 +16,14 @@
 ## History
 | Date | Task | Gate Passed | Notes |
 |------|------|-------------|-------|
-| 2026-05-09 | 收紧 MCP / Plugin 任务卡到官方结构 | planning | 已按 Codex 官方方向重写 `TASK-026` 和 `TASK-027`：先定义 `mcp_servers.<id>` server 配置边界，插件结构改回 `.codex-plugin/plugin.json + .mcp.json + .app.json`。 |
-| 2026-05-09 | 切换到下一张任务卡 | planning | 顶部状态正式切到 `TASK-026`，当前进入 MCP 边界设计 review；先读 Tool Registry、执行链路与 trace，再收口设计结论。 |
+| 2026-05-09 | 收拢为纯重构任务 | planning | 取消继续拆流程，改为只对现有功能做一次官方分层重构，不新增能力。 |
+| 2026-05-09 | 创建后端分层临时任务卡 | planning | 新增 `TASK-067`，专门承载后端分层重构方案，与 `TASK-066` 区分。 |
+| 2026-05-09 | 创建临时结构任务卡 | planning | 新增 `TASK-066`，专门承载临时结构整理，不和 `TASK-026` 混在一起。 |
+| 2026-05-09 | `TASK-026` 接口升级决策 | review | 决定把 `ModelAdapter` 按最终产品方式设计为统一请求/响应协议，不只覆盖最小闭环，还要预留 streaming 事件和 provider 元数据。 |
+| 2026-05-09 | `TASK-026` review 复核 | review | 当前 `Agent` 和 compact 路径仍直接依赖 `runtime/llm_client.py`，模型调用边界还未抽象为 adapter；现有单测通过，但 `TASK-026` 的完成标准尚未满足。 |
+| 2026-05-09 | 重排未来任务卡编号与路线 | planning | 自 `TASK-026` 起按主路径重新编号：先聊天助理，再代码助理，最后平台扩展；并补入 MCP 实现、hooks、app/connectors、plugin marketplace 等官方能力卡。历史记录中旧编号保留原样。 |
+| 2026-05-09 | 收紧 MCP / Plugin 任务卡到官方结构 | planning | 已按 Codex 官方方向重写旧 `TASK-026` / 旧 `TASK-027`（现 `TASK-054` / `TASK-057`）：先定义 `mcp_servers.<id>` server 配置边界，插件结构改回 `.codex-plugin/plugin.json + .mcp.json + .app.json`。 |
+| 2026-05-09 | 切换到下一张任务卡 | planning | 顶部状态曾切到旧 `TASK-026`（现 `TASK-054`），当时进入 MCP 边界设计 review；先读 Tool Registry、执行链路与 trace，再收口设计结论。 |
 | 2026-05-09 | 推进 `TASK-025` 后端稳健性修复 | implementation | 已完成 B1-B4：删除事务边界、LLM HTTP/响应结构错误处理、自动 compact 不提前落库、session nullable 元数据哨兵更新；全量 `python3 -m unittest agent_prototype.tests.test_agent -v` 47 项通过。 |
 | 2026-05-09 | 调整 `TASK-025` 剩余范围 | planning | B5/B6 归并到后续工具专项：统一处理工具安全边界、深度/结果限制和新增工具能力，不再阻塞当前主链路收口。 |
 | 2026-04-24 | 完成第一个工具调用闭环 | Verify / Review | 已跑通 `tool_calls -> tool -> final`，并用 `curl` 验证。 |
@@ -85,7 +91,7 @@
 | 2026-05-07 | `TASK-023` 验证完成 | Verify / Review | `POST /sessions` 已打通，空 session 可创建并出现在列表中，测试通过，Review 通过。 |
 | 2026-05-07 | 双产品路线规划 | planning | 确定同仓库共享内核方案，新增 TASK-052～059，BUILD_PLAN 重组为 M6～M9。 |
 | 2026-05-07 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-024` Web UI 基础壳。 |
-| 2026-05-07 | 同步路线文档冲突 | planning | 已修正 `BUILD_PLAN` 中 `TASK-023` 状态、统一 `TASK-058` CLI 路径到 `agent_prototype/cli/main.py`，并将 `TASK-053` 的默认工具描述改为不提前引用未实现的 `web_search`。 |
+| 2026-05-07 | 同步路线文档冲突 | planning | 已修正 `BUILD_PLAN` 中 `TASK-023` 状态、统一旧 `TASK-058`（现 `TASK-051`）CLI 路径到 `agent_prototype/cli/main.py`，并将旧 `TASK-053`（现 `TASK-029`）的默认工具描述改为不提前引用未实现的 `web_search`。 |
 | 2026-05-07 | 合并前端任务卡 | planning | 按“现有后端能力一次前端整合”的方向，将 `TASK-025` 并入 `TASK-024`，并把 `TASK-024` 扩展为 chat、sessions、trace、skills、compact、reset 的统一工作台任务卡。 |
 | 2026-05-06 | `TASK-021` 收口 | Review | 确认 `/run` 继续保留完整 `state`，并将顶层 `error` 确认为当前统一业务错误响应格式，任务完成。 |
 | 2026-05-06 | 删除任务卡 | planning | 删除旧 `TASK-022` 最小 CLI 入口任务卡。 |
@@ -100,4 +106,4 @@
 | 2026-05-07 | `TASK-024` 视觉重构 | implementation | 彻底推翻初版 UI，完成 Linear/Vercel 风格的极简极客暗色主题重构（Monolithic App Shell、等宽字体、无气泡对话流、1px网格系统）。 |
 | 2026-05-07 | `TASK-024` 前端全链路闭环 | Verify | 完成 `MessageComposer` 额度监控与 IME 处理，完成 `MessageList` 的 Compact 骨架屏与系统提示块渲染，修复 setup 致命错误，所有现有后端能力 100% 映射到 UI。 |
 | 2026-05-07 | `TASK-024` (含 `TASK-025`) 收口 | Review | 单页工作台已达到预期，Session/Chat/Trace/Skill/Compact 五大核心功能彻底贯通，体验拉满。 |
-| 2026-05-07 | 切换到下一张任务卡 | planning | 进入 MCP 架构阶段，开始推进 `TASK-026` MCP 边界设计。 |
+| 2026-05-07 | 切换到下一张任务卡 | planning | 进入 MCP 架构阶段，开始推进旧 `TASK-026`（现 `TASK-054`）MCP 边界设计。 |
