@@ -1,7 +1,8 @@
 import unittest
 import tempfile
+import requests
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -13,6 +14,7 @@ from agent_prototype.core.schemas import AgentInput, AgentState, SkillSummary
 from agent_prototype.storage.session_store import SqliteSessionStore
 from agent_prototype.storage.agent_definition_store import SqliteAgentDefinitionStore
 from agent_prototype.api.app import app
+from agent_prototype.runtime.llm_client import call_llm
 from agent_prototype.runtime.agent_loader import load_agent_definition
 from agent_prototype.runtime.skill_loader import list_skills
 from agent_prototype.runtime.tool_registry import build_default_tool_registry
@@ -78,6 +80,122 @@ class TestAgentLoader(unittest.TestCase):
             db.close()
 
         self.assertIn("Unknown agent definition", str(ctx.exception))
+
+
+class TestLlmClient(unittest.TestCase):
+    @patch.dict("os.environ", {"SENSENOVA_API_KEY": "test-key"}, clear=False)
+    @patch("agent_prototype.runtime.llm_client.requests.post")
+    def test_call_llm_wraps_http_error_with_runtime_error(self, mock_post):
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "upstream failed"
+        mock_response.raise_for_status.side_effect = requests.HTTPError("500 Server Error")
+        mock_post.return_value = mock_response
+
+        with self.assertRaises(RuntimeError) as ctx:
+            call_llm([{"role": "user", "content": "你好"}])
+
+        self.assertIn("LLM request failed", str(ctx.exception))
+        self.assertIn("status=500", str(ctx.exception))
+        self.assertIn("body=upstream failed", str(ctx.exception))
+        mock_response.raise_for_status.assert_called_once()
+        mock_response.json.assert_not_called()
+
+    @patch.dict("os.environ", {"SENSENOVA_API_KEY": "test-key"}, clear=False)
+    @patch("agent_prototype.runtime.llm_client.requests.post")
+    def test_call_llm_raises_when_choices_missing(self, mock_post):
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {}
+        mock_post.return_value = mock_response
+
+        with self.assertRaises(ValueError) as ctx:
+            call_llm([{"role": "user", "content": "你好"}])
+
+        self.assertEqual(str(ctx.exception), "LLM response missing choices")
+
+    @patch.dict("os.environ", {"SENSENOVA_API_KEY": "test-key"}, clear=False)
+    @patch("agent_prototype.runtime.llm_client.requests.post")
+    def test_call_llm_raises_when_message_missing(self, mock_post):
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"choices": [{}]}
+        mock_post.return_value = mock_response
+
+        with self.assertRaises(ValueError) as ctx:
+            call_llm([{"role": "user", "content": "你好"}])
+
+        self.assertEqual(str(ctx.exception), "LLM response missing message")
+
+
+class TestSessionStore(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        db_path = Path(self.temp_dir.name) / "test_session_store.db"
+        self.engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+        Base.metadata.create_all(bind=self.engine)
+        self.session_local = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+
+    def tearDown(self):
+        self.engine.dispose()
+        self.temp_dir.cleanup()
+
+    def test_upsert_session_snapshot_keeps_existing_nullable_metadata_when_not_provided(self):
+        db = self.session_local()
+        try:
+            store = SqliteSessionStore(db)
+            store.upsert_session_snapshot(
+                "session-keep-metadata",
+                state=AgentState(messages=[{"role": "user", "content": "你好"}]),
+                last_agent_name="default",
+                last_skill_name="openai-docs",
+                last_reply_preview="上一次回复摘要",
+            )
+            db.commit()
+
+            store.upsert_session_snapshot(
+                "session-keep-metadata",
+                state=AgentState(messages=[{"role": "user", "content": "新的消息"}]),
+            )
+            db.commit()
+
+            record = store.read_session_record("session-keep-metadata")
+            self.assertIsNotNone(record)
+            self.assertEqual(record.last_agent_name, "default")
+            self.assertEqual(record.last_skill_name, "openai-docs")
+            self.assertEqual(record.last_reply_preview, "上一次回复摘要")
+        finally:
+            db.close()
+
+    def test_upsert_session_snapshot_allows_explicit_none_to_clear_nullable_metadata(self):
+        db = self.session_local()
+        try:
+            store = SqliteSessionStore(db)
+            store.upsert_session_snapshot(
+                "session-clear-metadata",
+                state=AgentState(messages=[{"role": "user", "content": "你好"}]),
+                last_agent_name="default",
+                last_skill_name="openai-docs",
+                last_reply_preview="上一次回复摘要",
+            )
+            db.commit()
+
+            store.upsert_session_snapshot(
+                "session-clear-metadata",
+                state=AgentState(),
+                last_agent_name=None,
+                last_skill_name=None,
+                last_reply_preview=None,
+            )
+            db.commit()
+
+            record = store.read_session_record("session-clear-metadata")
+            self.assertIsNotNone(record)
+            self.assertIsNone(record.last_agent_name)
+            self.assertIsNone(record.last_skill_name)
+            self.assertIsNone(record.last_reply_preview)
+        finally:
+            db.close()
 
 
 class TestAgent(unittest.TestCase):
@@ -626,6 +744,63 @@ class TestAgentApi(unittest.TestCase):
         mock_compact_call_llm.assert_called_once()
         mock_run_call_llm.assert_called_once()
 
+    @patch(
+        "agent_prototype.runtime.agent.call_llm",
+        side_effect=RuntimeError("run failed after auto compact"),
+    )
+    @patch("agent_prototype.runtime.services.call_llm", return_value={"role": "assistant", "content": "自动压缩后的中段摘要"})
+    def test_run_endpoint_does_not_persist_auto_compact_when_run_fails(self, mock_compact_call_llm, mock_run_call_llm):
+        original_messages = [
+            {"role": "user", "content": "最初任务目标"},
+            {"role": "assistant", "content": "好的，我们先拆任务"},
+            {"role": "user", "content": "我需要支持 tool calling"},
+            {"role": "assistant", "content": "我们需要看 OpenAI 文档"},
+            {"role": "tool", "content": "tool result: Responses API docs"},
+            {"role": "assistant", "content": "我们再确认一遍上下文压缩策略"},
+            {"role": "user", "content": "我要保留关键约束"},
+            {"role": "assistant", "content": "好的，关键约束需要进入摘要"},
+            {"role": "tool", "content": "tool result: compact best practices"},
+            {"role": "user", "content": "还要保留最近原始消息"},
+            {"role": "assistant", "content": "明白，我们采用三段式策略"},
+            {"role": "user", "content": "继续准备自动 compact"},
+            {"role": "assistant", "content": "自动 compact 会在 /run 前触发"},
+            {"role": "user", "content": "现在开始做 compact"},
+        ]
+
+        db = self.session_local()
+        try:
+            store = SqliteSessionStore(db)
+            state = AgentState(messages=original_messages)
+            store.upsert_session_snapshot("auto-compact-fail-session", state=state)
+            db.commit()
+        finally:
+            db.close()
+
+        with self.assertRaises(RuntimeError) as ctx:
+            self.client.post(
+                "/run",
+                json={
+                    "session_id": "auto-compact-fail-session",
+                    "user_input": "继续执行下一步",
+                },
+            )
+
+        self.assertIn("run failed after auto compact", str(ctx.exception))
+        mock_compact_call_llm.assert_called_once()
+        mock_run_call_llm.assert_called_once()
+
+        db = self.session_local()
+        try:
+            store = SqliteSessionStore(db)
+            persisted_state = store.read_session_state("auto-compact-fail-session")
+            self.assertIsNotNone(persisted_state)
+            self.assertEqual(
+                [message.model_dump(exclude_none=True) for message in persisted_state.messages],
+                original_messages,
+            )
+        finally:
+            db.close()
+
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "mock reply\nwith preview"})
     def test_run_endpoint_updates_session_metadata(self, mock_call_llm):
         response = self.client.post(
@@ -861,6 +1036,94 @@ class TestAgentApi(unittest.TestCase):
             self.assertIsNone(record.last_reply_preview)
         finally:
             db.close()
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "reset reply"})
+    def test_reset_endpoint_clears_messages_but_keeps_same_session(self, mock_call_llm):
+        self.client.post(
+            "/run",
+            json={"session_id": "session-reset", "user_input": "你好"},
+        )
+
+        response = self.client.post(
+            "/reset",
+            json={"session_id": "session-reset"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
+
+        detail_response = self.client.get("/sessions/session-reset")
+        self.assertEqual(detail_response.status_code, 200)
+        detail_data = detail_response.json()
+
+        self.assertEqual(detail_data["session_id"], "session-reset")
+        self.assertEqual(detail_data["session_name"], "session-reset")
+        self.assertEqual(detail_data["message_count"], 0)
+        self.assertIsNone(detail_data["last_agent_name"])
+        self.assertIsNone(detail_data["last_skill_name"])
+        self.assertIsNone(detail_data["last_reply_preview"])
+        self.assertEqual(detail_data["state"]["messages"], [])
+        self.assertEqual(detail_data["state"]["step"], 0)
+        self.assertIsNone(detail_data["state"]["agent_name"])
+
+        db = self.session_local()
+        try:
+            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-reset").first()
+            self.assertIsNotNone(record)
+            self.assertEqual(record.session_name, "session-reset")
+            self.assertEqual(record.message_count, 0)
+            self.assertIsNone(record.last_agent_name)
+            self.assertIsNone(record.last_skill_name)
+            self.assertIsNone(record.last_reply_preview)
+        finally:
+            db.close()
+
+    def test_reset_endpoint_returns_structured_error_for_missing_session(self):
+        response = self.client.post(
+            "/reset",
+            json={"session_id": "missing-session"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"]["code"], "bad_request")
+        self.assertEqual(data["error"]["message"], "Session not found")
+
+    @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "delete reply"})
+    def test_delete_session_endpoint_removes_existing_session(self, mock_call_llm):
+        self.client.post(
+            "/run",
+            json={"session_id": "session-delete", "user_input": "你好"},
+        )
+
+        response = self.client.delete("/sessions/session-delete")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
+
+        detail_response = self.client.get("/sessions/session-delete")
+        self.assertEqual(detail_response.status_code, 404)
+        self.assertEqual(detail_response.json()["error"]["code"], "session_not_found")
+
+        list_response = self.client.get("/sessions")
+        self.assertEqual(list_response.status_code, 200)
+        session_ids = [item["session_id"] for item in list_response.json()]
+        self.assertNotIn("session-delete", session_ids)
+
+        db = self.session_local()
+        try:
+            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-delete").first()
+            self.assertIsNone(record)
+        finally:
+            db.close()
+
+    def test_delete_session_endpoint_returns_structured_error_for_missing_session(self):
+        response = self.client.delete("/sessions/missing-session")
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"]["code"], "bad_request")
+        self.assertEqual(data["error"]["message"], "Session not found")
 
     @patch("agent_prototype.runtime.agent.call_llm", return_value={"role": "assistant", "content": "first reply"})
     def test_list_sessions_endpoint_returns_summaries(self, mock_call_llm):

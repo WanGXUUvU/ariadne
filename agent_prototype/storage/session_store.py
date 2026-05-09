@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..core.schemas import AgentEvent, AgentState
 from .models import SessionRecord, SessionRunEventRecord, SessionRunRecord
 
+_UNSET=object()
 
 class SqliteSessionStore:
     """围绕 session 相关数据的 SQLite store。"""
@@ -34,9 +35,9 @@ class SqliteSessionStore:
         session_id: str,
         state: AgentState,
         session_name: Optional[str] = None,
-        last_agent_name: Optional[str] = None,
-        last_skill_name: Optional[str] = None,
-        last_reply_preview: Optional[str] = None,
+        last_agent_name=_UNSET,
+        last_skill_name=_UNSET,
+        last_reply_preview=_UNSET,
     ) -> SessionRecord:
         """输入：session 标识、状态快照和若干元数据。输出：插入或更新后的 SessionRecord。
 
@@ -56,21 +57,28 @@ class SqliteSessionStore:
                 record.session_name = session_name
             elif not record.session_name:
                 record.session_name = session_id
-            record.last_agent_name = last_agent_name
-            record.last_reply_preview = last_reply_preview
+            
+            if last_agent_name is not _UNSET:
+                record.last_agent_name = last_agent_name
+            if last_reply_preview is not _UNSET:
+                record.last_reply_preview = last_reply_preview
+
             record.message_count = message_count
-            record.last_skill_name = last_skill_name
+
+            if last_skill_name is not _UNSET:
+                record.last_skill_name = last_skill_name
         else:
             record = SessionRecord(
-                session_id=session_id,
-                session_name=session_name or session_id,
-                state_json=state_json,
-                last_agent_name=last_agent_name,
-                last_skill_name=last_skill_name,
-                message_count=message_count,
-                last_reply_preview=last_reply_preview,
+                session_id=session_id,  # 新记录直接使用传入的 session_id
+                session_name=session_name or session_id,  # 新建时没有名字就回退到 session_id
+                state_json=state_json,  # 保存序列化后的 state
+                last_agent_name=None if last_agent_name is _UNSET else last_agent_name,  # 没传就存 None，传了就按传入值存
+                last_skill_name=None if last_skill_name is _UNSET else last_skill_name,  # 同理处理 skill
+                message_count=message_count,  # 新记录的消息数直接来自当前 state
+                last_reply_preview=None if last_reply_preview is _UNSET else last_reply_preview,  # 没传就 None，显式传 None 也还是 None
             )
-            self.db.add(record)
+            self.db.add(record)  # 把新建记录加入当前事务
+
 
         return record
 
@@ -125,7 +133,6 @@ class SqliteSessionStore:
         record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
         if record:
             self.db.delete(record)
-            self.db.commit()
 
     def list_run_records(self, session_id: str, run_id: Optional[str] = None) -> list[SessionRunRecord]:
         """输入：session_id、可选 run_id。输出：按顺序排列的 SessionRunRecord 列表。"""

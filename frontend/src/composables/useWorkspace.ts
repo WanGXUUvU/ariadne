@@ -1,8 +1,69 @@
 import { ref, computed, watch } from 'vue';
 import { api } from '../api/client';
-import type { SessionSummary, AgentMessage, AgentEvent, SkillMetadata, CompactResponse } from '../types';
-import type { ViewMode, UiAgentOption } from '../types/ui';
+import type { SessionSummary, AgentMessage, AgentEvent, SkillMetadata, CompactResponse, TraceResponse } from '../types';
+import type { ViewMode } from '../types/ui';
 import { MOCK_AGENTS } from '../mock/ui-mocks';
+
+const RESET_HISTORY_STORAGE_KEY = 'agent-build-reset-history-v1';
+const RESET_MARKER_CONTENT = '[RESET_MARKER]';
+
+type ResetHistoryStore = Record<string, AgentMessage[]>;
+
+function readResetHistoryStore(): ResetHistoryStore {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(RESET_HISTORY_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+
+    return parsed as ResetHistoryStore;
+  } catch {
+    return {};
+  }
+}
+
+function writeResetHistoryStore(store: ResetHistoryStore) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(RESET_HISTORY_STORAGE_KEY, JSON.stringify(store));
+}
+
+function readSessionResetHistory(sessionId: string): AgentMessage[] {
+  return readResetHistoryStore()[sessionId] ?? [];
+}
+
+function writeSessionResetHistory(sessionId: string, messages: AgentMessage[]) {
+  const store = readResetHistoryStore();
+
+  if (messages.length === 0) {
+    delete store[sessionId];
+  } else {
+    store[sessionId] = messages;
+  }
+
+  writeResetHistoryStore(store);
+}
+
+function clearSessionResetHistory(sessionId: string) {
+  const store = readResetHistoryStore();
+  if (!(sessionId in store)) {
+    return;
+  }
+
+  delete store[sessionId];
+  writeResetHistoryStore(store);
+}
 
 export function useWorkspace() {
   // Global View State
@@ -11,7 +72,8 @@ export function useWorkspace() {
   // Data States
   const sessions = ref<SessionSummary[]>([]);
   const activeSessionId = ref<string | null>(null);
-  const messages = ref<AgentMessage[]>([]);
+  const currentMessages = ref<AgentMessage[]>([]);
+  const historyMessages = ref<AgentMessage[]>([]);
   const events = ref<AgentEvent[]>([]);
   const skills = ref<SkillMetadata[]>([]);
   
@@ -28,6 +90,7 @@ export function useWorkspace() {
   const infoMsg = ref<string | null>(null); // 成功/信息类提示，绿色显示，与 errorMsg 分开
 
   // Computed Properties
+  const messages = computed(() => [...historyMessages.value, ...currentMessages.value]);
   const activeSession = computed(() =>
     sessions.value.find((session) => session.session_id === activeSessionId.value) ?? null
   );
@@ -65,7 +128,8 @@ export function useWorkspace() {
       isChatLoading.value = true;
       const newSession = await api.createSession();
       await loadSessions(newSession.session_id);
-      messages.value = [];
+      historyMessages.value = [];
+      currentMessages.value = [];
       events.value = [];
       errorMsg.value = null;
     } catch (err: any) {
@@ -83,10 +147,11 @@ export function useWorkspace() {
         api.getSessionDetail(id),
         api.getTrace(id).catch(() => []) // Fallback if trace API fails
       ]);
-      messages.value = detail.state?.messages || [];
+      historyMessages.value = readSessionResetHistory(id);
+      currentMessages.value = detail.state?.messages || [];
       // Flatten all events from all runs in the TraceResponse
-      if (trace && trace.runs) {
-        events.value = trace.runs.flatMap((run: any) => run.events);
+      if (trace && 'runs' in trace) {
+        events.value = (trace as TraceResponse).runs.flatMap((run: any) => run.events);
       } else {
         events.value = [];
       }
@@ -94,7 +159,8 @@ export function useWorkspace() {
     } catch (err: any) {
       if (err.message.includes('not found') || err.message.includes('404')) {
         activeSessionId.value = null;
-        messages.value = [];
+        historyMessages.value = [];
+        currentMessages.value = [];
         events.value = [];
       } else {
         errorMsg.value = 'Failed to load session details: ' + err.message;
@@ -109,16 +175,16 @@ export function useWorkspace() {
   const sendMessage = async (input: string) => {
     if (!activeSessionId.value) return;
     try {
-      if (messages.value.length > 12) {
+      if (currentMessages.value.length > 12) {
         isCompacting.value = true;
       }
       isChatLoading.value = true;
       errorMsg.value = null;
       // Add pessimistic message
-      messages.value.push({ role: 'user', content: input });
+      currentMessages.value.push({ role: 'user', content: input });
       
       const res = await api.runPass(activeSessionId.value, input, activeAgent.value?.id);
-      messages.value = res.state?.messages || [];
+      currentMessages.value = res.state?.messages || [];
       // append new events to trace
       if (res.events && res.events.length > 0) {
         events.value = [...events.value, ...res.events];
@@ -154,15 +220,36 @@ export function useWorkspace() {
     }
   };
 
+  const deleteSession = async (id: string) => {
+    try {
+      await api.deleteSession(id);
+      clearSessionResetHistory(id);
+      if (activeSessionId.value === id) {
+        activeSessionId.value = null;
+        historyMessages.value = [];
+        currentMessages.value = [];
+        events.value = [];
+      }
+      await loadSessions();
+    } catch (err: any) {
+      errorMsg.value = 'Delete failed: ' + err.message;
+    }
+  };
+
   const resetSession = async () => {
     if (!activeSessionId.value) return;
     try {
-      const deletedId = activeSessionId.value; // 先记住要删的 id
-      await api.resetSession(deletedId); // 调后端删除
-      activeSessionId.value = null; // 清空当前选中，避免 watcher 试图加载已删 session
-      messages.value = []; // 清空消息
-      events.value = []; // 清空 trace
-      await loadSessions(); // 刷新列表，删掉的 session 会消失
+      const currentId = activeSessionId.value;
+      await api.resetSession(currentId);
+      historyMessages.value = [
+        ...historyMessages.value,
+        ...currentMessages.value,
+        { role: 'system', content: RESET_MARKER_CONTENT }
+      ];
+      writeSessionResetHistory(currentId, historyMessages.value);
+      currentMessages.value = [];
+      events.value = [];
+      await loadSessions(currentId);
     } catch (err: any) {
       errorMsg.value = 'Reset failed: ' + err.message;
     }
@@ -208,7 +295,8 @@ export function useWorkspace() {
     if (newId) {
       loadSessionDetail(newId);
     } else {
-      messages.value = [];
+      historyMessages.value = [];
+      currentMessages.value = [];
       events.value = [];
     }
   });
@@ -240,6 +328,7 @@ export function useWorkspace() {
     sendMessage,
     compactSession,
     resetSession,
+    deleteSession,
     toggleSkill,
     
     // Mock Data

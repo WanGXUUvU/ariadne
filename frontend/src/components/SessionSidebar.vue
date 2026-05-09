@@ -10,6 +10,7 @@ const props = defineProps<{
 defineEmits<{
   (e: 'select', id: string): void;
   (e: 'new'): void;
+  (e: 'delete', id: string): void;
 }>();
 
 const searchQuery = ref('');
@@ -63,7 +64,12 @@ const formatTime = (date: string | Date) => {
           <div class="session-title">{{ session.session_name || session.session_id.substring(0, 8) }}</div>
           <div class="session-meta mono-label">{{ session.message_count || 0 }} MSG</div>
         </div>
-        <div class="session-time mono-label">{{ formatTime(session.updated_at || session.created_at) }}</div>
+        <div class="session-actions">
+          <div class="session-time mono-label">{{ formatTime(session.updated_at || session.created_at) }}</div>
+          <button class="delete-btn" @click.stop="$emit('delete', session.session_id)" title="Delete Session">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>
       </div>
     </div>
   </aside>
@@ -150,9 +156,45 @@ const formatTime = (date: string | Date) => {
   color: var(--text-muted);
 }
 
+.session-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 40px;
+  justify-content: flex-end;
+}
+
 .session-time {
   color: var(--text-muted);
-  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+.delete-btn {
+  position: absolute;
+  right: 0;
+  background: transparent;
+  border: none;
+  color: var(--danger, #FF453A);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  background: rgba(255, 69, 58, 0.1);
+}
+
+.session-item:hover .session-time {
+  opacity: 0;
+}
+
+.session-item:hover .delete-btn {
+  opacity: 1;
 }
 
 .session-item.active .session-title {

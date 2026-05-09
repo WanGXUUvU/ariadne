@@ -1,0 +1,107 @@
+--- frontend/src/composables/useWorkspace.ts
++++ frontend/src/composables/useWorkspace.ts
+@@ -11,7 +11,8 @@
+   // Data States
+   const sessions = ref<SessionSummary[]>([]);
+   const activeSessionId = ref<string | null>(null);
+-  const messages = ref<AgentMessage[]>([]);
++  const currentMessages = ref<AgentMessage[]>([]);
++  const historyMessages = ref<AgentMessage[]>([]);
+   const events = ref<AgentEvent[]>([]);
+   const skills = ref<SkillMetadata[]>([]);
+   
+@@ -32,6 +33,8 @@
+     MOCK_AGENTS.find(a => a.id === activeAgentId.value) ?? MOCK_AGENTS[0]
+   );
+ 
++  const messages = computed(() => [...historyMessages.value, ...currentMessages.value]);
++
+   // --- ACTIONS ---
+ 
+   // Sessions
+@@ -65,7 +68,8 @@
+       isChatLoading.value = true;
+       const newSession = await api.createSession();
+       await loadSessions(newSession.session_id);
+-      messages.value = [];
++      historyMessages.value = [];
++      currentMessages.value = [];
+       events.value = [];
+       errorMsg.value = null;
+     } catch (err: any) {
+@@ -83,7 +87,8 @@
+         api.getSessionDetail(id),
+         api.getTrace(id).catch(() => []) // Fallback if trace API fails
+       ]);
+-      messages.value = detail.state?.messages || [];
++      historyMessages.value = [];
++      currentMessages.value = detail.state?.messages || [];
+       // Flatten all events from all runs in the TraceResponse
+       if (trace && trace.runs) {
+         events.value = trace.runs.flatMap((run: any) => run.events);
+@@ -94,7 +99,8 @@
+     } catch (err: any) {
+       if (err.message.includes('not found') || err.message.includes('404')) {
+         activeSessionId.value = null;
+-        messages.value = [];
++        historyMessages.value = [];
++        currentMessages.value = [];
+         events.value = [];
+       } else {
+         errorMsg.value = 'Failed to load session details: ' + err.message;
+@@ -109,16 +115,16 @@
+   const sendMessage = async (input: string) => {
+     if (!activeSessionId.value) return;
+     try {
+-      if (messages.value.length > 12) {
++      if (currentMessages.value.length > 12) {
+         isCompacting.value = true;
+       }
+       isChatLoading.value = true;
+       errorMsg.value = null;
+       // Add pessimistic message
+-      messages.value.push({ role: 'user', content: input });
++      currentMessages.value.push({ role: 'user', content: input });
+       
+       const res = await api.runPass(activeSessionId.value, input, activeAgent.value?.id);
+-      messages.value = res.state?.messages || [];
++      currentMessages.value = res.state?.messages || [];
+       // append new events to trace
+       if (res.events && res.events.length > 0) {
+         events.value = [...events.value, ...res.events];
+@@ -159,7 +165,8 @@
+       await api.deleteSession(id);
+       if (activeSessionId.value === id) {
+         activeSessionId.value = null;
+-        messages.value = [];
++        historyMessages.value = [];
++        currentMessages.value = [];
+         events.value = [];
+       }
+       await loadSessions();
+@@ -173,7 +180,13 @@
+     try {
+       const currentId = activeSessionId.value;
+       await api.resetSession(currentId);
+-      messages.value = [];
++      // 保存为历史，并加入标识
++      historyMessages.value = [
++        ...historyMessages.value,
++        ...currentMessages.value,
++        { role: 'system', content: '[RESET_MARKER]', name: 'SYSTEM' } as AgentMessage
++      ];
++      currentMessages.value = [];
+       events.value = [];
+       await loadSessions(currentId);
+     } catch (err: any) {
+@@ -219,9 +232,11 @@
+   watch(activeSessionId, (newId) => {
+     if (newId) {
+       loadSessionDetail(newId);
+     } else {
+-      messages.value = [];
++      historyMessages.value = [];
++      currentMessages.value = [];
+       events.value = [];
+     }
+   });

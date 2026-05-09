@@ -26,7 +26,7 @@ const emit = defineEmits<{
 }>();
 
 const handleReset = () => {
-  if (confirm('Delete this session? This cannot be undone.')) {
+  if (confirm('Reset this session? This will clear all chat history.')) {
     emit('reset');
   }
 };

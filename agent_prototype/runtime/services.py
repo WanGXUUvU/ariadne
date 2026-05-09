@@ -74,13 +74,10 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
     state = store.get(agent_input.session_id) or AgentState()  # 先读取当前 session 的状态；没有就新建空状态
 
     if state.messages:  # 只有已有历史消息时，才有必要尝试自动 compact
-        auto_compact_result = compact_session_service(  # 先尝试对当前 session 做一次自动 compact
-            CompactInput(
-                session_id=agent_input.session_id,  # 自动 compact 仍然针对当前 session
-                trigger_threshold=12,  # 第一版先写死默认阈值，后面再考虑配置化
-                keep_recent_count=2,  # 压缩后只保留最近 2 条原始消息，上下文更精简
-            ),
-            db,
+        auto_compact_result = _compact_in_memory(
+            state=state,  # 直接把当前内存里的 state 传进去做 compact 计算
+            trigger_threshold=12,  # 自动 compact 继续沿用当前默认触发阈值
+            keep_recent_count=2,  # 自动 compact 继续保留最近 2 条原始消息
         )
         state = auto_compact_result.state  # 自动 compact 后，后续统一使用返回的最新 state
 
@@ -155,6 +152,41 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
 
     return output
 
+def _compact_in_memory(
+    state: AgentState,
+    trigger_threshold: int,
+    keep_recent_count: int,
+) -> CompactOutput:
+    """输入：当前会话 state、触发阈值、recent 保留数量。输出：只在内存中计算出的 compact 结果。"""  # 这个内部函数只负责“算 compact”，不负责写库或提交事务
+
+    if len(state.messages) <= trigger_threshold:  # 如果当前消息数还没达到触发阈值，就不用压缩
+        return CompactOutput(state=state, did_compact=False, removed_count=0)  # 原样返回，不产生任何副作用
+
+    _, middle_messages, _ = split_messages_for_compaction(
+        state.messages,  # 把完整消息切成锚点、中段、recent 三段
+        keep_recent_count=keep_recent_count,  # recent 保留数量继续由调用方控制
+    )
+
+    if not middle_messages:  # 如果没有中段消息，说明没有真正可压缩的主体
+        return CompactOutput(state=state, did_compact=False, removed_count=0)  # 直接返回不压缩结果
+
+    compact_prompt = build_compact_prompt(middle_messages)  # 用中段消息拼出 compact 提示词
+
+    summary_response = call_llm(
+        [{"role": "system", "content": compact_prompt}],  # 让模型只做摘要任务
+        tools=None,  # compact 阶段不允许工具调用
+    )
+    summary_text = summary_response.get("content", "").strip()  # 提取模型返回的摘要正文
+
+    if not summary_text:  # 如果模型没有产出有效摘要
+        raise ValueError("Compact summary is empty")  # 抛业务错误，阻止后续写入空摘要
+
+    return compact_state_with_summary(
+        state=state,  # 基于原始 state 生成 compact 后的新 state
+        summary_text=summary_text,  # 用模型摘要替换中段历史
+        keep_recent_count=keep_recent_count,  # 保持 recent 截断策略一致
+    )
+
 def compact_session_service(payload:CompactInput,db:Session)->CompactOutput:
     """输入 压缩前的CompactInput和 db 输出 压缩后的对象"""
     store = SqliteSessionStore(db)
@@ -163,32 +195,11 @@ def compact_session_service(payload:CompactInput,db:Session)->CompactOutput:
     if state is None:
         raise ValueError("Session not found")
     
-    if len(state.messages) <=payload.trigger_threshold: #如果小于需要压缩的阈值
-        return CompactOutput(state=state,did_compact=False,removed_count=0)
-    
-    _, middle_messages,_ = split_messages_for_compaction(  # 先把完整历史切成三段
-        state.messages,  # 传入当前会话历史消息
-        keep_recent_count=payload.keep_recent_count,  # 按请求里的 recent 保留数量切分
+    compact_result = _compact_in_memory(
+        state=state,
+        trigger_threshold=payload.trigger_threshold,
+        keep_recent_count=payload.keep_recent_count,
     )
-
-    if not middle_messages:
-        return CompactOutput(state=state,did_compact=False,removed_count=0)
-    
-    compact_prompt = build_compact_prompt(middle_messages)
-
-    summary_response = call_llm(
-        [{"role":"system","content":compact_prompt}],
-        tools=None,
-    )
-    summary_text = summary_response.get("content","").strip()
-    if not summary_text:
-        raise ValueError("Compact summary is empty")
-    
-    compact_result = compact_state_with_summary(
-    state=state,  # 传入原始会话状态
-    summary_text=summary_text,  # 传入模型刚刚返回的 compact 摘要文本
-    keep_recent_count=payload.keep_recent_count,  # 继续沿用这次 compact 的 recent 保留数量
-)
 
     if not compact_result.did_compact:
         return compact_result
@@ -210,9 +221,44 @@ def compact_session_service(payload:CompactInput,db:Session)->CompactOutput:
 
     return compact_result
 def reset_session_service(payload: ResetInput, db: Session) -> dict[str, bool]:
-    """输入：ResetInput 请求对象、数据库会话。输出：是否删除成功的结果字典。"""
+    """输入：ResetInput 请求对象、数据库会话。输出：是否重置成功的结果字典。"""
 
     store = SqliteSessionStore(db)
-    store.delete(payload.session_id)
+    record = store.read_session_record(payload.session_id)
+    if not record:
+        raise ValueError("Session not found")
+    
+    empty_state=AgentState()
+
+    try:
+        store.upsert_session_snapshot(
+            payload.session_id,
+            state=empty_state,
+            session_name=record.session_name,
+            last_agent_name=None,
+            last_reply_preview=None,
+            last_skill_name=None,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return {"ok": True}
 
+def delete_session_service(session_id:str,db:Session)->dict[str,bool]:
+    """输入：session_id、数据库会话。输出：是否删除成功的结果字典。"""  # 这个 service 负责真正的删除业务和事务控制
+
+    store=SqliteSessionStore(db)
+    record=store.read_session_record(session_id)
+
+    if record is None:
+        raise ValueError("Session not found")
+    
+    try:
+        store.delete(session_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return {"ok":True}

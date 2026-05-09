@@ -2,7 +2,7 @@ import os
 import requests
 
 BASE_URL = "https://token.sensenova.cn/v1"
-MODEL = "deepseek-v4-flash"
+MODEL = "sensenova-6.7-flash-lite"
 
 def call_llm(messages,tools=None):
     """输入：消息列表、可选工具 schema 列表。输出：LLM 返回的完整 assistant message 字典。"""
@@ -21,17 +21,36 @@ def call_llm(messages,tools=None):
         "model":MODEL,
         "messages":messages,
         "thinking": {"type": "disabled"},
+        "stream": False,
     }
 
     if tools:
         payload["tools"]=tools
-    response = requests.post(url, headers=headers, json=payload, timeout=60)
-    if not response:
-        print("STATUS:",response.status_code)
-        print("BODY:",response.text)    
+        payload["tool_choice"]="auto"
+    response = requests.post(url, headers=headers, json=payload, timeout=2100)
+
+    try:
         response.raise_for_status()
-    data = response.json()
-    return data["choices"][0]["message"]
+    except requests.HTTPError as exc: #“异常包装”
+        raise RuntimeError(
+            f"LLM request failed: "
+            f"url={url}, "
+            f"model={payload['model']}, "
+            f"status={response.status_code}, "
+            f"body={response.text}"
+        ) from exc
+
+    data=response.json()
+    choices=data.get("choices")
+
+    if not choices:
+        raise ValueError("LLM response missing choices")
+    
+    message=choices[0].get("message")
+    if message is None:
+        raise ValueError("LLM response missing message")
+    
+    return message
 
 # 期望返回的结构大致是：
 # {

@@ -39,6 +39,7 @@ onMounted(() => {
         :activeId="workspace.activeSessionId.value"
         @select="id => workspace.activeSessionId.value = id"
         @new="workspace.createNewSession"
+        @delete="workspace.deleteSession"
       />
       <ChatPanel 
         :messages="workspace.messages.value"

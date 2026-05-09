@@ -32,7 +32,7 @@ from ..core.schemas import (
     TraceRunSummary,
     SkillSummary,
 )
-from ..runtime.services import reset_session_service, run_agent_service,compact_session_service,create_session_service
+from ..runtime.services import reset_session_service, run_agent_service,compact_session_service,create_session_service,delete_session_service
 from ..storage.db import get_db
 from ..storage.session_store import SqliteSessionStore
 from ..runtime.skill_loader import list_skills
@@ -71,9 +71,14 @@ def run_agent_api(agent_input: AgentInput, db: Session = Depends(get_db)) -> Age
 @router.post("/reset")
 def reset_session(payload: ResetInput, db: Session = Depends(get_db)) -> dict[str, bool]:
     """输入：ResetInput 请求对象、数据库会话。输出：是否重置成功的结果字典。"""
-
-    return reset_session_service(payload, db)
-
+    try:
+        return reset_session_service(payload, db)
+    except ValueError as exc:
+        return error_response(
+            status.HTTP_400_BAD_REQUEST,
+            "bad_request",
+            str(exc),
+        )
 
 @router.post("/sessions", response_model=SessionSummary)
 def create_session_api(payload: CreateSessionInput, db: Session = Depends(get_db)) -> SessionSummary:
@@ -81,6 +86,18 @@ def create_session_api(payload: CreateSessionInput, db: Session = Depends(get_db
 
     return create_session_service(payload, db)  # 直接把请求交给 service 层，保持 route 层只做 HTTP 适配
 
+@router.delete("/sessions/{session_id}")  # 删除某一条 session，路径要和现有 /sessions 体系保持一致
+def delete_session_api(session_id:str,db:Session=Depends(get_db)):
+    """输入：session_id、数据库会话。输出：是否删除成功的结果字典。"""  # route 层只负责接 HTTP 请求并转交给 service
+
+    try:
+        return delete_session_service(session_id,db)
+    except ValueError as exc:
+        return error_response(
+            status.HTTP_400_BAD_REQUEST,
+            "bad_request",
+            str(exc),
+        )
 
 @router.get("/sessions", response_model=list[SessionSummary])
 def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:

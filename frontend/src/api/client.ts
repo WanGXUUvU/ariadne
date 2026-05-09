@@ -1,4 +1,4 @@
-import type { RunResponse, SessionDetail, SessionSummary, AgentEvent, SkillMetadata, TraceResponse, CompactResponse } from '../types';
+import type { RunResponse, SessionDetail, SessionSummary, SkillMetadata, TraceResponse, CompactResponse } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -40,5 +40,6 @@ export const api = {
   enableSkill: (skill_name: string) => fetchApi<SkillMetadata>(`/skills/${skill_name}/enable`, { method: 'POST' }),
   disableSkill: (skill_name: string) => fetchApi<SkillMetadata>(`/skills/${skill_name}/disable`, { method: 'POST' }),
   compactSession: (session_id: string) => fetchApi<CompactResponse>(`/compact`, { method: 'POST', body: JSON.stringify({ session_id, trigger_threshold: 1 }) }), // 手动 compact 传 trigger_threshold:1，跳过默认 12 条阈值，确保任何时候都能触发
-  resetSession: (session_id: string) => fetchApi<{ok: boolean}>(`/reset`, { method: 'POST', body: JSON.stringify({ session_id }) })
+  resetSession: (session_id: string) => fetchApi<{ok: boolean}>(`/reset`, { method: 'POST', body: JSON.stringify({ session_id }) }),
+  deleteSession: (session_id: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'DELETE' })
 };
