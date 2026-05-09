@@ -14,8 +14,8 @@ from typing import Optional
 
 from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
 from ..core.schemas import AgentEvent, AgentInput, AgentOutput, AgentState, ChatMessage, ToolCall,RunMetadata
-from .llm_client import call_llm
-from .tool_registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
+from ..model.openai_adapter import call_llm
+from ..tools.tool_registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
 
 
 def strip_think(content: str) -> str:

@@ -3,11 +3,11 @@ from typing import  Optional  # 类型标注
 
 from ..core.schemas import ToolError, ToolResult
 from ..core.tool_types import ToolDefinition
-from ..tools_defs.echo import build_echo_tool_definition
-from ..tools_defs.fs_read import build_read_file_tool_definition
-from ..tools_defs.fs_list import build_list_dir_definition
-from ..tools_defs.fs_write import build_write_file_tool_definition
-from ..tools_defs.fs_search import build_search_text_definition
+from .builtin.echo import build_echo_tool_definition
+from .builtin.fs_read import build_read_file_tool_definition
+from .builtin.fs_list import build_list_dir_definition
+from .builtin.fs_write import build_write_file_tool_definition
+from .builtin.fs_search import build_search_text_definition
 
 
 class ToolRegistry:  # 工具注册中心

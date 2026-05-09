@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: implementation
-- Task: specs/TASK-067.md
-- Gate: verify
-- Allowed Now: implementation
+- Phase: review
+- Task: specs/TASK-069.md
+- Gate: review
+- Allowed Now: review
 - Lane: Fast
 - Blocked: None
-- Next action: 只重构现有功能，不新增能力；按官方分层把 `runtime` 拆窄，把现有文件归到 `api / application / runtime / model / context / skills / tools / storage / core`。
+- Next action: 复核测试拆分结果，确认各模块测试文件已按职责落位。
 
 
 ## 遗留项
@@ -16,6 +16,15 @@
 ## History
 | Date | Task | Gate Passed | Notes |
 |------|------|-------------|-------|
+| 2026-05-09 | `TASK-069` API 测试文件独立化完成 | Verify | 已将 `TestAgentApi` 迁到 `test_agent_api.py`，并删除旧的 `test_agent.py`；`python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
+| 2026-05-09 | `TASK-069` 测试拆分验证完成 | Verify | 已将测试按模块拆成多个文件，并用 `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 验证 47 项通过。 |
+| 2026-05-09 | `TASK-069` 建立并切换 | planning | 启动测试按模块拆分任务，把 `test_agent.py` 拆成多个按职责划分的测试文件。 |
+| 2026-05-09 | `TASK-068` 命名统一验证完成 | Verify | 已将 `types.py`、`loader.py`、`registry.py` 收紧为更明确的模块名，并修复相关 import；`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-05-09 | `TASK-068` 建立并切换 | planning | 启动模块命名统一任务，优先收紧 `types.py`、`loader.py`、`registry.py` 这类泛名文件。 |
+| 2026-05-09 | `TASK-067` 第二阶段清理完成 | Verify | 已删除旧 runtime / storage / tools_defs / core.model.adapter 重复实现，仅保留新分层目录中的实现；`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
+| 2026-05-09 | `TASK-067` 重构实现完成 | Verify | 已迁移后端核心职责到新分层目录，补了兼容 shim，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过；`pytest` 在当前环境不可用。 |
+| 2026-05-09 | 补全 `TASK-067` 目录目标图 | planning | 将 `storage`、`core`、`tools`、`trace`、`tests` 一并纳入目标结构，避免目标图缺块。 |
+| 2026-05-09 | 重写 `TASK-067` 重构卡 | planning | 按官方分层和当前项目现状补齐重构说明、职责边界、迁移顺序和验收标准。 |
 | 2026-05-09 | 收拢为纯重构任务 | planning | 取消继续拆流程，改为只对现有功能做一次官方分层重构，不新增能力。 |
 | 2026-05-09 | 创建后端分层临时任务卡 | planning | 新增 `TASK-067`，专门承载后端分层重构方案，与 `TASK-066` 区分。 |
 | 2026-05-09 | 创建临时结构任务卡 | planning | 新增 `TASK-066`，专门承载临时结构整理，不和 `TASK-026` 混在一起。 |

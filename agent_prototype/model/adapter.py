@@ -1,7 +1,7 @@
 from typing import Any,Literal,Optional
 from pydantic import BaseModel,Field
 
-from .schemas import ChatMessage,ToolCall
+from ..core.schemas import ChatMessage
 
 class ModelConfig(BaseModel):
     """一次模型调用配置"""

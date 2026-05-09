@@ -2,8 +2,8 @@ import json
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from .models import AgentDefinitionRecord
-from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
+from ..models import AgentDefinitionRecord
+from ...core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
 
 class SqliteAgentDefinitionStore:
     def __init__(self,db:Session):

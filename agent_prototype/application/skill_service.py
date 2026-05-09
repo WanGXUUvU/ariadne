@@ -1,5 +1,5 @@
 from ..core.schemas import SkillSummary
-from .skill_loader import list_skills,save_skill_config,load_skill_config,DEFAULT_PROTECTED_SKILL_NAMES
+from ..skills.skill_loader import list_skills,save_skill_config,load_skill_config,DEFAULT_PROTECTED_SKILL_NAMES
 def disable_skill_service(skill_name:str)->SkillSummary:
     """输入：要禁用的 skill 名称。输出：禁用后的 SkillSummary。"""
     skills = list_skills()

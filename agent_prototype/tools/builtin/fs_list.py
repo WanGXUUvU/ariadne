@@ -1,4 +1,4 @@
-from ..core.tool_types import ToolDefinition
+from ...core.tool_types import ToolDefinition
 
 from pathlib import Path
 

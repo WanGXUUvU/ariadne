@@ -1,5 +1,5 @@
-from ..core.tool_types import ToolDefinition
-from ..core.schemas import ToolResult
+from ...core.tool_types import ToolDefinition
+from ...core.schemas import ToolResult
 
 def echo_tool(text: str) -> ToolResult:
     """输入：文本字符串。输出：回显该文本的 ToolResult。"""

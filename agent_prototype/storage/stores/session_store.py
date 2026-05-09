@@ -13,8 +13,8 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from ..core.schemas import AgentEvent, AgentState
-from .models import SessionRecord, SessionRunEventRecord, SessionRunRecord
+from ...core.schemas import AgentEvent, AgentState
+from ..models import SessionRecord, SessionRunEventRecord, SessionRunRecord
 
 _UNSET=object()
 

@@ -15,13 +15,13 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from ..core.schemas import AgentInput, AgentOutput, AgentState, ResetInput,CompactInput,CompactOutput,RunMetadata,CreateSessionInput,SessionSummary
-from ..storage.session_store import SqliteSessionStore
-from .agent import Agent
-from .agent_loader import load_agent_definition
-from .skill_loader import list_skills,load_skill_content
-from .prompt_builder  import build_skill_catalog_prompt,build_runtime_system_prompt
-from .compaction import build_compact_prompt,compact_state_with_summary,split_messages_for_compaction
-from .llm_client import call_llm
+from ..storage.stores.session_store import SqliteSessionStore
+from ..runtime.agent_runtime import Agent
+from .agent_definition_service import load_agent_definition
+from ..skills.skill_loader import list_skills,load_skill_content
+from ..context.prompt_builder import build_skill_catalog_prompt,build_runtime_system_prompt
+from ..context.compaction import build_compact_prompt,compact_state_with_summary,split_messages_for_compaction
+from ..model.openai_adapter import call_llm
 
 def build_reply_preview(reply: str, max_len: int = 120) -> str:
     """输入：完整回复文本、最大长度。输出：单行回复摘要字符串。"""

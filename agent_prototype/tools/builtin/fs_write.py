@@ -1,6 +1,6 @@
 from pathlib import Path  # 处理文件路径
 
-from ..core.tool_types import ToolDefinition  # 导入工具定义
+from ...core.tool_types import ToolDefinition  # 导入工具定义
 
 
 def write_file(path: str, content: str) -> str:  # 把内容写入文件
