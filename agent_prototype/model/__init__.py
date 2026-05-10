@@ -1,4 +1,11 @@
-from .model_types import ModelConfig, ModelRequest
-from .openai_adapter import call_llm
+from .adapter import ModelAdapter
+from .model_types import ModelConfig, ModelRequest, ModelResponse
+from .openai_adapter import ChatCompletionsAdapter
 
-__all__ = ["ModelConfig", "ModelRequest", "call_llm"]
+__all__ = [
+    "ModelAdapter",
+    "ModelConfig",
+    "ModelRequest",
+    "ModelResponse",
+    "ChatCompletionsAdapter",
+]

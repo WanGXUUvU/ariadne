@@ -1,20 +1,18 @@
 import unittest
 import tempfile
-import requests
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.runtime.agent_runtime import Agent
 from agent_prototype.core.agent_definition import AgentDefinition
-from agent_prototype.core.schemas import AgentInput, AgentState, SkillSummary
+from agent_prototype.core.schemas import AgentState, ChatMessage, SkillSummary, ToolCall, ToolCallFunction
+from agent_prototype.model.model_types import ModelResponse
 from agent_prototype.storage.stores.session_store import SqliteSessionStore
 from agent_prototype.storage.stores.agent_definition_store import SqliteAgentDefinitionStore
 from agent_prototype.api.app import app
-from agent_prototype.model.openai_adapter import call_llm
 from agent_prototype.application.agent_definition_service import load_agent_definition
 from agent_prototype.skills.skill_loader import list_skills
 from agent_prototype.tools.tool_registry import build_default_tool_registry
@@ -51,8 +49,18 @@ class TestAgentApi(unittest.TestCase):
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "mock reply"})
-    def test_run_endpoint(self, mock_call_llm):
+    def _assistant_response(self, content=None, tool_calls=None):
+        return ModelResponse(
+            assistant_message=ChatMessage(
+                role="assistant",
+                content=content,
+                tool_calls=tool_calls,
+            )
+        )
+
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_run_endpoint(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="mock reply")
         response = self.client.post("/run", json={"session_id": "session-a", "user_input": "你好"})
 
         self.assertEqual(response.status_code, 200)
@@ -85,8 +93,9 @@ class TestAgentApi(unittest.TestCase):
             ],
         )
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "skill reply"})
-    def test_run_endpoint_returns_metadata_with_explicit_agent_and_skill(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_run_endpoint_returns_metadata_with_explicit_agent_and_skill(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="skill reply")
         db = self.session_local()
         try:
             store = SqliteAgentDefinitionStore(db)
@@ -134,8 +143,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["metadata"]["agent_name"], "reviewer")
         self.assertEqual(data["metadata"]["skill_name"], "openai-docs")
 
-    @patch("agent_prototype.application.run_service.call_llm", return_value={"role": "assistant", "content": "中段历史摘要"})
-    def test_compact_endpoint_returns_compacted_state(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_compact_endpoint_returns_compacted_state(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="中段历史摘要")
         db = self.session_local()
         try:
             store = SqliteSessionStore(db)
@@ -179,14 +189,14 @@ class TestAgentApi(unittest.TestCase):
         self.assertIn("中段历史摘要", data["state"]["messages"][1]["content"])
         self.assertEqual(data["state"]["messages"][-2]["content"], "自动 compact 会在 /run 前触发")
         self.assertEqual(data["state"]["messages"][-1]["content"], "现在开始做 compact")
-        mock_call_llm.assert_called_once()
+        mock_generate.assert_called_once()
 
-    @patch(
-        "agent_prototype.runtime.agent_runtime.call_llm",
-        return_value={"role": "assistant", "content": "run reply after auto compact"},
-    )
-    @patch("agent_prototype.application.run_service.call_llm", return_value={"role": "assistant", "content": "自动压缩后的中段摘要"})
-    def test_run_endpoint_auto_compacts_long_session_before_reply(self, mock_compact_call_llm, mock_run_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_run_endpoint_auto_compacts_long_session_before_reply(self, mock_generate):
+        mock_generate.side_effect = [
+            self._assistant_response(content="自动压缩后的中段摘要"),
+            self._assistant_response(content="run reply after auto compact"),
+        ]
         db = self.session_local()
         try:
             store = SqliteSessionStore(db)
@@ -234,15 +244,14 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(compacted_messages[-1]["role"], "assistant")
         self.assertEqual(compacted_messages[-1]["content"], "run reply after auto compact")
 
-        mock_compact_call_llm.assert_called_once()
-        mock_run_call_llm.assert_called_once()
+        self.assertEqual(mock_generate.call_count, 2)
 
-    @patch(
-        "agent_prototype.runtime.agent_runtime.call_llm",
-        side_effect=RuntimeError("run failed after auto compact"),
-    )
-    @patch("agent_prototype.application.run_service.call_llm", return_value={"role": "assistant", "content": "自动压缩后的中段摘要"})
-    def test_run_endpoint_does_not_persist_auto_compact_when_run_fails(self, mock_compact_call_llm, mock_run_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_run_endpoint_does_not_persist_auto_compact_when_run_fails(self, mock_generate):
+        mock_generate.side_effect = [
+            self._assistant_response(content="自动压缩后的中段摘要"),
+            RuntimeError("run failed after auto compact"),
+        ]
         original_messages = [
             {"role": "user", "content": "最初任务目标"},
             {"role": "assistant", "content": "好的，我们先拆任务"},
@@ -279,8 +288,7 @@ class TestAgentApi(unittest.TestCase):
             )
 
         self.assertIn("run failed after auto compact", str(ctx.exception))
-        mock_compact_call_llm.assert_called_once()
-        mock_run_call_llm.assert_called_once()
+        self.assertEqual(mock_generate.call_count, 2)
 
         db = self.session_local()
         try:
@@ -294,8 +302,9 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "mock reply\nwith preview"})
-    def test_run_endpoint_updates_session_metadata(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_run_endpoint_updates_session_metadata(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="mock reply\nwith preview")
         response = self.client.post(
             "/run",
             json={"session_id": "session-meta", "user_input": "你好，简单回复我一句"},
@@ -321,8 +330,9 @@ class TestAgentApi(unittest.TestCase):
             db.close()
 
     @patch("agent_prototype.application.run_service.load_agent_definition")
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "review reply"})
-    def test_run_endpoint_uses_explicit_agent_name(self, mock_call_llm, mock_load_agent_definition):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_run_endpoint_uses_explicit_agent_name(self, mock_generate, mock_load_agent_definition):
+        mock_generate.return_value = self._assistant_response(content="review reply")
         mock_load_agent_definition.return_value = AgentDefinition(
             id="reviewer",
             name="Reviewer Agent",
@@ -344,13 +354,14 @@ class TestAgentApi(unittest.TestCase):
 
     @patch("agent_prototype.application.run_service.load_skill_content", return_value="---\nname: openai-docs\ndescription: 查文档\n---\nFULL SKILL BODY")
     @patch("agent_prototype.application.run_service.list_skills")
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "skill reply"})
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_loads_selected_skill_content_into_system_prompt(
         self,
-        mock_call_llm,
+        mock_generate,
         mock_list_skills,
         mock_load_skill_content,
     ):
+        mock_generate.return_value = self._assistant_response(content="skill reply")
         mock_list_skills.return_value = [
             SkillSummary(
                 name="openai-docs",
@@ -372,8 +383,8 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mock_load_skill_content.assert_called_once_with("openai-docs")
 
-        messages = mock_call_llm.call_args.args[0]
-        system_prompt = messages[0]["content"]
+        request = mock_generate.call_args.args[0]
+        system_prompt = request.messages[0].content
 
         self.assertIn("Available skills:", system_prompt)
         self.assertIn("openai-docs: 查 OpenAI 官方文档", system_prompt)
@@ -394,13 +405,14 @@ class TestAgentApi(unittest.TestCase):
 
     @patch("agent_prototype.application.run_service.load_skill_content")
     @patch("agent_prototype.application.run_service.list_skills")
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "catalog reply"})
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_without_skill_name_only_includes_catalog_prompt(
         self,
-        mock_call_llm,
+        mock_generate,
         mock_list_skills,
         mock_load_skill_content,
     ):
+        mock_generate.return_value = self._assistant_response(content="catalog reply")
         mock_list_skills.return_value = [
             SkillSummary(
                 name="openai-docs",
@@ -421,8 +433,8 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mock_load_skill_content.assert_not_called()
 
-        messages = mock_call_llm.call_args.args[0]
-        system_prompt = messages[0]["content"]
+        request = mock_generate.call_args.args[0]
+        system_prompt = request.messages[0].content
 
         self.assertIn("Available skills:", system_prompt)
         self.assertIn("openai-docs: 查 OpenAI 官方文档", system_prompt)
@@ -530,8 +542,9 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "reset reply"})
-    def test_reset_endpoint_clears_messages_but_keeps_same_session(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_reset_endpoint_clears_messages_but_keeps_same_session(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="reset reply")
         self.client.post(
             "/run",
             json={"session_id": "session-reset", "user_input": "你好"},
@@ -582,8 +595,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["error"]["code"], "bad_request")
         self.assertEqual(data["error"]["message"], "Session not found")
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "delete reply"})
-    def test_delete_session_endpoint_removes_existing_session(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_delete_session_endpoint_removes_existing_session(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="delete reply")
         self.client.post(
             "/run",
             json={"session_id": "session-delete", "user_input": "你好"},
@@ -618,8 +632,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["error"]["code"], "bad_request")
         self.assertEqual(data["error"]["message"], "Session not found")
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "first reply"})
-    def test_list_sessions_endpoint_returns_summaries(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_list_sessions_endpoint_returns_summaries(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="first reply")
         self.client.post("/run", json={"session_id": "session-b", "user_input": "你好"})
         self.client.post("/run", json={"session_id": "session-a", "user_input": "你好"})
         import time
@@ -640,8 +655,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertIn("created_at", data[0])
         self.assertIn("updated_at", data[0])
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "detail reply"})
-    def test_read_session_endpoint_returns_detail(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_read_session_endpoint_returns_detail(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="detail reply")
         self.client.post("/run", json={"session_id": "session-detail", "user_input": "你好"})
 
         response = self.client.get("/sessions/session-detail")
@@ -740,8 +756,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertTrue(enable_response.json()["enabled"])
         self.assertEqual(config_path.read_text(encoding="utf-8"), '{\n  "disabled": []\n}')
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "trace reply"})
-    def test_trace_endpoint_returns_runs_in_order(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_trace_endpoint_returns_runs_in_order(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="trace reply")
         first_response = self.client.post("/run", json={"session_id": "trace-session", "user_input": "第一轮"})
         second_response = self.client.post("/run", json={"session_id": "trace-session", "user_input": "第二轮"})
 
@@ -768,8 +785,9 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.runtime.agent_runtime.call_llm", return_value={"role": "assistant", "content": "filtered trace reply"})
-    def test_trace_endpoint_supports_run_id_filter(self, mock_call_llm):
+    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    def test_trace_endpoint_supports_run_id_filter(self, mock_generate):
+        mock_generate.return_value = self._assistant_response(content="filtered trace reply")
         first_response = self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第一轮"})
         self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第二轮"})
 
@@ -789,5 +807,3 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["error"]["code"], "trace_not_found")
         self.assertEqual(response.json()["error"]["message"], "Trace not found")
-
-

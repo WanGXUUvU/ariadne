@@ -58,7 +58,10 @@ onMounted(() => {
         @compact="workspace.compactSession"
         @reset="workspace.resetSession"
       />
-      <TracePanel :events="workspace.events.value" />
+      <TracePanel
+        :runs="workspace.traceRuns.value"
+        :isLoading="workspace.isTraceLoading.value"
+      />
     </div>
 
     <!-- Plugin Marketplace Modal -->

@@ -1,6 +1,13 @@
 import { ref, computed, watch } from 'vue';
 import { api } from '../api/client';
-import type { SessionSummary, AgentMessage, AgentEvent, SkillMetadata, CompactResponse, TraceResponse } from '../types';
+import type {
+  SessionSummary,
+  AgentMessage,
+  SkillMetadata,
+  CompactResponse,
+  TraceResponse,
+  TraceRunSummary,
+} from '../types';
 import type { ViewMode } from '../types/ui';
 import { MOCK_AGENTS } from '../mock/ui-mocks';
 
@@ -66,42 +73,34 @@ function clearSessionResetHistory(sessionId: string) {
 }
 
 export function useWorkspace() {
-  // Global View State
   const activeView = ref<ViewMode>('chat');
 
-  // Data States
   const sessions = ref<SessionSummary[]>([]);
   const activeSessionId = ref<string | null>(null);
   const currentMessages = ref<AgentMessage[]>([]);
   const historyMessages = ref<AgentMessage[]>([]);
-  const events = ref<AgentEvent[]>([]);
+  const traceRuns = ref<TraceRunSummary[]>([]);
   const skills = ref<SkillMetadata[]>([]);
-  
-  // Selection States
+
   const activeAgentId = ref<string>(MOCK_AGENTS[0].id);
 
-  // Loading & Error States
   const isInitializing = ref(true);
   const isChatLoading = ref(false);
   const isTraceLoading = ref(false);
   const isSkillsLoading = ref(false);
   const isCompacting = ref(false);
   const errorMsg = ref<string | null>(null);
-  const infoMsg = ref<string | null>(null); // 成功/信息类提示，绿色显示，与 errorMsg 分开
+  const infoMsg = ref<string | null>(null);
 
-  // Computed Properties
   const messages = computed(() => [...historyMessages.value, ...currentMessages.value]);
   const activeSession = computed(() =>
     sessions.value.find((session) => session.session_id === activeSessionId.value) ?? null
   );
 
-  const activeAgent = computed(() => 
-    MOCK_AGENTS.find(a => a.id === activeAgentId.value) ?? MOCK_AGENTS[0]
+  const activeAgent = computed(() =>
+    MOCK_AGENTS.find((a) => a.id === activeAgentId.value) ?? MOCK_AGENTS[0]
   );
 
-  // --- ACTIONS ---
-
-  // Sessions
   const loadSessions = async (preferredSessionId?: string | null) => {
     try {
       const data = await api.getSessions();
@@ -123,6 +122,18 @@ export function useWorkspace() {
     }
   };
 
+  const loadTraceRuns = async (sessionId: string) => {
+    isTraceLoading.value = true;
+    try {
+      const trace: TraceResponse = await api.getTrace(sessionId);
+      traceRuns.value = trace.runs || [];
+    } catch {
+      traceRuns.value = [];
+    } finally {
+      isTraceLoading.value = false;
+    }
+  };
+
   const createNewSession = async () => {
     try {
       isChatLoading.value = true;
@@ -130,7 +141,7 @@ export function useWorkspace() {
       await loadSessions(newSession.session_id);
       historyMessages.value = [];
       currentMessages.value = [];
-      events.value = [];
+      traceRuns.value = [];
       errorMsg.value = null;
     } catch (err: any) {
       errorMsg.value = 'Failed to create session: ' + err.message;
@@ -143,25 +154,17 @@ export function useWorkspace() {
     try {
       isChatLoading.value = true;
       isTraceLoading.value = true;
-      const [detail, trace] = await Promise.all([
-        api.getSessionDetail(id),
-        api.getTrace(id).catch(() => []) // Fallback if trace API fails
-      ]);
+      const detail = await api.getSessionDetail(id);
       historyMessages.value = readSessionResetHistory(id);
       currentMessages.value = detail.state?.messages || [];
-      // Flatten all events from all runs in the TraceResponse
-      if (trace && 'runs' in trace) {
-        events.value = (trace as TraceResponse).runs.flatMap((run: any) => run.events);
-      } else {
-        events.value = [];
-      }
+      await loadTraceRuns(id);
       errorMsg.value = null;
     } catch (err: any) {
       if (err.message.includes('not found') || err.message.includes('404')) {
         activeSessionId.value = null;
         historyMessages.value = [];
         currentMessages.value = [];
-        events.value = [];
+        traceRuns.value = [];
       } else {
         errorMsg.value = 'Failed to load session details: ' + err.message;
       }
@@ -171,7 +174,6 @@ export function useWorkspace() {
     }
   };
 
-  // Chat
   const sendMessage = async (input: string) => {
     if (!activeSessionId.value) return;
     try {
@@ -179,20 +181,22 @@ export function useWorkspace() {
         isCompacting.value = true;
       }
       isChatLoading.value = true;
+      isTraceLoading.value = true;
       errorMsg.value = null;
-      // Add pessimistic message
+
       currentMessages.value.push({ role: 'user', content: input });
-      
+
       const res = await api.runPass(activeSessionId.value, input, activeAgent.value?.id);
       currentMessages.value = res.state?.messages || [];
-      // append new events to trace
-      if (res.events && res.events.length > 0) {
-        events.value = [...events.value, ...res.events];
-      }
+      await Promise.all([
+        loadSessions(activeSessionId.value),
+        loadTraceRuns(activeSessionId.value),
+      ]);
     } catch (err: any) {
       errorMsg.value = 'Run failed: ' + err.message;
     } finally {
       isChatLoading.value = false;
+      isTraceLoading.value = false;
       isCompacting.value = false;
     }
   };
@@ -201,18 +205,18 @@ export function useWorkspace() {
     if (!activeSessionId.value) return;
     try {
       isCompacting.value = true;
-      errorMsg.value = null; // 清除旧错误
+      errorMsg.value = null;
       const result: CompactResponse = await api.compactSession(activeSessionId.value);
-      await loadSessionDetail(activeSessionId.value); // 刷新聊天消息列表
-      await loadSessions(activeSessionId.value);       // 同步刷新 sidebar 的 message_count
-      // 根据后端返回的 did_compact 给用户反馈
+      await loadSessionDetail(activeSessionId.value);
+      await loadSessions(activeSessionId.value);
       if (result?.did_compact === false) {
         infoMsg.value = '✓ Context is already up to date — no compaction needed.';
       } else {
         infoMsg.value = `✓ Context compacted. ${result?.removed_count ?? ''} messages summarized.`;
       }
-      // 3 秒后自动清除提示
-      setTimeout(() => { infoMsg.value = null; }, 3000);
+      setTimeout(() => {
+        infoMsg.value = null;
+      }, 3000);
     } catch (err: any) {
       errorMsg.value = 'Compact failed: ' + err.message;
     } finally {
@@ -228,7 +232,7 @@ export function useWorkspace() {
         activeSessionId.value = null;
         historyMessages.value = [];
         currentMessages.value = [];
-        events.value = [];
+        traceRuns.value = [];
       }
       await loadSessions();
     } catch (err: any) {
@@ -244,18 +248,17 @@ export function useWorkspace() {
       historyMessages.value = [
         ...historyMessages.value,
         ...currentMessages.value,
-        { role: 'system', content: RESET_MARKER_CONTENT }
+        { role: 'system', content: RESET_MARKER_CONTENT },
       ];
       writeSessionResetHistory(currentId, historyMessages.value);
       currentMessages.value = [];
-      events.value = [];
+      traceRuns.value = [];
       await loadSessions(currentId);
     } catch (err: any) {
       errorMsg.value = 'Reset failed: ' + err.message;
     }
   };
 
-  // Skills
   const loadSkills = async () => {
     try {
       isSkillsLoading.value = true;
@@ -274,55 +277,45 @@ export function useWorkspace() {
       } else {
         await api.enableSkill(skillName);
       }
-      await loadSkills(); // Refresh
+      await loadSkills();
     } catch (err: any) {
       errorMsg.value = 'Failed to toggle skill: ' + err.message;
     }
   };
 
-  // Lifecycle
   const initializeWorkspace = async () => {
     isInitializing.value = true;
-    await Promise.all([
-      loadSessions(),
-      loadSkills()
-    ]);
+    await Promise.all([loadSessions(), loadSkills()]);
     isInitializing.value = false;
   };
 
-  // Watchers
   watch(activeSessionId, (newId) => {
     if (newId) {
       loadSessionDetail(newId);
     } else {
       historyMessages.value = [];
       currentMessages.value = [];
-      events.value = [];
+      traceRuns.value = [];
     }
   });
 
   return {
-    // State
     activeView,
     sessions,
     activeSessionId,
     activeSession,
     messages,
-    events,
+    traceRuns,
     skills,
     activeAgentId,
     activeAgent,
-    
-    // Status
     isInitializing,
     isChatLoading,
     isTraceLoading,
     isSkillsLoading,
     isCompacting,
     errorMsg,
-    infoMsg, // 成功/信息类提示
-
-    // Actions
+    infoMsg,
     initializeWorkspace,
     createNewSession,
     sendMessage,
@@ -330,8 +323,6 @@ export function useWorkspace() {
     resetSession,
     deleteSession,
     toggleSkill,
-    
-    // Mock Data
-    availableAgents: MOCK_AGENTS
+    availableAgents: MOCK_AGENTS,
   };
 }

@@ -38,3 +38,14 @@ Model Adapter
 - 是否避免过度抽象。
 - fake adapter 是否让测试更稳定。
 
+## 收口
+本卡已完成并验证通过。
+
+- 已定义统一 `ModelAdapter` 接口。
+- 已将现有 Chat Completions 调用收敛为 `ChatCompletionsAdapter`。
+- `Agent`、`compact_service`、`run_service` 已切到 adapter 链路。
+- 测试已迁移到 fake adapter / 新接口。
+- `compact` 和 `run` 已拆成可配置模型，长会话 compact 已实测可触发。
+
+## 验证结果
+- `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`

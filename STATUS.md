@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: review
-- Task: specs/TASK-069.md
-- Gate: review
-- Allowed Now: review
+- Phase: planning
+- Task: specs/TASK-072.md
+- Gate: planning
+- Allowed Now: planning
 - Lane: Fast
 - Blocked: None
-- Next action: 复核测试拆分结果，确认各模块测试文件已按职责落位。
+- Next action: 按 `TASK-072` 拆 `skills/skill_loader.py`，先把职责边界画清，再评估 `application/run_service.py` 是否还需要继续压缩。
 
 
 ## 遗留项
@@ -16,6 +16,31 @@
 ## History
 | Date | Task | Gate Passed | Notes |
 |------|------|-------------|-------|
+| 2026-05-10 | `TASK-071` 验证完成并切换到 `TASK-072` | Verify / planning | `agent_runtime.py` 已拆成 facade + helpers，runtime 单测和前端构建通过，准备收缩 `skill_loader.py`。 |
+| 2026-05-10 | 新建 `TASK-071` 并切换 | planning | 认为 `runtime/agent_runtime.py` 仍然偏胖，先拆 runtime 再回到平台扩展。 |
+| 2026-05-10 | `TASK-070` 收口并切换到 `TASK-054` | Verify / Review | `api/routes.py` 拆分与 `run_service.py` 收窄已完成，长链路和测试均已验证通过。 |
+| 2026-05-10 | `TASK-026` 收口并切换到 `TASK-070` | Verify / Review | 统一 `ModelAdapter` 与 `ChatCompletionsAdapter` 已落地，runtime / compact / run_service 已迁移，测试全绿，长会话 compact 已实测触发。 |
+| 2026-05-09 | 切回 `TASK-026` | planning | 回到模型适配层接口任务，先抽统一 `ModelAdapter`，再接 Chat Completions adapter。 |
+| 2026-05-09 | 切换到 `TASK-026` | planning | 进入模型适配层接口任务，先审查当前模型调用并定义统一 adapter。 |
+| 2026-05-09 | `TASK-070` 最终验收通过 | Verify / Review | 旧路由入口已去除，应用层主编排已收窄，后续中心文件无明显拆分收益；全量 `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
+| 2026-05-09 | `TASK-070` storage db 暂不拆 | planning | `storage/db.py` 只是 engine / session factory / Base / dependency provider。 |
+| 2026-05-09 | `TASK-070` storage models 暂不拆 | planning | `storage/models.py` 只是 ORM 定义，不混业务逻辑。 |
+| 2026-05-09 | `TASK-070` session store 暂不拆 | planning | `session_store.py` 仍是同一层 SQLite 访问封装：session / trace 读写与查询都在存储边界内。 |
+| 2026-05-09 | `TASK-070` openai adapter 暂不拆 | planning | `openai_adapter.py` 只是薄 HTTP 适配层：拼请求、发请求、验响应、吐 message。 |
+| 2026-05-09 | `TASK-070` runtime 暂不拆 | planning | `agent_runtime.py` 已是单一执行器层：LLM、tool calls、events、reply/state 一体。 |
+| 2026-05-09 | `TASK-070` context 层暂不拆 | planning | `compaction.py` 和 `prompt_builder.py` 各自职责单一：压缩、拼 prompt；先不拆。 |
+| 2026-05-09 | `TASK-070` tool registry 暂不拆 | planning | `tool_registry.py` 仍是同一层职责：注册、执行、默认装配；暂不拆。 |
+| 2026-05-09 | `TASK-070` skill loader 暂不拆 | planning | `skill_loader.py` 仍在同一职责层：发现、解析、读取、配置；拆分收益不高，先观察 `tool_registry.py`。 |
+| 2026-05-09 | `TASK-070` skill service 条件修正完成 | Verify | `_reload_skill` 目标匹配已修正，技能启停和全量回归通过。 |
+| 2026-05-09 | `TASK-070` skill service 复核发现问题 | planning | `_reload_skill` 的目标匹配条件写错，会返回错误 skill；测试当前未覆盖到这个分支。 |
+| 2026-05-09 | `TASK-070` 路由入口和主编排拆分完成 | Verify | 旧路由入口已移除，`run_service.py` 仅保留 `/run` 主链路，`python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
+| 2026-05-09 | `TASK-070` 应用层拆分方案确认 | planning | `run_service.py` 只留 `/run` 主链路；`compact` 独立；session 创建/重置/删除 独立。 |
+| 2026-05-09 | `TASK-070` 旧路由入口可删除 | planning | `api/app.py` 已切到 `api/routes/` 包，旧 `routes.py` 无继续引用，可移除。 |
+| 2026-05-09 | `TASK-070` 路由迁移细化 | planning | 先落公共错误响应和总装配，再按资源搬 `run/session/trace/skill` 路由。 |
+| 2026-05-09 | `TASK-070` 路由迁移起步 | planning | 目录已建好，下一步先把 `routes.py` 按资源迁到 `api/routers/`。 |
+| 2026-05-09 | `TASK-070` 拆分顺序确认 | planning | 先做 P0：按资源拆 `api/routes.py`；再做 P1：收窄 `application/run_service.py`。 |
+| 2026-05-09 | `TASK-070` 架构优化细化 | planning | 将架构优化拆成 P0/P1/P2/P3 四个层级，明确先拆路由、再压缩应用编排、再评估技能与工具中心文件。 |
+| 2026-05-09 | `TASK-070` 架构优化建卡 | planning | 新建架构优化任务卡，聚焦继续压缩 `api/routes.py`、`application/run_service.py` 等中心文件职责。 |
 | 2026-05-09 | `TASK-069` API 测试文件独立化完成 | Verify | 已将 `TestAgentApi` 迁到 `test_agent_api.py`，并删除旧的 `test_agent.py`；`python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
 | 2026-05-09 | `TASK-069` 测试拆分验证完成 | Verify | 已将测试按模块拆成多个文件，并用 `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 验证 47 项通过。 |
 | 2026-05-09 | `TASK-069` 建立并切换 | planning | 启动测试按模块拆分任务，把 `test_agent.py` 拆成多个按职责划分的测试文件。 |
