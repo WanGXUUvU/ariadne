@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AgentMessage } from '../types';
+import type { AgentMessage, TraceRunSummary } from '../types';
 import type { UiAgentOption } from '../types/ui';
 import MessageList from './MessageList.vue';
 import MessageComposer from './MessageComposer.vue';
@@ -14,6 +14,10 @@ defineProps<{
   sessionTitle: string;
   agents: UiAgentOption[];
   activeAgentId: string;
+  traceRuns?: TraceRunSummary[];
+  isStreaming?: boolean;
+  streamingTimeline?: import('../types').StreamingItem[];
+  lastCompletedRun?: TraceRunSummary | null;
 }>();
 
 const emit = defineEmits<{
@@ -105,6 +109,10 @@ const handleReset = () => {
       :messages="messages" 
       :isLoading="isLoading" 
       :isCompacting="isCompacting"
+      :traceRuns="traceRuns"
+      :isStreaming="isStreaming"
+      :streamingTimeline="streamingTimeline"
+      :lastCompletedRun="lastCompletedRun"
     />
     
     <MessageComposer 
@@ -116,5 +124,20 @@ const handleReset = () => {
 </template>
 
 <style scoped>
-/* No specific styles needed */
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-app);
+  position: relative;
+}
+
+.panel-header {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(10, 10, 10, 0.7);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
 </style>
