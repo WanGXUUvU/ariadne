@@ -4,68 +4,83 @@ import type { AgentMessage, TraceRunSummary, StreamingItem, AgentEvent } from '.
 import TraceInline from './TraceInline.vue';
 import ToolIcons from './common/ToolIcons.vue';
 
-// 连续事件合并逻辑
+// ======= 折叠区块结构 ======
 export type MergedTimelineItem = 
-  | { kind: 'text'; content: string }
   | { kind: 'event'; event: AgentEvent }
-  | { kind: 'event_group'; tool_name: string; count: number; raw_events: AgentEvent[] }
-  | { kind: 'merged_tool_run'; call: AgentEvent; result?: AgentEvent; error?: AgentEvent };
+  | { kind: 'event_group'; tool_name: string; count: number; raw_events: AgentEvent[] };
+
+export type TimelineChunk = 
+  | { type: 'text'; content: string; id: string }
+  | { type: 'tools'; items: MergedTimelineItem[]; id: string; raw_count: number };
 
 const mergeThreshold = 2; // >=2次完整调用（>=4个事件）开始折叠
 
-const groupTimeline = (timeline: StreamingItem[] | undefined): MergedTimelineItem[] => {
+const chunkTimeline = (timeline: StreamingItem[] | undefined, msgIdx: number = 0): TimelineChunk[] => {
   if (!timeline) return [];
-  const result: MergedTimelineItem[] = [];
-  let currentGroup: { tool_name: string, events: AgentEvent[] } | null = null;
   
-  const flushGroup = () => {
-    if (!currentGroup) return;
-    const callCount = currentGroup.events.filter(e => e.type === 'assistant_tool_call').length;
-    if (callCount < mergeThreshold) {
-      currentGroup.events.forEach(e => result.push({ kind: 'event', event: e }));
-    } else {
-      result.push({
-        kind: 'event_group',
-        tool_name: currentGroup.tool_name,
-        count: callCount,
-        raw_events: currentGroup.events
+  const chunks: TimelineChunk[] = [];
+  let currentTools: AgentEvent[] = [];
+  let currentText = '';
+  
+  const flushTools = () => {
+    if (currentTools.length === 0) return;
+    const items: MergedTimelineItem[] = [];
+    let cg: { tool_name: string, events: AgentEvent[] } | null = null;
+    const flushG = () => {
+      if (!cg) return;
+      const callCount = cg.events.filter(e => e.type === 'assistant_tool_call').length;
+      if (callCount < mergeThreshold) cg.events.forEach(e => items.push({ kind: 'event', event: e }));
+      else items.push({ kind: 'event_group', tool_name: cg.tool_name, count: callCount, raw_events: cg.events });
+      cg = null;
+    };
+    
+    for (const e of currentTools) {
+      if (e.type === 'final_answer') continue;
+      const tName = e.tool_name || e.type;
+      if (!cg) cg = { tool_name: tName, events: [e] };
+      else if (cg.tool_name === tName) cg.events.push(e);
+      else { flushG(); cg = { tool_name: tName, events: [e] }; }
+    }
+    flushG();
+    
+    if (items.length > 0) {
+      chunks.push({
+        type: 'tools',
+        items,
+        raw_count: items.reduce((acc, item) => acc + (item.kind === 'event_group' ? item.raw_events.length : 1), 0),
+        id: `msg-${msgIdx}-tools-${chunks.length}`
       });
     }
-    currentGroup = null;
+    currentTools = [];
   };
-
+  
   for (const item of timeline) {
     if (item.kind === 'text') {
-      flushGroup();
-      result.push({ kind: 'text', content: item.content });
+      if (currentTools.length > 0) flushTools();
+      currentText += item.content;
     } else {
-      const event = item.event;
-      const tName = event.tool_name || event.type;
-      if (!currentGroup) {
-        currentGroup = { tool_name: tName, events: [event] };
-      } else {
-        if (currentGroup.tool_name === tName) {
-          currentGroup.events.push(event);
-        } else {
-          flushGroup();
-          currentGroup = { tool_name: tName, events: [event] };
-        }
+      if (currentText.length > 0) {
+        chunks.push({ type: 'text', content: currentText, id: `msg-${msgIdx}-text-${chunks.length}` });
+        currentText = '';
       }
+      currentTools.push(item.event);
     }
   }
-  flushGroup();
-  return result;
+  
+  if (currentTools.length > 0) flushTools();
+  if (currentText.length > 0) chunks.push({ type: 'text', content: currentText, id: `msg-${msgIdx}-text-${chunks.length}` });
+  
+  return chunks;
 };
 
-// 每条消息的工具事件折叠状态（key = 消息在列表中的 index）
-const eventsCollapsed = ref<Record<number, boolean>>({});
-const toggleEvents = (idx: number) => {
-  eventsCollapsed.value = { ...eventsCollapsed.value, [idx]: !eventsCollapsed.value[idx] };
+// 独立区块的折叠状态
+const collapsedChunks = ref<Record<string, boolean>>({});
+const toggleChunk = (id: string) => {
+  collapsedChunks.value = { ...collapsedChunks.value, [id]: !(collapsedChunks.value[id] ?? true) };
 };
-const isCollapsed = (idx: number) => eventsCollapsed.value[idx] ?? true;  // 默认收起
+const isChunkCollapsed = (id: string) => collapsedChunks.value[id] ?? true; // 默认收起
 
-// timeline 中工具事件数量
-const timelineEventCount = (tl: StreamingItem[]) => tl.filter(i => i.kind === 'event').length;
+
 
 const props = defineProps<{
   messages: AgentMessage[];
@@ -190,35 +205,37 @@ const formatContent = (text: string | null) => {
           <div class="message-meta mono-label">{{ m.role === 'user' ? 'USER' : 'AGENT' }}</div>
           
           <template v-if="m.role === 'assistant' && m.timeline && m.timeline.length > 0">
-            <template v-for="(item, ti) in groupTimeline(m.timeline)" :key="ti">
-              <div v-if="item.kind === 'text'" class="message-text" v-html="formatContent(item.content)"></div>
+            <template v-for="(chunk, ci) in chunkTimeline(m.timeline, idx)" :key="chunk.id">
+              <div v-if="chunk.type === 'text'" class="message-text" v-html="formatContent(chunk.content)"></div>
               
-              <template v-else-if="item.kind === 'event' || item.kind === 'event_group'">
-                <!-- 依然可以在第一个工具调用处放折叠开关 -->
-                <button v-if="ti === groupTimeline(m.timeline).findIndex((x: any) => x.kind.startsWith('event'))" class="timeline-toggle" @click="toggleEvents(idx)">
-                  <span class="timeline-toggle-arrow" :class="{ open: !isCollapsed(idx) }">›</span>
-                  <span class="mono-label">工具调用</span>
-                  <span class="mono-label" style="color:var(--text-muted)">{{ timelineEventCount(m.timeline) }} 步</span>
+              <div v-else-if="chunk.type === 'tools'" class="history-trace-container">
+                <button class="timeline-toggle" @click="toggleChunk(chunk.id)">
+                  <span class="timeline-toggle-arrow" :class="{ open: !isChunkCollapsed(chunk.id) }">›</span>
+                  <span class="mono-label">工具调用 {{ ci > 0 ? '(续)' : '' }}</span>
+                  <span class="mono-label" style="color:var(--text-muted)">{{ chunk.raw_count }} 步</span>
                 </button>
                 
-                <div v-if="item.kind === 'event'" class="stream-event-row stagger-anim" :class="[`evt-${item.event.type}`, { 'evt-hidden': isCollapsed(idx) }]" :style="{ animationDelay: `${ti * 0.05}s` }">
-                  <span class="evt-icon"><ToolIcons :type="item.event.type"/></span>
-                  <span class="evt-label mono-label">{{ item.event.tool_name ?? item.event.type }}</span>
-                  <span v-if="item.event.content" class="evt-content">{{ item.event.content.replace(/\n/g,' ').slice(0, 80) }}{{ item.event.content.length > 80 ? '…' : '' }}</span>
-                </div>
-                
-                <div v-else-if="item.kind === 'event_group'" class="stream-event-row evt-group stagger-anim" :class="[{ 'evt-hidden': isCollapsed(idx) }]" :style="{ animationDelay: `${ti * 0.05}s` }">
-                  <span class="evt-icon"><ToolIcons type="assistant_tool_call"/></span>
-                  <span class="evt-label mono-label">{{ item.tool_name }}</span>
-                  <span class="evt-content" style="font-weight: 500; font-style: italic;">连续执行了 {{ item.count }} 次 (Grouped {{ item.raw_events.length }} events)</span>
-                </div>
-              </template>
+                <template v-for="(item, ti) in chunk.items" :key="'item-' + ti">
+                  <div v-if="item.kind === 'event'" class="stream-event-row stagger-anim" :class="[`evt-${item.event.type}`, { 'evt-hidden': isChunkCollapsed(chunk.id) }]" :style="{ animationDelay: `${ti * 0.03}s` }">
+                    <span class="evt-icon"><ToolIcons :type="item.event.type"/></span>
+                    <span class="evt-label mono-label">{{ item.event.tool_name ?? item.event.type }}</span>
+                    <span v-if="item.event.content" class="evt-content">{{ item.event.content.replace(/\n/g,' ').slice(0, 80) }}{{ item.event.content.length > 80 ? '…' : '' }}</span>
+                  </div>
+                  
+                  <div v-else-if="item.kind === 'event_group'" class="stream-event-row evt-group stagger-anim" :class="[{ 'evt-hidden': isChunkCollapsed(chunk.id) }]" :style="{ animationDelay: `${ti * 0.03}s` }">
+                    <span class="evt-icon"><ToolIcons type="assistant_tool_call"/></span>
+                    <span class="evt-label mono-label">{{ item.tool_name }}</span>
+                    <span class="evt-content" style="font-weight: 500; font-style: italic;">连续执行了 {{ item.count }} 次 (Grouped {{ item.raw_events.length }} events)</span>
+                  </div>
+                </template>
+              </div>
             </template>
           </template>
 
           <template v-else>
-            <div class="message-text" v-html="formatContent(m.content)"></div>
+            <!-- 在最终文字回答之前显示历史工具调用记录 -->
             <TraceInline v-if="m.role === 'assistant' && (() => { const r = findRun(idx, idx === visibleMessages.length - 1); return r && hasToolEvents(r) ? r : null })()" :events="findRun(idx, idx === visibleMessages.length - 1)!.events" />
+            <div class="message-text" v-html="formatContent(m.content)"></div>
           </template>
         </div>
       </template>
@@ -242,17 +259,26 @@ const formatContent = (text: string | null) => {
         <div class="message-meta mono-label">AGENT <span class="blink">STREAMING...</span></div>
 
         <template v-if="streamingTimeline && streamingTimeline.length > 0">
-          <template v-for="(item, i) in groupTimeline(streamingTimeline)" :key="i">
-            <div v-if="item.kind === 'text'" class="message-text" v-html="formatContent(item.content)"></div>
-            <div v-else-if="item.kind === 'event'" class="stream-event-row stagger-anim" :class="`evt-${item.event.type}`">
-              <span class="evt-icon"><ToolIcons :type="item.event.type"/></span>
-              <span class="evt-label mono-label">{{ item.event.tool_name ?? item.event.type }}</span>
-              <span v-if="item.event.content" class="evt-content">{{ item.event.content.replace(/\n/g,' ').slice(0, 80) }}{{ item.event.content.length > 80 ? '…' : '' }}</span>
-            </div>
-            <div v-else-if="item.kind === 'event_group'" class="stream-event-row evt-group stagger-anim">
-              <span class="evt-icon"><ToolIcons type="assistant_tool_call"/></span>
-              <span class="evt-label mono-label">{{ item.tool_name }}</span>
-              <span class="evt-content" style="font-weight: 500; font-style: italic;">连续执行了 {{ item.count }} 次...</span>
+          <template v-for="chunk in chunkTimeline(streamingTimeline, 9999)" :key="chunk.id">
+            <div v-if="chunk.type === 'text'" class="message-text" v-html="formatContent(chunk.content)"></div>
+            <div v-else-if="chunk.type === 'tools'" class="history-trace-container active-stream">
+               <button class="timeline-toggle" style="pointer-events: none;">
+                  <span class="timeline-toggle-arrow open">›</span>
+                  <span class="mono-label">工具调用 (Running...)</span>
+                  <span class="mono-label" style="color:var(--text-muted)">{{ chunk.raw_count }} 步</span>
+               </button>
+               <template v-for="(item, ti) in chunk.items" :key="'item-' + ti">
+                  <div v-if="item.kind === 'event'" class="stream-event-row stagger-anim" :class="`evt-${item.event.type}`" :style="{ animationDelay: `${ti * 0.03}s` }">
+                    <span class="evt-icon"><ToolIcons :type="item.event.type"/></span>
+                    <span class="evt-label mono-label">{{ item.event.tool_name ?? item.event.type }}</span>
+                    <span v-if="item.event.content" class="evt-content">{{ item.event.content.replace(/\n/g,' ').slice(0, 80) }}{{ item.event.content.length > 80 ? '…' : '' }}</span>
+                  </div>
+                  <div v-else-if="item.kind === 'event_group'" class="stream-event-row evt-group stagger-anim" :style="{ animationDelay: `${ti * 0.03}s` }">
+                    <span class="evt-icon"><ToolIcons type="assistant_tool_call"/></span>
+                    <span class="evt-label mono-label">{{ item.tool_name }}</span>
+                    <span class="evt-content" style="font-weight: 500; font-style: italic;">连续执行了 {{ item.count }} 次 (Grouped {{ item.raw_events.length }} events)</span>
+                  </div>
+               </template>
             </div>
           </template>
         </template>
