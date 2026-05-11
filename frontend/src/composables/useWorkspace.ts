@@ -7,6 +7,7 @@ import type {
   CompactResponse,
   TraceResponse,
   TraceRunSummary,
+  StreamingItem,
 } from '../types';
 import type { ViewMode } from '../types/ui';
 import { MOCK_AGENTS } from '../mock/ui-mocks';
@@ -89,6 +90,9 @@ export function useWorkspace() {
   const isTraceLoading = ref(false);
   const isSkillsLoading = ref(false);
   const isCompacting = ref(false);
+  const isStreaming = ref(false);
+  const streamingTimeline = ref<StreamingItem[]>([]);  // 按到达顺序混排文字和工具事件
+  const lastCompletedRun = ref<TraceRunSummary | null>(null);
   const errorMsg = ref<string | null>(null);
   const infoMsg = ref<string | null>(null);
 
@@ -176,28 +180,69 @@ export function useWorkspace() {
 
   const sendMessage = async (input: string) => {
     if (!activeSessionId.value) return;
+
+    isChatLoading.value = true;
+    isStreaming.value = true;
+    streamingTimeline.value = [];
+    lastCompletedRun.value = null;
+    errorMsg.value = null;
+
+    currentMessages.value.push({ role: 'user', content: input });
+
+    let capturedRunId: string | null = null;
+
     try {
-      if (currentMessages.value.length > 12) {
-        isCompacting.value = true;
+      for await (const frame of api.streamRun(activeSessionId.value, input, activeAgent.value?.id)) {
+        if (frame.type === 'start') {
+          capturedRunId = frame.data.run_id;
+        } else if (frame.type === 'delta') {
+          // 追加到最后一个 text 项，或新建一个 text 项
+          const tl = streamingTimeline.value;
+          const last = tl[tl.length - 1];
+          if (last?.kind === 'text') {
+            last.content += frame.data.content;
+            streamingTimeline.value = [...tl];   // 触发响应式
+          } else {
+            streamingTimeline.value = [...tl, { kind: 'text', content: frame.data.content }];
+          }
+        } else if (frame.type === 'agent_event') {
+          // 工具事件直接追加（跳过 final_answer，那是文字回答的元数据）
+          if (frame.data.type !== 'final_answer') {
+            streamingTimeline.value = [...streamingTimeline.value, { kind: 'event', event: frame.data }];
+          }
+        } else if (frame.type === 'end') {
+          // 冻结时间线，patch 进新消息里，再替换 currentMessages
+          const frozenTimeline = [...streamingTimeline.value];
+          const newMsgs = [...(frame.data.state?.messages ?? currentMessages.value)];
+          for (let i = newMsgs.length - 1; i >= 0; i--) {
+            if (newMsgs[i].role === 'assistant') {
+              newMsgs[i] = { ...newMsgs[i], timeline: frozenTimeline };
+              break;
+            }
+          }
+          currentMessages.value = newMsgs;
+          // 只刷新 sessions 列表（更新预览文字），不传 preferredSessionId 避免触发 watch → loadSessionDetail
+          // loadSessionDetail 会覆盖 currentMessages，把刚写入的 timeline 冲掉
+          const [, traceResult] = await Promise.allSettled([
+            api.getSessions().then(data => { sessions.value = data || []; }),
+            api.getTrace(activeSessionId.value!),
+          ]);
+          if (traceResult.status === 'fulfilled') {
+            traceRuns.value = (traceResult.value as any).runs || [];
+          }
+          if (capturedRunId) {
+            lastCompletedRun.value = traceRuns.value.find(r => r.run_id === capturedRunId) ?? null;
+          }
+        } else if (frame.type === 'error') {
+          errorMsg.value = frame.data.message ?? 'Streaming error';
+        }
       }
-      isChatLoading.value = true;
-      isTraceLoading.value = true;
-      errorMsg.value = null;
-
-      currentMessages.value.push({ role: 'user', content: input });
-
-      const res = await api.runPass(activeSessionId.value, input, activeAgent.value?.id);
-      currentMessages.value = res.state?.messages || [];
-      await Promise.all([
-        loadSessions(activeSessionId.value),
-        loadTraceRuns(activeSessionId.value),
-      ]);
     } catch (err: any) {
       errorMsg.value = 'Run failed: ' + err.message;
     } finally {
       isChatLoading.value = false;
-      isTraceLoading.value = false;
-      isCompacting.value = false;
+      isStreaming.value = false;
+      streamingTimeline.value = [];
     }
   };
 
@@ -289,7 +334,10 @@ export function useWorkspace() {
     isInitializing.value = false;
   };
 
-  watch(activeSessionId, (newId) => {
+  watch(activeSessionId, (newId, _oldId) => {
+    // streaming 进行中 / 刚结束时，end 帧已经自行更新了 currentMessages（含 timeline），
+    // 此时绝不能触发 loadSessionDetail，否则后端返回的纯消息会覆盖 timeline。
+    if (isStreaming.value || isChatLoading.value) return;
     if (newId) {
       loadSessionDetail(newId);
     } else {
@@ -314,6 +362,9 @@ export function useWorkspace() {
     isTraceLoading,
     isSkillsLoading,
     isCompacting,
+    isStreaming,
+    streamingTimeline,
+    lastCompletedRun,
     errorMsg,
     infoMsg,
     initializeWorkspace,

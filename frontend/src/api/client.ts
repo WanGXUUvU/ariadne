@@ -1,4 +1,4 @@
-import type { RunResponse, SessionDetail, SessionSummary, SkillMetadata, TraceResponse, CompactResponse } from '../types';
+import type { RunResponse, SessionDetail, SessionSummary, SkillMetadata, TraceResponse, CompactResponse, StreamFrame } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -22,6 +22,48 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
   return data;
 }
 
+// SSE streaming：逐帧 yield StreamFrame，调用方用 for await 消费
+async function* streamRun(
+  session_id: string,
+  user_input: string,
+  agent_name?: string,
+): AsyncGenerator<StreamFrame> {
+  const res = await fetch(`${API_BASE}/run/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id, user_input, agent_name }),
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error(`Stream request failed: ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    // SSE 每帧以 \n\n 结尾，切割后逐行处理
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';   // 最后一段可能不完整，留到下次
+
+    for (const part of parts) {
+      for (const line of part.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        const text = line.slice(6).trim();
+        if (text === '[DONE]') return;
+        try {
+          yield JSON.parse(text) as StreamFrame;
+        } catch { /* 跳过无法解析的行 */ }
+      }
+    }
+  }
+}
+
 export const api = {
   getSessions: () => fetchApi<SessionSummary[]>('/sessions'),
   createSession: () =>
@@ -35,6 +77,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ session_id, user_input, agent_name }),
     }),
+  streamRun,
   getTrace: (session_id: string) => fetchApi<TraceResponse>(`/sessions/${session_id}/trace`),
   getSkills: () => fetchApi<SkillMetadata[]>('/skills'),
   enableSkill: (skill_name: string) => fetchApi<SkillMetadata>(`/skills/${skill_name}/enable`, { method: 'POST' }),

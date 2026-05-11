@@ -4,7 +4,6 @@ import { useWorkspace } from './composables/useWorkspace';
 import GlobalNav from './components/layout/GlobalNav.vue';
 import SessionSidebar from './components/SessionSidebar.vue';
 import ChatPanel from './components/ChatPanel.vue';
-import TracePanel from './components/TracePanel.vue';
 import PluginMarketplace from './components/PluginMarketplace.vue';
 
 const workspace = useWorkspace();
@@ -51,16 +50,16 @@ onMounted(() => {
         :sessionTitle="workspace.activeSession.value?.session_name || workspace.activeSession.value?.session_id || 'NEW_SESSION'"
         :agents="workspace.availableAgents"
         :activeAgentId="workspace.activeAgentId.value"
+        :traceRuns="workspace.traceRuns.value"
+        :isStreaming="workspace.isStreaming.value"
+        :streamingTimeline="workspace.streamingTimeline.value"
+        :lastCompletedRun="workspace.lastCompletedRun.value"
         @update:activeAgentId="id => workspace.activeAgentId.value = id"
         @send="workspace.sendMessage"
         @errorDismiss="workspace.errorMsg.value = null"
         @infoDismiss="workspace.infoMsg.value = null"
         @compact="workspace.compactSession"
         @reset="workspace.resetSession"
-      />
-      <TracePanel
-        :runs="workspace.traceRuns.value"
-        :isLoading="workspace.isTraceLoading.value"
       />
     </div>
 

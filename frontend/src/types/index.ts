@@ -12,6 +12,7 @@ export interface SessionSummary {
 export interface AgentMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string | null;
+  timeline?: StreamingItem[];   // 客户端专属：本轮 streaming 时间线，持久保留
 }
 
 export interface SessionState {
@@ -88,3 +89,37 @@ export interface CompactResponse {
   did_compact: boolean;
   removed_count: number;
 }
+
+// SSE streaming frame types
+export interface StreamStartData {
+  session_id: string;
+  run_id: string;
+  agent_name: string;
+  skill_name: string | null;
+}
+
+export interface StreamDeltaData {
+  content: string;
+}
+
+export interface StreamEndData {
+  reply: string;
+  state: SessionState;
+  metadata: { session_id: string; run_id: string; agent_name: string; skill_name: string | null };
+}
+
+export interface StreamErrorData {
+  message: string;
+}
+
+export type StreamFrame =
+  | { type: 'start';       data: StreamStartData }
+  | { type: 'agent_event'; data: AgentEvent }
+  | { type: 'delta';       data: StreamDeltaData }
+  | { type: 'end';         data: StreamEndData }
+  | { type: 'error';       data: StreamErrorData };
+
+// 统一时间线：文字和工具事件按到达顺序混排
+export type StreamingItem =
+  | { kind: 'text';  content: string }
+  | { kind: 'event'; event: AgentEvent };

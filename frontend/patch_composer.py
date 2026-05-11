@@ -1,50 +1,9 @@
-<script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import re
 
-const props = defineProps<{
-  disabled: boolean;
-  messageCount?: number;
-}>();
+with open('src/components/MessageComposer.vue', 'r') as f:
+    content = f.read()
 
-const emit = defineEmits<{
-  (e: 'send', text: string): void;
-}>();
-
-const text = ref('');
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const isFocused = ref(false);
-
-const adjustHeight = () => {
-  if (!textareaRef.value) return;
-  textareaRef.value.style.height = 'auto';
-  textareaRef.value.style.height = `${Math.min(textareaRef.value.scrollHeight, 160)}px`;
-};
-
-watch(text, () => {
-  nextTick(adjustHeight);
-});
-
-const handleSend = () => {
-  if (!text.value.trim() || props.disabled) return;
-  emit('send', text.value.trim());
-  text.value = '';
-  nextTick(adjustHeight);
-};
-
-const handleKeyDown = (e: KeyboardEvent) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    // If user is currently composing text using an IME (like Chinese/Japanese pinyin),
-    // do not trigger the send action.
-    if (e.isComposing || e.keyCode === 229) {
-      return;
-    }
-    e.preventDefault();
-    handleSend();
-  }
-};
-</script>
-
-<template>
+template = """<template>
   <div class="composer-container">
     <div class="composer-header mono-label">
       <span>INPUT_STREAM</span>
@@ -80,9 +39,14 @@ const handleKeyDown = (e: KeyboardEvent) => {
       </button>
     </div>
   </div>
-</template>
+</template>"""
 
-<style scoped>
+content = re.sub(r'<template>.*?</template>', template, content, flags=re.DOTALL)
+
+script_insert = """const isFocused = ref(false);"""
+content = content.replace("const textareaRef = ref<HTMLTextAreaElement | null>(null);", "const textareaRef = ref<HTMLTextAreaElement | null>(null);\n" + script_insert)
+
+style = """<style scoped>
 .composer-container {
   padding: 16px 24px 24px;
   background: linear-gradient(to top, var(--bg-app) 70%, transparent);
@@ -170,4 +134,10 @@ const handleKeyDown = (e: KeyboardEvent) => {
   color: var(--text-muted);
   cursor: not-allowed;
 }
-</style>
+</style>"""
+
+content = re.sub(r'<style scoped>.*?</style>', style, content, flags=re.DOTALL)
+
+with open('src/components/MessageComposer.vue', 'w') as f:
+    f.write(content)
+
