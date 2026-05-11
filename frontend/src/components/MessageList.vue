@@ -98,11 +98,14 @@ const hasToolEvents = (run: TraceRunSummary): boolean =>
 
 const findRun = (msgIndex: number, isLast: boolean): TraceRunSummary | undefined => {
   if (isLast && props.lastCompletedRun) return props.lastCompletedRun;
-  for (let i = msgIndex - 1; i >= 0; i--) {
+  let userMsgCount = 0;
+  for (let i = 0; i < msgIndex; i++) {
     if (props.messages[i]?.role === 'user') {
-      const userText = (props.messages[i].content ?? '').trim();
-      return props.traceRuns?.find(r => r.user_input.trim() === userText);
+      userMsgCount++;
     }
+  }
+  if (props.traceRuns && userMsgCount > 0 && props.traceRuns.length >= userMsgCount) {
+    return props.traceRuns[userMsgCount - 1];
   }
   return undefined;
 };
