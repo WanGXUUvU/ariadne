@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status  # 导入路由、依赖和状态码
 from sqlalchemy.orm import Session  # 导入数据库会话
-from ...core.schemas import CreateSessionInput, SessionDetail, SessionSummary  # 导入 schema
-from ...application.session_service import create_session_service, delete_session_service  # session 生命周期服务
+from ...core.schemas import CreateSessionInput, SessionDetail, SessionSummary,RenameSessionInput  # 导入 schema
+from ...application.session_service import create_session_service, delete_session_service,rename_session_service  # session 生命周期服务
 from ...storage.db import get_db  # 导入数据库依赖
 from ...storage.stores.session_store import SqliteSessionStore  # 导入 session store
 from .common import error_response  # 导入统一错误响应
@@ -61,3 +61,10 @@ def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionD
         message_count=record.message_count,  # 消息数
         state=state,  # session state
     )  # 响应结束
+
+@router.patch("/sessions/{session_id}")
+def rename_session_api(session_id:str,payload:RenameSessionInput,db:Session=Depends(get_db))->dict[str,bool]:
+    try:
+        return rename_session_service(session_id,payload.session_name,db)
+    except ValueError as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST,"bad_request",str(exc))

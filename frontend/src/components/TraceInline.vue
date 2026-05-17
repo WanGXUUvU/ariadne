@@ -1,172 +1,209 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, watch } from 'vue';
 import type { AgentEvent } from '../types';
-import ToolIcons from './common/ToolIcons.vue';
 
 const props = defineProps<{
   events: AgentEvent[];
+  autoExpand?: boolean;   // live 模式下传 true，自动展开
 }>();
 
-const expanded = ref(false);
+const expanded = ref(props.autoExpand ?? false);
 
-export type MergedTimelineItem = 
-  | { kind: 'event'; event: AgentEvent }
-  | { kind: 'event_group'; tool_name: string; count: number; raw_events: AgentEvent[] };
-
-const mergeThreshold = 2; // >=2次完整调用（>=4个事件）开始折叠
-
-const groupEvents = computed(() => {
-  const result: MergedTimelineItem[] = [];
-  let currentGroup: { tool_name: string, events: AgentEvent[] } | null = null;
-  
-  const flushGroup = () => {
-    if (!currentGroup) return;
-    const callCount = currentGroup.events.filter(e => e.type === 'assistant_tool_call').length;
-    if (callCount < mergeThreshold) {
-      currentGroup.events.forEach(e => result.push({ kind: 'event', event: e }));
-    } else {
-      result.push({
-        kind: 'event_group',
-        tool_name: currentGroup.tool_name,
-        count: callCount,
-        raw_events: currentGroup.events
-      });
-    }
-    currentGroup = null;
-  };
-
-  const pureEvents = props.events.filter(e => e.type !== 'final_answer'); // Filter out fake final answer events
-
-  for (const event of pureEvents) {
-    const tName = event.tool_name || event.type;
-    if (!currentGroup) {
-      currentGroup = { tool_name: tName, events: [event] };
-    } else {
-      if (currentGroup.tool_name === tName) {
-        currentGroup.events.push(event);
-      } else {
-        flushGroup();
-        currentGroup = { tool_name: tName, events: [event] };
-      }
-    }
-  }
-  flushGroup();
-  return result;
+// autoExpand 变成 false（streaming 结束后）时不自动折叠，保留用户当前状态
+watch(() => props.autoExpand, (val) => {
+  if (val) expanded.value = true;
 });
+
+const eventIcon = (event: AgentEvent) => {
+  if (event.type === 'assistant_tool_call') return '🔧';
+  if (event.type === 'tool_result') return '✅';
+  if (event.type === 'tool_error') return '❌';
+  if (event.type === 'final_answer') return '💬';
+  return '·';
+};
+
+const eventLabel = (event: AgentEvent) => {
+  if (event.type === 'assistant_tool_call') return event.tool_name ?? 'tool';
+  if (event.type === 'tool_result') return event.tool_name ? `${event.tool_name} 返回` : '工具返回';
+  if (event.type === 'tool_error') return event.tool_name ? `${event.tool_name} 出错` : '工具出错';
+  if (event.type === 'final_answer') return '最终回答';
+  return event.type;
+};
+
+// 展示 event content 的摘要（最多 80 字符）
+const truncate = (s: string | null | undefined, max = 80) => {
+  if (!s) return '';
+  const oneLine = s.replace(/\n/g, ' ');
+  return oneLine.length > max ? oneLine.slice(0, max) + '…' : oneLine;
+};
 </script>
 
 <template>
-  <div v-if="groupEvents.length > 0" class="history-trace-container">
-    <button class="timeline-toggle" @click="expanded = !expanded">
-      <span class="timeline-toggle-arrow" :class="{ open: expanded }">›</span>
-      <span class="mono-label">工具调用 (History)</span>
-      <span class="mono-label" style="color:var(--text-muted)">{{ events.filter(e => e.type !== 'final_answer').length }} 步</span>
+  <div class="trace-inline">
+    <!-- 折叠/展开按钮 -->
+    <button class="trace-toggle" @click="expanded = !expanded">
+      <span class="trace-toggle-arrow" :class="{ open: expanded }">›</span>
+      <span class="trace-toggle-label mono-label">
+        运行过程
+      </span>
+      <span class="trace-toggle-count mono-label">
+        {{ events.length }} 步
+      </span>
     </button>
 
-    <template v-for="(item, ti) in groupEvents" :key="ti">
-      <div v-if="item.kind === 'event'" class="stream-event-row stagger-anim" :class="[`evt-${item.event.type}`, { 'evt-hidden': !expanded }]" :style="{ animationDelay: `${ti * 0.03}s` }">
-        <span class="evt-icon"><ToolIcons :type="item.event.type"/></span>
-        <span class="evt-label mono-label">{{ item.event.tool_name ?? item.event.type }}</span>
-        <span v-if="item.event.content" class="evt-content">{{ item.event.content.replace(/\n/g,' ').slice(0, 80) }}{{ item.event.content.length > 80 ? '…' : '' }}</span>
+    <!-- 事件列表，用 CSS max-height 做弹簧动画 -->
+    <div class="trace-body" :class="{ open: expanded }">
+      <div class="trace-events">
+        <div
+          v-for="event in events"
+          :key="event.index"
+          class="trace-event"
+          :class="`event-${event.type}`"
+        >
+          <span class="event-icon">{{ eventIcon(event) }}</span>
+          <span class="event-label mono-label">{{ eventLabel(event) }}</span>
+          <span v-if="event.content" class="event-content">
+            {{ truncate(event.content) }}
+          </span>
+        </div>
       </div>
-      
-      <div v-else-if="item.kind === 'event_group'" class="stream-event-row evt-group stagger-anim" :class="[{ 'evt-hidden': !expanded }]" :style="{ animationDelay: `${ti * 0.03}s` }">
-        <span class="evt-icon"><ToolIcons type="assistant_tool_call"/></span>
-        <span class="evt-label mono-label">{{ item.tool_name }}</span>
-        <span class="evt-content" style="font-weight: 500; font-style: italic;">连续执行了 {{ item.count }} 次 (Grouped {{ item.raw_events.length }} events)</span>
-      </div>
-    </template>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.history-trace-container {
-  margin-top: 12px;
+.trace-inline {
+  margin-top: 10px;
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-app);
 }
 
-.timeline-toggle {
+/* 折叠按钮行 */
+.trace-toggle {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 6px 10px;
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--text-primary);
-  opacity: 0.8;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  margin-bottom: 6px;
+  color: var(--text-secondary);
+  text-align: left;
+  transition: background 0.15s;
 }
 
-.timeline-toggle:hover {
+.trace-toggle:hover {
   background: var(--bg-hover);
-  opacity: 1;
+  color: var(--text-primary);
 }
 
-.timeline-toggle-arrow {
-  font-size: 16px;
+.trace-toggle-arrow {
+  font-size: 14px;
   line-height: 1;
   display: inline-block;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   transform: rotate(0deg);
-  font-family: var(--font-mono);
+  color: var(--text-muted);
 }
-.timeline-toggle-arrow.open {
+
+.trace-toggle-arrow.open {
   transform: rotate(90deg);
 }
 
-.stream-event-row {
+.trace-toggle-label {
+  flex: 1;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.trace-toggle-count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* 事件列表容器 — 弹簧展开动画 */
+.trace-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease;
+  opacity: 0;
+}
+
+.trace-body.open {
+  max-height: 320px;   /* 限制高度，内容超出时可滚动 */
+  overflow-y: auto;
+  opacity: 1;
+}
+
+.trace-events {
+  border-top: 1px solid var(--border-dim);
+  padding: 6px 0;
+}
+
+/* 单条事件 */
+.trace-event {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 4px 0;
+  padding: 5px 12px;
   font-size: 12px;
-  border-left: 2px solid var(--border-strong);
-  padding-left: 8px;
-  margin: 3px 0;
-  opacity: 0.85;
-  overflow: hidden;
-  max-height: 40px;
-  transition: max-height 0.2s ease, opacity 0.2s ease, margin 0.2s ease, padding 0.2s ease;
+  border-bottom: 1px solid var(--border-dim);
+  transition: background 0.1s;
 }
 
-.stream-event-row.evt-group {
-  border-left: 2px solid var(--accent);
-  background: var(--bg-active);
-  border-radius: 4px;
-  padding: 6px 10px;
-  margin-left: -2px;
+.trace-event:last-child {
+  border-bottom: none;
 }
 
-.stream-event-row.evt-hidden {
-  max-height: 0;
-  opacity: 0;
-  margin: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+.trace-event:hover {
+  background: var(--bg-hover);
 }
 
-.evt-icon {
+.event-icon {
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1;
 }
 
-.evt-label {
+.event-label {
   flex-shrink: 0;
+  font-size: 10px;
   color: var(--text-primary);
-  font-weight: 500;
+  min-width: 90px;
 }
 
-.evt-content {
+.event-content {
   color: var(--text-muted);
-  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 320px;
+  font-family: var(--font-mono, monospace);
+}
+
+/* 不同事件类型的左侧色条 */
+.event-assistant_tool_call {
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+}
+
+.event-tool_result {
+  border-left: 2px solid #50E3C2;
+  padding-left: 10px;
+}
+
+.event-tool_error {
+  border-left: 2px solid #E35050;
+  padding-left: 10px;
+}
+
+.event-final_answer {
+  border-left: 2px solid var(--text-muted);
+  padding-left: 10px;
 }
 </style>

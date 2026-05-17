@@ -683,10 +683,16 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "session_not_found")
         self.assertEqual(response.json()["error"]["message"], "Session not found")
 
+    @patch("agent_prototype.skills.skill_loader.get_default_skill_config_path")
     @patch("agent_prototype.skills.skill_loader.get_default_skill_roots")
-    def test_list_skills_endpoint_returns_summaries(self, mock_get_default_skill_roots):
+    def test_list_skills_endpoint_returns_summaries(
+        self,
+        mock_get_default_skill_roots,
+        mock_get_default_skill_config_path,
+    ):
         project_skills_root = Path(self.temp_dir.name) / "project-skills"
         user_skills_root = Path(self.temp_dir.name) / "user-skills"
+        config_path = Path(self.temp_dir.name) / ".agent" / "skill-config.json"
 
         self._write_skill(
             project_skills_root,
@@ -703,6 +709,7 @@ class TestAgentApi(unittest.TestCase):
             ("project-opencode", project_skills_root),
             ("user-codex", user_skills_root),
         ]
+        mock_get_default_skill_config_path.return_value = config_path
 
         response = self.client.get("/skills")
 
@@ -807,3 +814,41 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["error"]["code"], "trace_not_found")
         self.assertEqual(response.json()["error"]["message"], "Trace not found")
+
+    def test_rename_session_endpoint_updates_name(self):
+        # 先创建 session
+        create_resp = self.client.post("/sessions", json={"session_name": "旧名字"})
+        self.assertEqual(create_resp.status_code, 200)
+        session_id = create_resp.json()["session_id"]
+
+        # 发送重命名请求
+        rename_resp = self.client.patch(
+            f"/sessions/{session_id}",
+            json={"session_name": "新名字"},
+        )
+        self.assertEqual(rename_resp.status_code, 200)
+        self.assertEqual(rename_resp.json(), {"ok": True})
+
+        # 确认名称已持久化
+        detail_resp = self.client.get(f"/sessions/{session_id}")
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertEqual(detail_resp.json()["session_name"], "新名字")
+
+    def test_rename_session_endpoint_returns_error_for_empty_name(self):
+        create_resp = self.client.post("/sessions", json={"session_name": "测试会话"})
+        session_id = create_resp.json()["session_id"]
+
+        rename_resp = self.client.patch(
+            f"/sessions/{session_id}",
+            json={"session_name": "   "},  # 空白字符串
+        )
+        self.assertEqual(rename_resp.status_code, 400)
+        self.assertEqual(rename_resp.json()["error"]["code"], "bad_request")
+
+    def test_rename_session_endpoint_returns_error_for_missing_session(self):
+        rename_resp = self.client.patch(
+            "/sessions/nonexistent-id",
+            json={"session_name": "新名字"},
+        )
+        self.assertEqual(rename_resp.status_code, 400)
+        self.assertEqual(rename_resp.json()["error"]["code"], "bad_request")

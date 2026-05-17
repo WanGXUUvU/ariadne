@@ -73,10 +73,34 @@ def delete_session_service(session_id:str,db:Session)->dict[str,bool]:
         raise ValueError("Session not found")
     
     try:
-        store.delete(session_id)
+        store.delete_session(session_id)
         db.commit()
     except Exception:
         db.rollback()
         raise
 
     return {"ok":True}
+
+def rename_session_service(session_id:str,new_name:str,db:Session)->dict[str,bool]:
+    store = SqliteSessionStore(db)
+
+    record=store.read_session_record(session_id)
+
+    if not new_name or not new_name.strip():
+        raise ValueError("Session name cannot be empty")
+    
+    if record is None:
+        raise ValueError("Session not found")
+    
+    try:
+        store.rename_session(session_id,new_name)
+        db.commit()
+    
+    except Exception:
+        db.rollback()
+        
+        raise
+
+    return{"ok":True}
+
+

@@ -74,6 +74,9 @@ class CreateSessionInput(BaseModel):
         min_length=1
     )
 
+class RenameSessionInput(BaseModel):
+    session_name: str  # 新的会话名称
+    
 class ResetInput(BaseModel):
     """`/reset` 请求体。"""
 
@@ -118,6 +121,20 @@ class AgentOutput(BaseModel):
     state: AgentState
     events: list[AgentEvent]
     metadata:RunMetadata
+
+class StreamFrame(BaseModel):
+    """一条 SSE 推送帧的结构。
+
+    type 取值：
+    - start      : 运行开始，包含 session_id / run_id / agent_name / skill_name
+    - agent_event: 一个语义事件（工具调用 / 工具结果 / 工具错误）
+    - delta      : 最终回答阶段的 token 级增量内容
+    - end        : 运行完成，包含完整 reply / state / metadata
+    - error      : 运行失败，包含错误码和错误信息
+    """
+
+    type: Literal["start", "agent_event", "delta", "end", "error"]
+    data: dict[str, Any]
 
 class CompactOutput(BaseModel):
     """/compact 响应体"""
@@ -188,5 +205,31 @@ class SkillSummary(BaseModel):
     enabled:bool=True
     error:Optional[str]=None #skill损坏 返回的错误信息
 
+class FinalizeRunInput(BaseModel):
+    user_input: str
+    partial_reply: str
+    agent_name: Optional[str] = None
+    skill_name: Optional[str] = None
 
+class ToolCallSummary(BaseModel):
+    """单次工具调用的详情。"""
+    id: int
+    tool_name: str
+    tool_call_id: Optional[str] = None
+    status: str
+    input_json: Optional[str] = None
+    result_json: Optional[str] = None
+    started_at: datetime
+    finished_at: Optional[datetime] = None
 
+class RunDetailResponse(BaseModel):
+    """GET /sessions/{id}/runs/{run_id} 的响应体。"""
+    run_id: str
+    session_id: str
+    run_status: str
+    user_input: str
+    reply: str
+    agent_name: Optional[str] = None
+    skill_name: Optional[str] = None
+    created_at: datetime
+    tool_calls: list[ToolCallSummary]

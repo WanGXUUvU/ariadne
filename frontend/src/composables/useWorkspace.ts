@@ -13,9 +13,29 @@ import type { ViewMode } from '../types/ui';
 import { MOCK_AGENTS } from '../mock/ui-mocks';
 
 const RESET_HISTORY_STORAGE_KEY = 'agent-build-reset-history-v1';
+const TIMELINE_STORAGE_KEY = 'agent-build-timelines-v1';
 const RESET_MARKER_CONTENT = '[RESET_MARKER]';
 
 type ResetHistoryStore = Record<string, AgentMessage[]>;
+type TimelineStore = Record<string, StreamingItem[]>;
+
+function readTimelineStore(): TimelineStore {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(TIMELINE_STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as TimelineStore;
+  } catch {
+    return {};
+  }
+}
+
+function writeTimelineToStore(runId: string, timeline: StreamingItem[]) {
+  if (typeof window === 'undefined') return;
+  const store = readTimelineStore();
+  store[runId] = timeline;
+  window.localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(store));
+}
 
 function readResetHistoryStore(): ResetHistoryStore {
   if (typeof window === 'undefined') {
@@ -92,6 +112,12 @@ export function useWorkspace() {
   const isCompacting = ref(false);
   const isStreaming = ref(false);
   const streamingTimeline = ref<StreamingItem[]>([]);  // 按到达顺序混排文字和工具事件
+
+  // Stop 按钮相关状态
+  const streamAbortController = ref<AbortController | null>(null);
+  const pendingRunId = ref<string | null>(null);
+  const pendingUserInput = ref<string>('');
+  const pendingAgentName = ref<string | undefined>(undefined);
   const lastCompletedRun = ref<TraceRunSummary | null>(null);
   const errorMsg = ref<string | null>(null);
   const infoMsg = ref<string | null>(null);
@@ -160,8 +186,32 @@ export function useWorkspace() {
       isTraceLoading.value = true;
       const detail = await api.getSessionDetail(id);
       historyMessages.value = readSessionResetHistory(id);
-      currentMessages.value = detail.state?.messages || [];
+      
+      const msgs = detail.state?.messages || [];
       await loadTraceRuns(id);
+
+      // 从本地存储恢复 timeline (交错视图)，保证刷新后视觉一致
+      const timelineStore = readTimelineStore();
+      if (traceRuns.value.length > 0) {
+        for (let i = 0; i < msgs.length; i++) {
+          if (msgs[i].role === 'assistant') {
+            // 往前找对应的 user 消息，通过内容去匹配 trace run
+            let correspondingRun: TraceRunSummary | undefined;
+            for (let j = i - 1; j >= 0; j--) {
+              if (msgs[j].role === 'user') {
+                const userText = (msgs[j].content ?? '').trim();
+                correspondingRun = traceRuns.value.find(r => r.user_input.trim() === userText);
+                break;
+              }
+            }
+            if (correspondingRun && timelineStore[correspondingRun.run_id]) {
+              msgs[i] = { ...msgs[i], timeline: timelineStore[correspondingRun.run_id] };
+            }
+          }
+        }
+      }
+      
+      currentMessages.value = msgs;
       errorMsg.value = null;
     } catch (err: any) {
       if (err.message.includes('not found') || err.message.includes('404')) {
@@ -190,11 +240,16 @@ export function useWorkspace() {
     currentMessages.value.push({ role: 'user', content: input });
 
     let capturedRunId: string | null = null;
+    const abortController = new AbortController();
+    streamAbortController.value = abortController;
+    pendingUserInput.value = input;
+    pendingAgentName.value = activeAgent.value?.id;
 
     try {
-      for await (const frame of api.streamRun(activeSessionId.value, input, activeAgent.value?.id)) {
+      for await (const frame of api.streamRun(activeSessionId.value, input, activeAgent.value?.id, abortController.signal)) {
         if (frame.type === 'start') {
           capturedRunId = frame.data.run_id;
+          pendingRunId.value = capturedRunId;
         } else if (frame.type === 'delta') {
           // 追加到最后一个 text 项，或新建一个 text 项
           const tl = streamingTimeline.value;
@@ -213,6 +268,9 @@ export function useWorkspace() {
         } else if (frame.type === 'end') {
           // 冻结时间线，patch 进新消息里，再替换 currentMessages
           const frozenTimeline = [...streamingTimeline.value];
+          if (capturedRunId) {
+            writeTimelineToStore(capturedRunId, frozenTimeline);
+          }
           const newMsgs = [...(frame.data.state?.messages ?? currentMessages.value)];
           for (let i = newMsgs.length - 1; i >= 0; i--) {
             if (newMsgs[i].role === 'assistant') {
@@ -238,11 +296,50 @@ export function useWorkspace() {
         }
       }
     } catch (err: any) {
-      errorMsg.value = 'Run failed: ' + err.message;
+      // AbortError 是用户主动 Stop，不是错误，静默处理
+      if (err.name !== 'AbortError') {
+        errorMsg.value = 'Run failed: ' + err.message;
+      }
     } finally {
       isChatLoading.value = false;
       isStreaming.value = false;
       streamingTimeline.value = [];
+      streamAbortController.value = null;
+      pendingRunId.value = null;
+    }
+  };
+
+  const stopStreaming = async () => {
+    if (!isStreaming.value || !streamAbortController.value) return;
+
+    // 1. 截取当前已输出的内容
+    const partialReply = streamingTimeline.value
+      .filter(item => item.kind === 'text')
+      .map(item => item.content)
+      .join('');
+    const runId = pendingRunId.value;
+    const sessionId = activeSessionId.value;
+    const userInput = pendingUserInput.value;
+    const agentName = pendingAgentName.value;
+
+    // 2. 中止 SSE
+    streamAbortController.value.abort();
+
+    // 3. 如果已有 run_id，调 finalize 接口落库
+    if (runId && sessionId && userInput) {
+      try {
+        await api.finalizeRun(sessionId, runId, userInput, partialReply, agentName);
+      } catch {
+        // finalize 失败不阻塞 UI
+      }
+    }
+
+    // 4. 把截断内容追加到对话框，标记 stopped=true
+    if (partialReply) {
+      currentMessages.value = [
+        ...currentMessages.value,
+        { role: 'assistant', content: partialReply, stopped: true },
+      ];
     }
   };
 
@@ -282,6 +379,15 @@ export function useWorkspace() {
       await loadSessions();
     } catch (err: any) {
       errorMsg.value = 'Delete failed: ' + err.message;
+    }
+  };
+
+  const renameSession = async (id: string, newName: string) => {
+    try {
+      await api.renameSession(id, newName);
+      await loadSessions();
+    } catch (err: any) {
+      errorMsg.value = 'Rename failed: ' + err.message;
     }
   };
 
@@ -370,9 +476,11 @@ export function useWorkspace() {
     initializeWorkspace,
     createNewSession,
     sendMessage,
+    stopStreaming,
     compactSession,
     resetSession,
     deleteSession,
+    renameSession,
     toggleSkill,
     availableAgents: MOCK_AGENTS,
   };

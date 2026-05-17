@@ -1,143 +1,64 @@
 # STATUS
 
 ## Current Status
-- Phase: planning
-- Task: specs/TASK-072.md
-- Gate: planning
-- Allowed Now: planning
+- Phase: implementation
+- Task: specs/TASK-037.md
+- Gate: implementation
+- Allowed Now: implementation
 - Lane: Fast
 - Blocked: None
-- Next action: 按 `TASK-072` 拆 `skills/skill_loader.py`，先把职责边界画清，再评估 `application/run_service.py` 是否还需要继续压缩。
+- Next action: Stop 按钮前端实现（abort SSE + finalize 落库 + UI 标记）
+
+## 读取规则
+- `STATUS.md` 是当前唯一权威入口，先看这里再看路线图。
+- 任务号不等于时间顺序；遇到临时插卡、收口卡或重构卡时，以当前任务正文和状态为准。
+- 路线图只负责长期顺序，不能直接推导当前正在做哪一张卡。
 
 
 ## 遗留项
 - 见 `specs/TASK-002.md`
 
-## History
-| Date | Task | Gate Passed | Notes |
-|------|------|-------------|-------|
-| 2026-05-10 | `TASK-071` 验证完成并切换到 `TASK-072` | Verify / planning | `agent_runtime.py` 已拆成 facade + helpers，runtime 单测和前端构建通过，准备收缩 `skill_loader.py`。 |
-| 2026-05-10 | 新建 `TASK-071` 并切换 | planning | 认为 `runtime/agent_runtime.py` 仍然偏胖，先拆 runtime 再回到平台扩展。 |
-| 2026-05-10 | `TASK-070` 收口并切换到 `TASK-054` | Verify / Review | `api/routes.py` 拆分与 `run_service.py` 收窄已完成，长链路和测试均已验证通过。 |
-| 2026-05-10 | `TASK-026` 收口并切换到 `TASK-070` | Verify / Review | 统一 `ModelAdapter` 与 `ChatCompletionsAdapter` 已落地，runtime / compact / run_service 已迁移，测试全绿，长会话 compact 已实测触发。 |
-| 2026-05-09 | 切回 `TASK-026` | planning | 回到模型适配层接口任务，先抽统一 `ModelAdapter`，再接 Chat Completions adapter。 |
-| 2026-05-09 | 切换到 `TASK-026` | planning | 进入模型适配层接口任务，先审查当前模型调用并定义统一 adapter。 |
-| 2026-05-09 | `TASK-070` 最终验收通过 | Verify / Review | 旧路由入口已去除，应用层主编排已收窄，后续中心文件无明显拆分收益；全量 `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
-| 2026-05-09 | `TASK-070` storage db 暂不拆 | planning | `storage/db.py` 只是 engine / session factory / Base / dependency provider。 |
-| 2026-05-09 | `TASK-070` storage models 暂不拆 | planning | `storage/models.py` 只是 ORM 定义，不混业务逻辑。 |
-| 2026-05-09 | `TASK-070` session store 暂不拆 | planning | `session_store.py` 仍是同一层 SQLite 访问封装：session / trace 读写与查询都在存储边界内。 |
-| 2026-05-09 | `TASK-070` openai adapter 暂不拆 | planning | `openai_adapter.py` 只是薄 HTTP 适配层：拼请求、发请求、验响应、吐 message。 |
-| 2026-05-09 | `TASK-070` runtime 暂不拆 | planning | `agent_runtime.py` 已是单一执行器层：LLM、tool calls、events、reply/state 一体。 |
-| 2026-05-09 | `TASK-070` context 层暂不拆 | planning | `compaction.py` 和 `prompt_builder.py` 各自职责单一：压缩、拼 prompt；先不拆。 |
-| 2026-05-09 | `TASK-070` tool registry 暂不拆 | planning | `tool_registry.py` 仍是同一层职责：注册、执行、默认装配；暂不拆。 |
-| 2026-05-09 | `TASK-070` skill loader 暂不拆 | planning | `skill_loader.py` 仍在同一职责层：发现、解析、读取、配置；拆分收益不高，先观察 `tool_registry.py`。 |
-| 2026-05-09 | `TASK-070` skill service 条件修正完成 | Verify | `_reload_skill` 目标匹配已修正，技能启停和全量回归通过。 |
-| 2026-05-09 | `TASK-070` skill service 复核发现问题 | planning | `_reload_skill` 的目标匹配条件写错，会返回错误 skill；测试当前未覆盖到这个分支。 |
-| 2026-05-09 | `TASK-070` 路由入口和主编排拆分完成 | Verify | 旧路由入口已移除，`run_service.py` 仅保留 `/run` 主链路，`python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
-| 2026-05-09 | `TASK-070` 应用层拆分方案确认 | planning | `run_service.py` 只留 `/run` 主链路；`compact` 独立；session 创建/重置/删除 独立。 |
-| 2026-05-09 | `TASK-070` 旧路由入口可删除 | planning | `api/app.py` 已切到 `api/routes/` 包，旧 `routes.py` 无继续引用，可移除。 |
-| 2026-05-09 | `TASK-070` 路由迁移细化 | planning | 先落公共错误响应和总装配，再按资源搬 `run/session/trace/skill` 路由。 |
-| 2026-05-09 | `TASK-070` 路由迁移起步 | planning | 目录已建好，下一步先把 `routes.py` 按资源迁到 `api/routers/`。 |
-| 2026-05-09 | `TASK-070` 拆分顺序确认 | planning | 先做 P0：按资源拆 `api/routes.py`；再做 P1：收窄 `application/run_service.py`。 |
-| 2026-05-09 | `TASK-070` 架构优化细化 | planning | 将架构优化拆成 P0/P1/P2/P3 四个层级，明确先拆路由、再压缩应用编排、再评估技能与工具中心文件。 |
-| 2026-05-09 | `TASK-070` 架构优化建卡 | planning | 新建架构优化任务卡，聚焦继续压缩 `api/routes.py`、`application/run_service.py` 等中心文件职责。 |
-| 2026-05-09 | `TASK-069` API 测试文件独立化完成 | Verify | 已将 `TestAgentApi` 迁到 `test_agent_api.py`，并删除旧的 `test_agent.py`；`python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
-| 2026-05-09 | `TASK-069` 测试拆分验证完成 | Verify | 已将测试按模块拆成多个文件，并用 `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 验证 47 项通过。 |
-| 2026-05-09 | `TASK-069` 建立并切换 | planning | 启动测试按模块拆分任务，把 `test_agent.py` 拆成多个按职责划分的测试文件。 |
-| 2026-05-09 | `TASK-068` 命名统一验证完成 | Verify | 已将 `types.py`、`loader.py`、`registry.py` 收紧为更明确的模块名，并修复相关 import；`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-05-09 | `TASK-068` 建立并切换 | planning | 启动模块命名统一任务，优先收紧 `types.py`、`loader.py`、`registry.py` 这类泛名文件。 |
-| 2026-05-09 | `TASK-067` 第二阶段清理完成 | Verify | 已删除旧 runtime / storage / tools_defs / core.model.adapter 重复实现，仅保留新分层目录中的实现；`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-05-09 | `TASK-067` 重构实现完成 | Verify | 已迁移后端核心职责到新分层目录，补了兼容 shim，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过；`pytest` 在当前环境不可用。 |
-| 2026-05-09 | 补全 `TASK-067` 目录目标图 | planning | 将 `storage`、`core`、`tools`、`trace`、`tests` 一并纳入目标结构，避免目标图缺块。 |
-| 2026-05-09 | 重写 `TASK-067` 重构卡 | planning | 按官方分层和当前项目现状补齐重构说明、职责边界、迁移顺序和验收标准。 |
-| 2026-05-09 | 收拢为纯重构任务 | planning | 取消继续拆流程，改为只对现有功能做一次官方分层重构，不新增能力。 |
-| 2026-05-09 | 创建后端分层临时任务卡 | planning | 新增 `TASK-067`，专门承载后端分层重构方案，与 `TASK-066` 区分。 |
-| 2026-05-09 | 创建临时结构任务卡 | planning | 新增 `TASK-066`，专门承载临时结构整理，不和 `TASK-026` 混在一起。 |
-| 2026-05-09 | `TASK-026` 接口升级决策 | review | 决定把 `ModelAdapter` 按最终产品方式设计为统一请求/响应协议，不只覆盖最小闭环，还要预留 streaming 事件和 provider 元数据。 |
-| 2026-05-09 | `TASK-026` review 复核 | review | 当前 `Agent` 和 compact 路径仍直接依赖 `runtime/llm_client.py`，模型调用边界还未抽象为 adapter；现有单测通过，但 `TASK-026` 的完成标准尚未满足。 |
-| 2026-05-09 | 重排未来任务卡编号与路线 | planning | 自 `TASK-026` 起按主路径重新编号：先聊天助理，再代码助理，最后平台扩展；并补入 MCP 实现、hooks、app/connectors、plugin marketplace 等官方能力卡。历史记录中旧编号保留原样。 |
-| 2026-05-09 | 收紧 MCP / Plugin 任务卡到官方结构 | planning | 已按 Codex 官方方向重写旧 `TASK-026` / 旧 `TASK-027`（现 `TASK-054` / `TASK-057`）：先定义 `mcp_servers.<id>` server 配置边界，插件结构改回 `.codex-plugin/plugin.json + .mcp.json + .app.json`。 |
-| 2026-05-09 | 切换到下一张任务卡 | planning | 顶部状态曾切到旧 `TASK-026`（现 `TASK-054`），当时进入 MCP 边界设计 review；先读 Tool Registry、执行链路与 trace，再收口设计结论。 |
-| 2026-05-09 | 推进 `TASK-025` 后端稳健性修复 | implementation | 已完成 B1-B4：删除事务边界、LLM HTTP/响应结构错误处理、自动 compact 不提前落库、session nullable 元数据哨兵更新；全量 `python3 -m unittest agent_prototype.tests.test_agent -v` 47 项通过。 |
-| 2026-05-09 | 调整 `TASK-025` 剩余范围 | planning | B5/B6 归并到后续工具专项：统一处理工具安全边界、深度/结果限制和新增工具能力，不再阻塞当前主链路收口。 |
-| 2026-04-24 | 完成第一个工具调用闭环 | Verify / Review | 已跑通 `tool_calls -> tool -> final`，并用 `curl` 验证。 |
-| 2026-04-24 | 规划会话隔离任务 | implementation | 已确认当前原型需要按 `session_id` 隔离状态，进入下一阶段。 |
-| 2026-04-24 | 实现会话隔离与重置 | implementation | 已改为按 `session_id` 读写内存会话状态，并提供 `/reset`。 |
-| 2026-04-24 | 手动验证会话隔离 | Verify | `A` 可续上下文，`B` 独立，`/reset` 后 `A` 重新开始。 |
-| 2026-04-24 | `TASK-002` 功能收口 | Review | 会话隔离与重置功能完成，测试按当前安排延期。 |
-| 2026-04-24 | 回归验证失败 | Verify | `unittest` 运行失败，`AgentInput` 还缺 `session_id`，测试未同步。 |
-| 2026-04-24 | 回归验证通过 | Verify | `python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-04-24 | 创建下一张任务卡 | planning | 新增 `specs/TASK-003.md`，聚焦会话持久化。 |
-| 2026-04-24 | 确认存储方案 | planning | `TASK-003` 先走 SQLite，不上更重的数据库。 |
-| 2026-04-26 | 开始接通 SQLite 链路 | implementation | 已有 `db.py`、`models.py`、`session_store.py`、`services.py`，下一步是修正接口引用并初始化表。 |
-| 2026-04-26 | `TASK-003` 功能完成 | Review | SQLite 会话持久化链路已跑通，功能收口。 |
-| 2026-04-26 | 创建下一张任务卡 | planning | 新增 `specs/TASK-004.md`，聚焦 SQLite 迁移与 Alembic。 |
-| 2026-04-26 | `TASK-004` 验证完成 | Verify | Alembic baseline migration 已补齐并通过 `upgrade head` / `current` 验证。 |
-| 2026-04-26 | `TASK-004` 收口 | Review | `session_records` 已完成 Alembic 接管，迁移流程可用。 |
-| 2026-04-26 | 创建下一张任务卡 | planning | 新增 `specs/TASK-005.md`，聚焦结构化执行轨迹输出。 |
-| 2026-04-26 | `TASK-005` 验证完成 | Verify | `AgentEvent` 结构化输出与测试已跑通，`/run` 返回稳定轨迹。 |
-| 2026-04-26 | `TASK-005` 收口 | Review | 结构化执行轨迹已完成，主线回到 Prompt/Skill 与工具编排。 |
-| 2026-04-26 | 创建下一张任务卡 | planning | 新增 `specs/TASK-006.md`，聚焦 Prompt/Skill 体系 v1。 |
-| 2026-04-26 | 仓库体检 | Review | 发现 `tools.py` 冲突标记导致测试无法导入，且 `llm_client.py` 存在硬编码 API Key，需先处理。 |
-| 2026-04-26 | 修复导入阻塞 | Verify | `tools.py` 的 merge conflict 标记已清除，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-04-27 | 重新分解 `TASK-006` | planning | `TASK-006` 已从内存 prompt 过渡为 Agent 核心定义路线，并为后续 skill / plugin 扩展预留结构。 |
-| 2026-04-27 | 建立产品规划与任务卡体系 | 实现审批 | 新增 `SPEC.md`、`DECISIONS.md`、`BUILD_PLAN.md`，删除旧 `TASK-006` 并重建 `TASK-006` 到 `TASK-027`。 |
-| 2026-04-27 | 切换为轻量流程 | 规划 | 保留已预建任务卡和路线图，但日常执行只推进当前任务卡，路线文档仅在范围变化时读取。 |
-| 2026-04-27 | 精简流程文档 | 规划 | 删除完整流程遗留的 `SPEC.md` 和 `DECISIONS.md`，轻量流程保留 `STATUS.md`、任务卡和 `BUILD_PLAN.md` 路线图。 |
-| 2026-04-27 | 扩展 Codex 类产品路线 | 规划 | 基于 Codex 官方 Skills / Plugins / CLI 能力面，细化 `TASK-006` 到 `TASK-027`，新增 `TASK-028` 到 `TASK-051`。 |
-| 2026-04-27 | 校正产品方向 | 规划 | 结合开源 agent 产品的架构，对当前阶段切换为 Agent 核心定义 + Skill / Plugin 扩展路线。 |
-| 2026-04-27 | 路线审查完成 | Review | 任务卡主线整体合理，少量残留语义仍需统一，重点关注 plugin 是否要承载 agents、以及 skill 术语是否继续保留。 |
-| 2026-04-27 | `TASK-006` 功能完成 | Verify / Review | Agent 定义层已接入 runtime，默认定义与 SQLite store 已打通，单测通过。 |
-| 2026-04-27 | `TASK-007` 功能完成 | Verify / Review | 默认 agent 定义读取器已接入数据库读取与内存回退，单测通过。 |
-| 2026-04-27 | `TASK-008` 功能完成 | Verify / Review | Agent 定义已注入 runtime，默认运行路径使用定义层，单测通过。 |
-| 2026-04-27 | `TASK-009` 功能完成 | Verify / Review | Agent 输入已支持显式 agent_name，默认回退与未知 agent 错误路径已验证。 |
-| 2026-04-28 | `TASK-010` 功能完成 | Verify / Review | Tool Registry 已统一注册本地工具，schema 暴露与执行链路已通过测试。 |
-| 2026-04-28 | `TASK-011` 功能完成 | Verify / Review | Skill 工具允许列表已串到 runtime，默认 skill 仍可用 echo_tool，禁止工具会被拦截。 |
-| 2026-04-28 | `TASK-012` 验证完成 | Verify | 工具错误已转成结构化 `tool_error` 事件，未知工具、参数错误、运行异常测试通过。 |
-| 2026-04-28 | `TASK-013` 验证完成 | Verify | 工具结果已统一为 `ToolResult`，成功和失败路径都通过测试。 |
-| 2026-04-28 | 模块结构整理完成 | Review | 将 `agent_prototype/` 按 api/core/runtime/storage/tools_defs 分层，旧入口路径已清理，新入口可从 `agent_prototype.api.app` 启动。 |
-| 2026-04-28 | `TASK-014` 验证完成 | Verify | Session 元数据已接入 `session_records`，创建/更新时间、最近 agent、消息数和回复预览都通过测试。 |
-| 2026-04-29 | `TASK-014` 收口 | Review | Session 元数据已完成，进入 Session 列表与读取接口阶段。 |
-| 2026-04-29 | `TASK-015` 验证完成 | Verify | Session 列表、详情和 404 路径已补齐，API 测试通过。 |
-| 2026-04-29 | `TASK-015` 收口 | Review | Session API 已具备列表与读取能力，下一步进入 Trace 回放接口。 |
-| 2026-05-02 | `TASK-016` 验证完成 | Verify | Trace 落库、`GET /sessions/{session_id}/trace`、`run_id` 过滤和顺序测试通过。 |
-| 2026-05-02 | `TASK-016` 收口 | Review | Trace 回放接口已打通，并补齐 Alembic 迁移。 |
-| 2026-05-02 | 补充教练式拆任务方法 | planning | `AGENTS.md` 新增 6 行拆解模板和按层分析规则，后续任务先拆再写。 |
-| 2026-05-02 | 强化大代码量教学节奏 | planning | `AGENTS.md` 补充“只看当前任务主链路、先定义任务再画链路再按层读”的规则，后续新会话默认按这个节奏带。 |
-| 2026-05-02 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-017`，进入 Skill 索引元数据阶段。 |
-| 2026-05-02 | 拆解 `TASK-017` 主链路 | planning | 确认先做 skill 索引最小闭环：测试夹具 -> metadata schema -> loader 列表函数 -> API/测试。 |
-| 2026-05-02 | 升级教练闭环 | planning | `AGENTS.md` 增加“讲完即提问、复述检查、答偏先纠偏再推进”的规则，后续默认按教练闭环带学。 |
-| 2026-05-02 | 强制分层串行实现 | planning | `AGENTS.md` 补充“进入实现后一次只推进一层，不一次性给出多层完整代码”的规则。 |
-| 2026-05-02 | `TASK-017` 验证完成 | Verify | Skill metadata schema、loader、`GET /skills` 和坏 skill 容错测试已补齐，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-05-02 | `TASK-017` 收口 | Review | 接受当前 skill 扫描实现，切到下一张任务卡 `TASK-018`。 |
-| 2026-05-02 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-018`，进入渐进式 Skill 加载阶段。 |
-| 2026-05-03 | `TASK-018` 验证完成 | Verify | 已接入 skill catalog prompt、`skill_name` 显式全文加载和对应 API 测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-05-03 | `TASK-018` 收口 | Review | 接受当前渐进式 Skill 加载最小闭环，切到下一张任务卡 `TASK-019`。 |
-| 2026-05-03 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-019`，进入 Skill 启用和禁用配置阶段。 |
-| 2026-05-05 | `TASK-019` 验证完成 | Verify | 已补充 skill disabled 配置、enable/disable API、disabled skill 运行时拦截测试，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-05-05 | 重写 `TASK-020` 拆解 | planning | 按 OpenAI/Codex compact 机制重写任务卡，明确“主动 compact + 自动 compact + 共享核心 + 第一版规则摘要”主线。 |
-| 2026-05-05 | 调整 `TASK-020` 路线 | planning | 将 `TASK-020` 改为“LLM 压缩中段核心历史 + 保留前锚点与最近原文”的标准 compact 方案。 |
-| 2026-05-05 | `TASK-020` 验证完成 | Verify | 手动 `/compact` 与 `/run` 自动 compact 测试已通过，LLM 压缩中段历史链路已打通。 |
-| 2026-05-05 | `TASK-020` 收口 | Review | 接受当前 compact 最小闭环实现，下一步切到 `TASK-021` 做 `/run` 输出整理。 |
-| 2026-05-05 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-021`，进入 `/run` 响应结构整理阶段。 |
-| 2026-05-06 | 拆解 `TASK-021` 主链路 | planning | 已确认当前 `/run` 已有 `reply/state/events/metadata`，并决定保留完整 `state`，下一步统一错误响应与测试。 |
-| 2026-05-06 | `TASK-021` 收口 | Review | 统一业务错误响应为顶层 `error`，相关测试通过。 |
-| 2026-05-07 | `TASK-023` 验证完成 | Verify / Review | `POST /sessions` 已打通，空 session 可创建并出现在列表中，测试通过，Review 通过。 |
-| 2026-05-07 | 双产品路线规划 | planning | 确定同仓库共享内核方案，新增 TASK-052～059，BUILD_PLAN 重组为 M6～M9。 |
-| 2026-05-07 | 切换到下一张任务卡 | planning | 当前任务切到 `TASK-024` Web UI 基础壳。 |
-| 2026-05-07 | 同步路线文档冲突 | planning | 已修正 `BUILD_PLAN` 中 `TASK-023` 状态、统一旧 `TASK-058`（现 `TASK-051`）CLI 路径到 `agent_prototype/cli/main.py`，并将旧 `TASK-053`（现 `TASK-029`）的默认工具描述改为不提前引用未实现的 `web_search`。 |
-| 2026-05-07 | 合并前端任务卡 | planning | 按“现有后端能力一次前端整合”的方向，将 `TASK-025` 并入 `TASK-024`，并把 `TASK-024` 扩展为 chat、sessions、trace、skills、compact、reset 的统一工作台任务卡。 |
-| 2026-05-06 | `TASK-021` 收口 | Review | 确认 `/run` 继续保留完整 `state`，并将顶层 `error` 确认为当前统一业务错误响应格式，任务完成。 |
-| 2026-05-06 | 删除任务卡 | planning | 删除旧 `TASK-022` 最小 CLI 入口任务卡。 |
-| 2026-05-06 | 调整任务卡编号 | planning | 将前端规划任务卡改回 `TASK-022`，并新建 `TASK-023` 专门承载“新建 session 接口”。 |
-| 2026-05-06 | 拆解 `TASK-022` 主链路 | planning | 先围绕 Chat / Sessions / Trace 三页梳理最小前端范围、现有 API 对齐情况与缺口，再决定后续 UI 任务卡。 |
-| 2026-05-06 | 确认 `TASK-022` API 缺口 | planning | 已确认“创建新 session” 需要独立接口，不再只依赖前端自己生成 `session_id` 后首次调用 `/run`；缺口拆到 `TASK-023`。 |
-| 2026-05-06 | `TASK-022` 收口 | Review | 已确认第一版前端范围为 Chat / Sessions / Trace，现有 API 基本够用，唯独缺少独立 `POST /sessions`，已拆到 `TASK-023`。 |
-| 2026-05-06 | 开始 `TASK-023` | planning | 已按 `schema -> route -> service -> test` 打通独立新建会话主链路。 |
-| 2026-05-06 | `TASK-023` 验证完成 | Verify | `POST /sessions` 已可创建空白会话、返回 `SessionSummary`、出现在 `GET /sessions` 中，`python3 -m unittest agent_prototype.tests.test_agent -v` 通过。 |
-| 2026-05-06 | 重排后续任务卡 | planning | 将 `Web UI 基础壳` 和 `Trace 时间线面板` 前移为 `TASK-024`、`TASK-025`；原 `TASK-024` 到 `TASK-043` 顺延两位，路线图同步为“先前端闭环，再平台边界”。 |
-| 2026-05-07 | `TASK-024` 第一阶段 | implementation | 已建立 `useWorkspace` 核心状态层，接入 `GlobalNav` 全局侧边栏和 `TopControlBar` 顶部控制区（含 Agent 选择、Compact、Reset），完成三栏大布局壳子搭建与技能库 Mock 页面入口。 |
-| 2026-05-07 | `TASK-024` 视觉重构 | implementation | 彻底推翻初版 UI，完成 Linear/Vercel 风格的极简极客暗色主题重构（Monolithic App Shell、等宽字体、无气泡对话流、1px网格系统）。 |
-| 2026-05-07 | `TASK-024` 前端全链路闭环 | Verify | 完成 `MessageComposer` 额度监控与 IME 处理，完成 `MessageList` 的 Compact 骨架屏与系统提示块渲染，修复 setup 致命错误，所有现有后端能力 100% 映射到 UI。 |
-| 2026-05-07 | `TASK-024` (含 `TASK-025`) 收口 | Review | 单页工作台已达到预期，Session/Chat/Trace/Skill/Compact 五大核心功能彻底贯通，体验拉满。 |
-| 2026-05-07 | 切换到下一张任务卡 | planning | 进入 MCP 架构阶段，开始推进旧 `TASK-026`（现 `TASK-054`）MCP 边界设计。 |
+## 近期记录
+
+| Date | Event | Gate / Phase | Notes |
+|------|-------|--------------|-------|
+| 2026-05-14 | `TASK-028` 收口并切换到 `TASK-029` | Verify / Review | 前端完成 fetch+ReadableStream 解析 SSE，实现打字机效果及实时 Trace 面板，完善刷新后的历史统一渲染。 |
+| 2026-05-15 | `TASK-036` 收口并切换到 `TASK-037` | Verify / Review | Session 重命名（画笔内联编辑）+ 删除前后端全链路完成，构建通过，手动验证 ok。 |
+| 2026-05-14 | `TASK-035` 收口并切换到 `TASK-036` | Verify / Review | web_search 工具落地，接入 Tavily API，注册进 DEFAULT_TOOL_REGISTRY，assistant agent tool_names 已加入 web_search，全量测试通过。 |
+| 2026-05-14 | `TASK-029` 收口并切换到 `TASK-035` | Verify / Review | ASSISTANT_AGENT_DEFINITION 常量落地，load_agent_definition 改为字典 fallback，现有测试全部通过。 |
+| 2026-05-11 | `TASK-027` 收口并切换到 `TASK-028` | Verify / Review | streaming 后端全链路完成，SSE endpoint `/run/stream` 测试通过，顺手修复 `choices=[]` 空列表 IndexError。 |
+| 2026-05-10 | 同步收紧 `TASK-027` / `TASK-028` | planning | 统一 SSE 语义事件契约，前端不再默认 token 级 delta。 |
+| 2026-05-10 | 切换到 `TASK-027` | planning | `TASK-054` 暂停，先推进 streaming 事件输出主线。 |
+| 2026-05-10 | 切换到 `TASK-054` | planning | `TASK-072` 已收口，进入 `MCP` 边界设计主线。 |
+| 2026-05-10 | 补充卡 02 收口 | Verify / Review | `skill_loader.py` 已拆出 `skill_config.py`，`run_service.py` 收窄为预处理 / 执行 / 落库三段，`python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
+| 2026-05-10 | 补充卡 01 收口 | Verify / Review | `agent_runtime.py` 已拆成 facade + helpers，runtime 单测和前端构建通过。 |
+| 2026-05-10 | `TASK-070` 收口并切换到 `TASK-054` | Verify / Review | 路由入口拆分、应用层收窄完成，后续中心文件暂不继续拆。 |
+| 2026-05-09 | `TASK-026` 收口并切换到 `TASK-070` | Verify / Review | 统一 `ModelAdapter` 与 `ChatCompletionsAdapter` 已落地，runtime / compact / run_service 已迁移。 |
+| 2026-05-09 | 后端分层重构推进 | planning / Verify | `TASK-067` / `TASK-068` / `TASK-069` 依次完成重构、命名统一和测试拆分。 |
+| 2026-05-09 | MCP / Plugin 路线校正 | planning | `TASK-054` / `TASK-057` 重新对齐官方结构，`mcp_servers.<id>` 与插件包格式开始分离。 |
+| 2026-05-07 | 聊天助理 MVP 完成 | Verify / Review | `TASK-024`（含 `TASK-025`）收口，Session / Chat / Trace / Skill / Compact 前端工作台打通。 |
+
+## 阶段里程碑
+
+### M1 - M5 已完成
+- 稳定 Agent Runtime
+- Agent 核心定义
+- Tool Registry 与工具约束
+- Session 产品层
+- Agent 扩展管理
+
+### M6 - 聊天助理 MVP
+- 当前阶段：进行中
+- 已完成：`TASK-021`、`TASK-022`、`TASK-023`
+- 已完成：`TASK-024` / `TASK-025` 前端整合
+- 已完成：`TASK-026`、`TASK-027`、`TASK-028`
+- 待推进：`TASK-029`、`TASK-030`
+
+### M7 - M9
+- `M7`：聊天助理完善，当前计划中
+- `M8`：编码产品 MVP，当前计划中
+- `M9`：平台扩展，共享能力后续推进
+
+## 说明
+- 历史区只保留最近与阶段级信息，避免把模型淹没在流水账里。
+- 更早的逐条推进细节仍可从 git 历史或对应任务卡追溯。

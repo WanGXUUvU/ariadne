@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useWorkspace } from './composables/useWorkspace';
 import GlobalNav from './components/layout/GlobalNav.vue';
 import SessionSidebar from './components/SessionSidebar.vue';
@@ -8,6 +8,17 @@ import PluginMarketplace from './components/PluginMarketplace.vue';
 
 const workspace = useWorkspace();
 const showPluginsModal = ref(false);
+
+const isUuid = (s: string) => /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(s);
+const sessionTitle = computed(() => {
+  const s = workspace.activeSession.value;
+  if (!s) return 'NEW SESSION';
+  const name = s.session_name;
+  if (!name || name === s.session_id || isUuid(name)) {
+    return 'Untitled #' + s.session_id.slice(0, 8);
+  }
+  return name;
+});
 
 const handleNavAction = (action: string) => {
   if (action === 'open-plugins') {
@@ -39,6 +50,7 @@ onMounted(() => {
         @select="id => workspace.activeSessionId.value = id"
         @new="workspace.createNewSession"
         @delete="workspace.deleteSession"
+        @rename="workspace.renameSession"
       />
       <ChatPanel 
         :messages="workspace.messages.value"
@@ -47,7 +59,7 @@ onMounted(() => {
         :error="workspace.errorMsg.value"
         :infoMsg="workspace.infoMsg.value"
         :hasSession="!!workspace.activeSessionId.value"
-        :sessionTitle="workspace.activeSession.value?.session_name || workspace.activeSession.value?.session_id || 'NEW_SESSION'"
+        :sessionTitle="sessionTitle"
         :agents="workspace.availableAgents"
         :activeAgentId="workspace.activeAgentId.value"
         :traceRuns="workspace.traceRuns.value"
@@ -60,6 +72,7 @@ onMounted(() => {
         @infoDismiss="workspace.infoMsg.value = null"
         @compact="workspace.compactSession"
         @reset="workspace.resetSession"
+        @stop="workspace.stopStreaming"
       />
     </div>
 
