@@ -123,9 +123,31 @@ const visibleMessages = computed(() =>
 watch([() => visibleMessages.value.length, () => props.isLoading, () => props.isCompacting, () => props.streamingTimeline?.length], async () => {
   await nextTick();
   if (listRef.value) {
-    listRef.value.scrollTop = listRef.value.scrollHeight;
+    listRef.value.scrollTo({
+      top: listRef.value.scrollHeight,
+      behavior: 'smooth'
+    });
   }
 }, { deep: true });
+
+const getSyntheticTimeline = (m: AgentMessage, idx: number, isLast: boolean): StreamingItem[] => {
+  if (m.timeline && m.timeline.length > 0) return m.timeline;
+  
+  const r = findRun(idx, isLast);
+  const items: StreamingItem[] = [];
+  
+  if (r && r.events) {
+    r.events.forEach(e => {
+      items.push({ kind: 'event', event: e });
+    });
+  }
+  
+  if (m.content) {
+    items.push({ kind: 'text', content: m.content });
+  }
+  
+  return items;
+};
 
 const formatContent = (text: string | null) => {
   if (!text) return '';
@@ -207,8 +229,8 @@ const formatContent = (text: string | null) => {
         <div class="message-content">
           <div class="message-meta mono-label">{{ m.role === 'user' ? 'USER' : 'AGENT' }}</div>
           
-          <template v-if="m.role === 'assistant' && m.timeline && m.timeline.length > 0">
-            <template v-for="(chunk, ci) in chunkTimeline(m.timeline, idx)" :key="chunk.id">
+          <template v-if="m.role === 'assistant'">
+            <template v-for="(chunk, ci) in chunkTimeline(getSyntheticTimeline(m, idx, idx === visibleMessages.length - 1), idx)" :key="chunk.id">
               <div v-if="chunk.type === 'text'" class="message-text" v-html="formatContent(chunk.content)"></div>
               
               <div v-else-if="chunk.type === 'tools'" class="history-trace-container">
@@ -233,11 +255,10 @@ const formatContent = (text: string | null) => {
                 </template>
               </div>
             </template>
+            <div v-if="m.stopped" class="stopped-label">⏹ Stopped</div>
           </template>
 
           <template v-else>
-            <!-- 在最终文字回答之前显示历史工具调用记录 -->
-            <TraceInline v-if="m.role === 'assistant' && (() => { const r = findRun(idx, idx === visibleMessages.length - 1); return r && hasToolEvents(r) ? r : null })()" :events="findRun(idx, idx === visibleMessages.length - 1)!.events" />
             <div class="message-text" v-html="formatContent(m.content)"></div>
           </template>
         </div>

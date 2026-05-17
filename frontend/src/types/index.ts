@@ -13,6 +13,7 @@ export interface AgentMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string | null;
   timeline?: StreamingItem[];   // 客户端专属：本轮 streaming 时间线，持久保留
+  stopped?: boolean;            // 客户端专属：用户主动 Stop，内容为截断版本
 }
 
 export interface SessionState {

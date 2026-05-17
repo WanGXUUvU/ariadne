@@ -11,10 +11,11 @@
 import json
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ...core.schemas import AgentEvent, AgentState
-from ..models import SessionRecord, SessionRunEventRecord, SessionRunRecord
+from ...core.schemas import AgentEvent, AgentState,ChatMessage
+from ..models import SessionRecord, SessionRunEventRecord, SessionRunRecord,ToolCallRecord
 
 _UNSET=object()
 
@@ -126,14 +127,63 @@ class SqliteSessionStore:
             )
 
         return run_record
+    
+    def save_partial_run(
+            self,
+            *,
+            session_id:str,
+            run_id:str,
+            agent_name:Optional[str],
+            skill_name:Optional[str],
+            user_input:str,
+            partial_reply:str,
+            state:AgentState,
+    )->SessionRunRecord:
+        existing  =self.db.query(SessionRecord).filter(SessionRecord.session_id==session_id).first()
+        if existing:
+            return existing
+        run_record=SessionRunRecord(
+            session_id=session_id,
+            run_id=run_id,
+            agent_name=agent_name,
+            skill_name=skill_name,
+            user_input=user_input,
+            reply=partial_reply,
+            event_count=0,
+        )
+        
+        self.db.add(run_record)
 
-    def delete(self, session_id: str) -> None:
+        state.messages.append(ChatMessage(role="assistant",content=partial_reply))
+
+        record=self.db.query(SessionRecord).filter(SessionRecord.session_id==session_id).first()
+        if record:
+            record.state_json=json.dumps(state.model_dump(),ensure_ascii=False)
+
+        return run_record
+
+    def rename_session(self,session_id,new_name:str)->bool:
+        """输入：session_id、新名称。输出：找到并更新返回 True，找不到返回 False。"""
+        record=self.db.query(SessionRecord).filter(SessionRecord.session_id==session_id).first()
+        if not record:
+            return False
+        record.session_name=new_name
+        return True
+
+    def delete_session(self, session_id: str) -> bool:
         """输入：session_id。输出：无，副作用是删除这个 session 的主记录。"""
 
         record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
-        if record:
-            self.db.delete(record)
-
+        if not record:
+            return False
+        run_ids = [r.run_id for r in self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == session_id).all()]
+        for run_id in run_ids:
+            self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id == run_id).delete()
+        # 再删 run
+        self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == session_id).delete()
+        # 最后删 session
+        self.db.delete(record)
+        return True
     def list_run_records(self, session_id: str, run_id: Optional[str] = None) -> list[SessionRunRecord]:
         """输入：session_id、可选 run_id。输出：按顺序排列的 SessionRunRecord 列表。"""
 
@@ -178,3 +228,54 @@ class SqliteSessionStore:
             return None
 
         return AgentState.model_validate(json.loads(record.state_json))
+
+    def create_tool_call(
+            self,
+            *,
+            run_id:str,
+            tool_name:str,
+            tool_call_id:Optional[str],
+            input_json: Optional[str],
+    )->int:
+        """工具开始执行前调用。返回新建记录的id"""
+        record=ToolCallRecord(
+            run_id=run_id,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            status="running",
+            input_json=input_json,
+        )
+        self.db.add(record)
+        self.db.flush()
+        return record.id
+    
+    def finish_tool_call(
+            self,
+            *,
+            record_id:int,
+            status:str,
+            result_json:Optional[str]
+    )->None:
+        record = self.db.query(ToolCallRecord).filter(ToolCallRecord.id==record_id).first()
+        if record:
+            record.status=status
+            record.result_json=result_json
+            record.finished_at=func.now()
+    
+    def update_run_status(self, *, run_id: str, status: str) -> None:
+        """更新 run 的状态字段。"""
+        record = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        if record:
+            record.run_status = status
+
+    def get_run_detail(self, run_id: str):
+        run = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        if not run:
+            return None, []
+        tool_calls = (
+            self.db.query(ToolCallRecord)
+            .filter(ToolCallRecord.run_id == run_id)
+            .order_by(ToolCallRecord.id)
+            .all()
+        )
+        return run, tool_calls

@@ -251,3 +251,94 @@ select.tech-btn option {
 .blink {
   animation: blink 1.5s ease-in-out infinite;
 }
+
+@keyframes label-fade {
+  0%   { opacity: 0; transform: translateY(-4px); }
+  15%  { opacity: 1; transform: translateY(0); }
+  85%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(4px); }
+}
+.stream-label-cycle {
+  display: inline-block;
+  animation: label-fade 1.8s ease-in-out infinite;
+  color: var(--accent);
+}
+
+/* ---------------- Premium Chat Elements ---------------- */
+.message-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+  word-wrap: break-word;
+}
+
+.stopped-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(220, 80, 80, 0.1);
+  border: 1px solid rgba(220, 80, 80, 0.3);
+  color: #c06060;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+.message-text p { margin-bottom: 0.8em; }
+.message-text p:last-child { margin-bottom: 0; }
+
+.message-text strong {
+  font-weight: 600;
+  color: #fff;
+}
+
+.message-text code.inline-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #A78BFA;
+}
+
+/* Premium Code Blocks */
+.code-block {
+  background: #0D0D0D;
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 12px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.code-lang {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-dim);
+  background: rgba(255, 255, 255, 0.02);
+}
+.code-block pre {
+  padding: 12px;
+  overflow-x: auto;
+}
+.code-block code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #E5E7EB;
+}
+
+/* Premium Markdown Lists */
+.md-list {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+.md-list li {
+  position: relative;
+  margin-bottom: 6px;
+  line-height: 1.6;
+}

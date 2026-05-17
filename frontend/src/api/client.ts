@@ -27,11 +27,13 @@ async function* streamRun(
   session_id: string,
   user_input: string,
   agent_name?: string,
+  signal?: AbortSignal,
 ): AsyncGenerator<StreamFrame> {
   const res = await fetch(`${API_BASE}/run/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id, user_input, agent_name }),
+    signal,
   });
 
   if (!res.ok || !res.body) {
@@ -77,12 +79,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ session_id, user_input, agent_name }),
     }),
-  streamRun,
+  streamRun: (session_id: string, user_input: string, agent_name?: string, signal?: AbortSignal) =>
+    streamRun(session_id, user_input, agent_name, signal),
+  finalizeRun: (
+    session_id: string,
+    run_id: string,
+    user_input: string,
+    partial_reply: string,
+    agent_name?: string,
+  ) =>
+    fetchApi<{ ok: boolean }>(`/sessions/${session_id}/runs/${run_id}/finalize`, {
+      method: 'POST',
+      body: JSON.stringify({ user_input, partial_reply, agent_name }),
+    }),
   getTrace: (session_id: string) => fetchApi<TraceResponse>(`/sessions/${session_id}/trace`),
   getSkills: () => fetchApi<SkillMetadata[]>('/skills'),
   enableSkill: (skill_name: string) => fetchApi<SkillMetadata>(`/skills/${skill_name}/enable`, { method: 'POST' }),
   disableSkill: (skill_name: string) => fetchApi<SkillMetadata>(`/skills/${skill_name}/disable`, { method: 'POST' }),
   compactSession: (session_id: string) => fetchApi<CompactResponse>(`/compact`, { method: 'POST', body: JSON.stringify({ session_id, trigger_threshold: 1 }) }), // 手动 compact 传 trigger_threshold:1，跳过默认 12 条阈值，确保任何时候都能触发
   resetSession: (session_id: string) => fetchApi<{ok: boolean}>(`/reset`, { method: 'POST', body: JSON.stringify({ session_id }) }),
-  deleteSession: (session_id: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'DELETE' })
+  deleteSession: (session_id: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'DELETE' }),
+  renameSession: (session_id: string, session_name: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'PATCH', body: JSON.stringify({ session_name }) })
 };

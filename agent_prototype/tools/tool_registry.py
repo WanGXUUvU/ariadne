@@ -8,7 +8,7 @@ from .builtin.fs_read import build_read_file_tool_definition
 from .builtin.fs_list import build_list_dir_definition
 from .builtin.fs_write import build_write_file_tool_definition
 from .builtin.fs_search import build_search_text_definition
-
+from .builtin.web_search import build_web_search_tool_definition
 
 class ToolRegistry:  # 工具注册中心
     def __init__(self) -> None:
@@ -83,7 +83,7 @@ def build_default_tool_registry() -> ToolRegistry:
     registry.register(build_list_dir_definition())
     registry.register(build_write_file_tool_definition())
     registry.register(build_search_text_definition())
-
+    registry.register(build_web_search_tool_definition())
     return registry
 
 

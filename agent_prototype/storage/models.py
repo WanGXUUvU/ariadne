@@ -45,6 +45,7 @@ class SessionRunRecord(Base):
         nullable=False,
     )
     run_id = Column(String, unique=True, nullable=False)
+    run_status = Column(String,nullable=False,default="running")
     agent_name = Column(String, nullable=True, index=True)
     skill_name = Column(String, nullable=True, index=True)
     user_input = Column(Text, nullable=False)
@@ -60,7 +61,19 @@ class SessionRunRecord(Base):
         order_by="SessionRunEventRecord.event_index",
     )
 
+class ToolCallRecord(Base):
+    __tablename__ = "tool_call_records"
 
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String, ForeignKey("session_runs.run_id", ondelete="CASCADE"), index=True, nullable=False)
+    tool_name = Column(String, nullable=False)
+    tool_call_id = Column(String, nullable=True)   # LLM 分配的 ID
+    status = Column(String, nullable=False, default="running")  # running / completed / failed / timeout / cancelled
+    input_json = Column(Text, nullable=True)        # 工具入参
+    result_json = Column(Text, nullable=True)       # 工具结果
+    started_at = Column(DateTime, server_default=func.now(), nullable=False)
+    finished_at = Column(DateTime, nullable=True)   # 执行完才有
+    
 class SessionRunEventRecord(Base):
     """单次 run 下的逐条事件表。"""
 
