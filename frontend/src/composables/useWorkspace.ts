@@ -12,7 +12,7 @@ import type {
   ChildAgentInfo,
 } from '../types';
 import type { ViewMode } from '../types/ui';
-import { MOCK_AGENTS } from '../mock/ui-mocks';
+import type { UiAgentOption } from '../types/ui';
 
 const RESET_HISTORY_STORAGE_KEY = 'agent-build-reset-history-v1';
 const TIMELINE_STORAGE_KEY = 'agent-build-timelines-v1';
@@ -110,7 +110,8 @@ export function useWorkspace() {
   const traceRuns = ref<TraceRunSummary[]>([]);
   const skills = ref<SkillMetadata[]>([]);
 
-  const activeAgentId = ref<string>(MOCK_AGENTS[0].id);
+  const availableAgents = ref<UiAgentOption[]>([]);
+  const activeAgentId = ref<string>('default');
 
   const isInitializing = ref(true);
   const isChatLoading = ref(false);
@@ -224,7 +225,7 @@ export function useWorkspace() {
   );
 
   const activeAgent = computed(() =>
-    MOCK_AGENTS.find((a) => a.id === activeAgentId.value) ?? MOCK_AGENTS[0]
+    availableAgents.value.find((a) => a.id === activeAgentId.value) ?? availableAgents.value[0] ?? null
   );
 
   const loadSessions = async (preferredSessionId?: string | null) => {
@@ -541,9 +542,42 @@ export function useWorkspace() {
     }
   };
 
+  const fetchAgents = async () => {
+    try {
+      const data = await api.getAgents();
+      availableAgents.value = (data ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        description: a.description ?? '',
+        icon: '\ud83e\udd16',
+        is_builtin: a.is_builtin,
+      }));
+      // 如果当前 activeAgentId 不在列表里，回落到第一个
+      if (availableAgents.value.length > 0 && !availableAgents.value.find((a) => a.id === activeAgentId.value)) {
+        activeAgentId.value = availableAgents.value[0].id;
+      }
+    } catch {
+      // 加载失败时保持空列表，不阻塞其他初始化
+    }
+  };
+
+  const saveAgent = async (definition: { id: string; name: string; description: string; system_prompt: string; tool_names: string[] | null }) => {
+    await api.saveAgent(definition);
+    await fetchAgents();
+  };
+
+  const deleteAgent = async (agent_id: string) => {
+    await api.deleteAgent(agent_id);
+    await fetchAgents();
+    // 如果删的是当前选中的 agent，回退到 default
+    if (activeAgentId.value === agent_id) {
+      activeAgentId.value = 'default';
+    }
+  };
+
   const initializeWorkspace = async () => {
     isInitializing.value = true;
-    await Promise.all([loadSessions(), loadSkills()]);
+    await Promise.all([loadSessions(), loadSkills(), fetchAgents()]);
     isInitializing.value = false;
   };
 
@@ -591,6 +625,9 @@ export function useWorkspace() {
     deleteSession,
     renameSession,
     toggleSkill,
-    availableAgents: MOCK_AGENTS,
+    availableAgents,
+    customAgents: computed(() => availableAgents.value.filter(a => !a.is_builtin)),
+    saveAgent,
+    deleteAgent,
   };
 }

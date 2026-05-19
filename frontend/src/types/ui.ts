@@ -5,4 +5,5 @@ export interface UiAgentOption {
   name: string;
   description: string;
   icon: string;
+  is_builtin?: boolean;
 }

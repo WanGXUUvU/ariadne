@@ -41,7 +41,14 @@ class SqliteAgentDefinitionStore:
             record.definition_json=definition_json
 
         self.db.commit()
-        
+    
+    def list_all(self)->list[AgentDefinition]:
+        records=self.db.query(AgentDefinitionRecord).all()
+        result = []
+        for record in records:
+            data=json.loads(record.definition_json)
+            result.append(AgentDefinition.model_validate(data))
+        return result
 
     def get_or_default(self)->AgentDefinition:
         """输入：无。输出：default 的 AgentDefinition，不存在时返回内存默认定义。"""
@@ -51,3 +58,11 @@ class SqliteAgentDefinitionStore:
             return definition
         
         return DEFAULT_AGENT_DEFINITION
+    
+    def delete_agent(self,agent_id:str):
+        """输入：需要删除的agent_id。 输出：删除的AgentDefinition"""
+
+        record=self.db.query(AgentDefinitionRecord).filter(AgentDefinitionRecord.agent_id==agent_id).first()
+        if record:
+            self.db.delete(record)
+            self.db.commit()

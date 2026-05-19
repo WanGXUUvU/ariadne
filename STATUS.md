@@ -2,7 +2,7 @@
 
 ## Current Status
 - Phase: done
-- Task: specs/TASK-040.md
+- Task: specs/TASK-041.md
 - Gate: Verify / Review
 - Allowed Now: next task selection
 - Lane: Fast
@@ -22,6 +22,7 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
+| 2026-05-19 | `TASK-041` 收口 | Verify / Review | Agent 管理全链路完成：builtin agent 从 .md 文件加载（is_builtin 标记）、自定义 agent CRUD（POST/DELETE /agents）、前端 AgentManager 面板（新建/编辑/删除）、工具多选下拉（GET /tools）、dropdown 绑定真实后端数据替换 MOCK_AGENTS。 |
 | 2026-05-18 | 子 Agent 面板 bug 修复 & code review | Verify / Review | 修复 save_partial_run 查错表、_global_futures 内存泄漏、子 Agent 未透传 RUN_MODEL；前端修复 AgentEvent 导入缺失、extractChildAgents 状态硬编码、localStorage 无限增长；子 Agent 最终输出支持 Markdown 渲染，formatContent 提取为共享工具；面板滚动问题修复。 |
 | 2026-05-17 | `TASK-040` 收口 | Verify / Review | 多 Agent 子任务模型完成：parent_run_id 字段+migration、create_child_run/get_children_runs、spawn_child_agent 工具、build_run_registry 动态注册、5个单测全通过。 |
 | 2026-05-14 | `TASK-028` 收口并切换到 `TASK-029` | Verify / Review | 前端完成 fetch+ReadableStream 解析 SSE，实现打字机效果及实时 Trace 面板，完善刷新后的历史统一渲染。 |
