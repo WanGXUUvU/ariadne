@@ -39,8 +39,6 @@ class SqliteAgentDefinitionStore:
             self.db.add(record)
         else:
             record.definition_json=definition_json
-
-        self.db.commit()
     
     def list_all(self)->list[AgentDefinition]:
         records=self.db.query(AgentDefinitionRecord).all()
@@ -65,4 +63,3 @@ class SqliteAgentDefinitionStore:
         record=self.db.query(AgentDefinitionRecord).filter(AgentDefinitionRecord.agent_id==agent_id).first()
         if record:
             self.db.delete(record)
-            self.db.commit()

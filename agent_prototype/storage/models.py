@@ -105,3 +105,16 @@ class AgentDefinitionRecord(Base):
     agent_id = Column(String, primary_key=True, index=True)
     definition_json = Column(Text, nullable=False)
     update_at = Column(DateTime, server_default=func.now())
+
+class PendingApproval(Base):
+    """待审批工具调用记录表。"""
+
+    __tablename__ = "pending_approvals"
+
+    id         = Column(String, primary_key=True)          # UUID，审批单号
+    session_id = Column(String, nullable=False, index=True) # 关联 session
+    run_id     = Column(String, nullable=False)             # 关联 run
+    tool_name  = Column(String, nullable=False)             # 要执行的工具
+    arguments  = Column(Text, nullable=False)               # 工具参数 JSON 字符串
+    status     = Column(String, nullable=False, default="pending")  # pending / approved / rejected
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)

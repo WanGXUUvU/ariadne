@@ -2,14 +2,13 @@ import json  # 解析工具参数 JSON
 from typing import  Optional  # 类型标注
 
 from ..core.schemas import ToolError, ToolResult
-from ..core.tool_types import ToolDefinition
+from ..core.tool_types import ToolDefinition,RiskLevel
 from .builtin.echo import build_echo_tool_definition
 from .builtin.fs_read import build_read_file_tool_definition
 from .builtin.fs_list import build_list_dir_definition
 from .builtin.fs_write import build_write_file_tool_definition
 from .builtin.fs_search import build_search_text_definition
 from .builtin.web_search import build_web_search_tool_definition
-from .builtin.spawn_child_agent import build_spawn_child_agent_tool
 from .builtin.check_child_status import build_check_child_status_tool
 from .builtin.wait_child_agent import build_wait_child_agent_tool
 
@@ -39,11 +38,16 @@ class ToolRegistry:  # 工具注册中心
 
         return [tool.schema for tool in tools]  # 只返回 schema 列表
 
+    def get_risk_level(self,name:str)->RiskLevel:
+        tool=self._tools.get(name)
+        if tool is None:
+            return RiskLevel.SAFE
+        return tool.risk_level
     def execute_tool_call(self, name: str, arguments: str) -> ToolResult:
         """输入：工具名、JSON 字符串参数。输出：统一的 ToolResult。"""
         tool = self._tools.get(name)  # 按名字找工具
         if tool is None:
-            return ToolResult(  
+            return ToolResult(
                 ok=False,
                 error=ToolError(
                     code="unknown_tool",  # 错误码
