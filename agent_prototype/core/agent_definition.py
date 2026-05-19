@@ -7,6 +7,7 @@ class AgentDefinition(BaseModel):  # Agent 产品层定义
     system_prompt: str = Field(default="你是一个助手")
     description: Optional[str] = None
     tool_names: Optional[list[str]] = None  # 只存工具名；None 表示默认不限制
+    is_builtin: bool = False  # True 表示来自内置 .md 文件，不可删除
 
 DEFAULT_AGENT_DEFINITION = AgentDefinition()  # 默认 skill 不限制工具，交给 registry 暴露全部
 ASSISTANT_AGENT_DEFINITION= AgentDefinition(

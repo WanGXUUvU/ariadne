@@ -6,10 +6,12 @@ import SessionSidebar from './components/SessionSidebar.vue';
 import ChatPanel from './components/ChatPanel.vue';
 import ChildAgentPanel from './components/ChildAgentPanel.vue';
 import PluginMarketplace from './components/PluginMarketplace.vue';
+import AgentManager from './components/AgentManager.vue';
 import type { ChildAgentInfo } from './types';
 
 const workspace = useWorkspace();
 const showPluginsModal = ref(false);
+const showAgentsModal = ref(false);
 
 // 子 Agent 标签页管理
 const openChildAgents = ref<ChildAgentInfo[]>([]);
@@ -54,6 +56,8 @@ const sessionTitle = computed(() => {
 const handleNavAction = (action: string) => {
   if (action === 'open-plugins') {
     showPluginsModal.value = true;
+  } else if (action === 'open-agents') {
+    showAgentsModal.value = true;
   }
 };
 
@@ -126,7 +130,7 @@ onMounted(() => {
           :infoMsg="workspace.infoMsg.value"
           :hasSession="!!workspace.activeSessionId.value"
           :sessionTitle="sessionTitle"
-          :agents="workspace.availableAgents"
+          :agents="workspace.availableAgents.value"
           :activeAgentId="workspace.activeAgentId.value"
           :traceRuns="workspace.traceRuns.value"
           :isStreaming="workspace.isStreaming.value"
@@ -164,6 +168,15 @@ onMounted(() => {
       @close="showPluginsModal = false"
       @toggle="workspace.toggleSkill"
       @clearError="workspace.errorMsg.value = null"
+    />
+
+    <!-- Agent Manager Modal -->
+    <AgentManager
+      :isOpen="showAgentsModal"
+      :agents="workspace.customAgents.value"
+      @close="showAgentsModal = false"
+      @save="workspace.saveAgent"
+      @delete="workspace.deleteAgent"
     />
   </div>
 </template>
