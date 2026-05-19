@@ -1,6 +1,6 @@
 from pathlib import Path  # 处理文件路径
 
-from ...core.tool_types import ToolDefinition  # 导入工具定义
+from ...core.tool_types import ToolDefinition,RiskLevel  # 导入工具定义
 
 
 def write_file(path: str, content: str) -> str:  # 把内容写入文件
@@ -47,4 +47,5 @@ def build_write_file_tool_definition() -> ToolDefinition:  # 构造 registry 需
         name="write_file",  # 工具名
         schema=WRITE_FILE_SCHEMA,  # schema
         handler=write_file,  # 真正执行函数
+        risk_level=RiskLevel.WRITE
     )

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional,AsyncIterator,Union
 import asyncio
 
-from ..core.schemas import AgentEvent, ChatMessage, ToolCall
+from ..core.schemas import AgentEvent, ChatMessage, ToolCall,ApprovalPolicy,RiskLevel
 from ..tools.tool_registry import ToolRegistry
 from concurrent.futures import ThreadPoolExecutor
 
@@ -96,6 +96,15 @@ def handle_tool_calls(
         next_event_index=current_index,
     )
 
+def needs_approval(policy:ApprovalPolicy,risk:RiskLevel)->bool:
+    if policy == ApprovalPolicy.NEVER:
+        return False
+    if policy==ApprovalPolicy.UNTRUSTED:
+        return risk !=RiskLevel.SAFE
+    if policy == ApprovalPolicy.ON_REQUEST:
+        return risk==RiskLevel.DANGER
+    return False
+
 async def async_handle_tool_calls(
     tool_registry: ToolRegistry,
     tool_calls: list[ToolCall],
@@ -103,6 +112,8 @@ async def async_handle_tool_calls(
     event_index: int,
     on_tool_start=None,
     on_tool_finish=None,
+    approval_policy:ApprovalPolicy=ApprovalPolicy.NEVER,
+    on_approval_required=None,
 ) -> AsyncIterator[Union[AgentEvent, ToolTurnResult]]:
     """处理一轮模型返回的 tool calls。 AsyncIterator 是告诉类型检查器"这个函数会逐条产出 AgentEvent 或 ToolTurnResult"""
 
@@ -123,6 +134,24 @@ async def async_handle_tool_calls(
             raise ValueError(f"Tool not allowed:{tool_call.function.name}")
         
         record_id=None
+        risk = tool_registry.get_risk_level(tool_call.function.name)
+
+        if needs_approval(approval_policy,risk):
+            approval_id = None
+            if on_approval_required:
+                approval_id = on_approval_required(
+                    tool_call.function.name,
+                    tool_call.function.arguments,
+                )
+            yield AgentEvent(
+                index=current_index,
+                type="approval_required",
+                tool_name=tool_call.function.name,
+                tool_call_id=tool_call.id,
+                content=approval_id or tool_call.function.arguments,
+            )
+            current_index+=1
+            continue
         if on_tool_start:
             record_id=on_tool_start(
                 tool_call.function.name,

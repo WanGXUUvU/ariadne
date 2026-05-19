@@ -93,7 +93,7 @@ class AgentEvent(BaseModel):
     """一次 run 中的结构化事件。"""
 
     index: int
-    type: Literal["assistant_tool_call", "tool_result", "tool_error", "final_answer"]
+    type: Literal["assistant_tool_call", "tool_result", "tool_error", "final_answer","approval_required","approval_result"]
     content: Optional[str] = None
     tool_name: Optional[str] = None
     tool_call_id: Optional[str] = None
@@ -307,3 +307,8 @@ class PermissionProfile(BaseModel):
     sandbox_mode:SandboxMode
     approval_policy:ApprovalPolicy
     workspace_path: Optional[str] = None
+
+class RiskLevel(str, Enum):
+    SAFE   = "safe"    # 只读，永远不需要审批
+    WRITE  = "write"   # 写操作，视策略决定
+    DANGER = "danger"  # 高危，除非 never 否则都要审批

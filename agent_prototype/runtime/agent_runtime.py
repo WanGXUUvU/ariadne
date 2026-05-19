@@ -13,12 +13,12 @@
 from typing import Iterator, Optional, Union,AsyncIterator
 
 from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
-from ..core.schemas import AgentEvent, AgentInput, AgentOutput, AgentState, ChatMessage, RunMetadata,ToolCall, ToolCallFunction
+from ..core.schemas import AgentEvent, AgentInput, AgentOutput, AgentState, ChatMessage, RunMetadata,ToolCall, ToolCallFunction,ApprovalPolicy
 from ..model.adapter import ModelAdapter
 from ..tools.tool_registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
 from .message_builder import build_model_request
 from .response_handler import build_final_turn
-from .tool_executor import handle_tool_calls, async_handle_tool_calls, ToolTurnResult
+from .tool_executor import handle_tool_calls, async_handle_tool_calls
 
 class Agent:
 
@@ -29,6 +29,7 @@ class Agent:
         tool_registry: Optional[ToolRegistry] = None,
         allow_tool_names: Optional[list[str]] = None,
         model_adapter:Optional[ModelAdapter]=None,
+        approval_policy:ApprovalPolicy=ApprovalPolicy.NEVER
     ):
         """输入：可选 state、agent 定义、工具注册表、允许工具名列表。输出：初始化后的 Agent 实例。"""
         self.state = state or AgentState()
@@ -36,6 +37,7 @@ class Agent:
         self.tool_registry = tool_registry or DEFAULT_TOOL_REGISTRY
         self.allow_tool_names = allow_tool_names if allow_tool_names is not None else self.definition.tool_names
         self.model_adapter = model_adapter
+        self.approval_policy=approval_policy
 
     def run(self, agent_input: AgentInput) -> AgentOutput:
         """输入：AgentInput 请求对象。输出：包含 reply、state、events 的 AgentOutput。"""
@@ -166,7 +168,7 @@ class Agent:
             self.state.messages.append(assistant_message)
             break
 
-    async def async_stream_run(self, agent_input: AgentInput,on_tool_start=None,on_tool_finish=None,) -> AsyncIterator[Union[AgentEvent, str]]:
+    async def async_stream_run(self, agent_input: AgentInput,on_tool_start=None,on_tool_finish=None,on_approval_required=None) -> AsyncIterator[Union[AgentEvent, str]]:
         """输入：AgentInput。输出：逐步 yield AgentEvent（工具阶段）或 str（delta，最终回答阶段）。"""
 
         event_index = 0
@@ -232,6 +234,8 @@ class Agent:
                     event_index,
                     on_tool_start=on_tool_start,
                     on_tool_finish=on_tool_finish,
+                    approval_policy=self.approval_policy,
+                    on_approval_required=on_approval_required,
                 ):
                     if isinstance(item,AgentEvent):
                         yield item

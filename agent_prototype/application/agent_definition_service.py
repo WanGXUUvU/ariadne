@@ -31,8 +31,10 @@ def list_agents_service(db: Session) -> list[AgentDefinition]:
 def delete_agent_service(agent_id:str,db:Session):
     store=SqliteAgentDefinitionStore(db)
     store.delete_agent(agent_id)
+    db.commit()
 
 def save_agent_service(definition:AgentDefinition,db:Session)->AgentDefinition:
     store=SqliteAgentDefinitionStore(db)
     store.save(definition)
+    db.commit()
     return definition

@@ -24,6 +24,10 @@ from .agent_definition_service import load_agent_definition_service  # 加载 ag
 from .compact_service import _compact_in_memory  # 自动 compact 内存计算  # 这一行把压缩逻辑交给独立文件
 from ..model.openai_adapter import ChatCompletionsAdapter
 from ..tools.tool_registry import build_run_registry
+from ..storage.stores.approval_store import SqliteApprovalStore
+from ..core.schemas import ApprovalPolicy
+from .session_service import PROFILES
+from ..storage.models import SessionRecord
 
 RUN_MODEL = os.getenv("RUN_MODEL", "deepseek-v4-flash")
 _executor = ThreadPoolExecutor(max_workers=8)
@@ -37,7 +41,7 @@ def build_reply_preview(reply: str, max_len: int = 120) -> str:
     return text[:max_len]
 
 
-def _prepare_run_context(agent_input: AgentInput, db: Session) -> tuple[AgentState, str, str]:
+def _prepare_run_context(agent_input: AgentInput, db: Session) -> tuple[AgentState, str, str,ApprovalPolicy]:
     """输入：AgentInput 请求对象、数据库会话。输出：运行前准备好的 state、runtime definition、agent 名称。"""
 
     store = SqliteSessionStore(db)
@@ -59,8 +63,11 @@ def _prepare_run_context(agent_input: AgentInput, db: Session) -> tuple[AgentSta
         list_skills=list_skills,
         load_skill_content=load_skill_content,
     )
+    record=db.query(SessionRecord).filter(SessionRecord.session_id==agent_input.session_id).first()
+    profile_name=record.permission_profile if record else "conservative"
+    approval_policy=PROFILES.get(profile_name,PROFILES["conservative"]).approval_policy
 
-    return state, runtime_definition, effective_agent_name
+    return state, runtime_definition, effective_agent_name,approval_policy
 
 
 def _persist_run_result(
@@ -108,6 +115,7 @@ def _persist_run_result(
 
     return output
 
+
 def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
     """输入：AgentInput 请求对象、数据库会话。输出：AgentOutput 结果对象。
 
@@ -117,14 +125,15 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
     """
 
     store = SqliteSessionStore(db)
-    state, runtime_definition, effective_agent_name = _prepare_run_context(agent_input, db)
+    state, runtime_definition, effective_agent_name, approval_policy = _prepare_run_context(agent_input, db)
     run_id = uuid.uuid4().hex
     agent = Agent(
         state=state,
         definition=runtime_definition,
         allow_tool_names=runtime_definition.tool_names,
         model_adapter=ChatCompletionsAdapter(model=RUN_MODEL),
-        tool_registry=build_run_registry(parent_run_id=run_id, session_id=agent_input.session_id, executor=_executor, futures=_global_futures)
+        tool_registry=build_run_registry(parent_run_id=run_id, session_id=agent_input.session_id, executor=_executor, futures=_global_futures),
+        approval_policy=approval_policy,
     )
 
     output = agent.run(agent_input)
@@ -141,14 +150,15 @@ def run_agent_service(agent_input: AgentInput, db: Session) -> AgentOutput:
 def stream_agent_service(agent_input:AgentInput,db:Session)->Iterator[str]:
 
     store = SqliteSessionStore(db)
-    state, runtime_definition, effective_agent_name = _prepare_run_context(agent_input, db)
+    state, runtime_definition, effective_agent_name, approval_policy = _prepare_run_context(agent_input, db)
     run_id = uuid.uuid4().hex
     agent = Agent(
         state=state,
         definition=runtime_definition,
         allow_tool_names=runtime_definition.tool_names,
         model_adapter=ChatCompletionsAdapter(model=RUN_MODEL),
-        tool_registry=build_run_registry(parent_run_id=run_id, session_id=agent_input.session_id, executor=_executor, futures=_global_futures)
+        tool_registry=build_run_registry(parent_run_id=run_id, session_id=agent_input.session_id, executor=_executor, futures=_global_futures),
+        approval_policy=approval_policy,
     )
 
     yield _sse_frame(StreamFrame(
@@ -219,13 +229,24 @@ async def async_stream_agent_service(agent_input:AgentInput,db:Session)->AsyncIt
             result_json=result_json,
         )
         db.commit()
-    state, runtime_definition, effective_agent_name = _prepare_run_context(agent_input, db)
+    def on_approval_required(tool_name, arguments):
+        approval_store = SqliteApprovalStore(db)
+        record = approval_store.create(
+            session_id=agent_input.session_id,
+            run_id=run_id,
+            tool_name=tool_name,
+            arguments=arguments,
+        )
+        db.commit()
+        return record.id
+    state, runtime_definition, effective_agent_name, approval_policy = _prepare_run_context(agent_input, db)
     agent = Agent(
         state=state,
         definition=runtime_definition,
         allow_tool_names=runtime_definition.tool_names,
         model_adapter=ChatCompletionsAdapter(model=RUN_MODEL),
         tool_registry=build_run_registry(parent_run_id=run_id, session_id=agent_input.session_id, executor=_executor, futures=_global_futures),
+        approval_policy=approval_policy,
     )
 
     completed=False
@@ -239,7 +260,7 @@ async def async_stream_agent_service(agent_input:AgentInput,db:Session)->AsyncIt
 
         events:list[AgentEvent]=[]
 
-        async for item in agent.async_stream_run(agent_input,on_tool_start=on_tool_start,on_tool_finish=on_tool_finish,):
+        async for item in agent.async_stream_run(agent_input,on_tool_start=on_tool_start,on_tool_finish=on_tool_finish,on_approval_required=on_approval_required,):
             if isinstance(item,str):
                 partial_reply+=item
                 yield _sse_frame(StreamFrame(type="delta",data={"content":item}))
