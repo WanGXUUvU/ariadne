@@ -1,8 +1,26 @@
 import uuid  # 生成新的 session_id  # 这一行负责唯一 ID
 from sqlalchemy.orm import Session  # 数据库会话类型  # 这一行负责事务上下文
 
-from ..core.schemas import AgentState, CreateSessionInput, ResetInput, SessionSummary  # session 相关 schema  # 这一行负责输入输出类型
+from ..core.schemas import AgentState, CreateSessionInput, ResetInput, SessionSummary,PermissionProfile,SandboxMode,ApprovalPolicy  # session 相关 schema  # 这一行负责输入输出类型
 from ..storage.stores.session_store import SqliteSessionStore  # session 持久化仓库  # 这一行负责读写数据库记录
+
+PROFILES = {
+    "conservative": PermissionProfile(
+        name="conservative",
+        sandbox_mode=SandboxMode.READ_ONLY,
+        approval_policy=ApprovalPolicy.UNTRUSTED,
+    ),
+    "standard": PermissionProfile(
+        name="standard",
+        sandbox_mode=SandboxMode.WORKSPACE_WRITE,
+        approval_policy=ApprovalPolicy.ON_REQUEST,
+    ),
+    "full-auto": PermissionProfile(
+        name="full-auto",
+        sandbox_mode=SandboxMode.DANGER_FULL_ACCESS,
+        approval_policy=ApprovalPolicy.NEVER,
+    ),
+}
 
 def create_session_service(payload:CreateSessionInput,db:Session)->SessionSummary:
     """输入：CreateSessionInput 请求对象、数据库会话。输出：新建 session 的摘要信息。"""  # 这个 service 负责创建空白 session，但不运行 agent
@@ -19,6 +37,7 @@ def create_session_service(payload:CreateSessionInput,db:Session)->SessionSummar
             last_agent_name=None,  # 新建空会话时还没有运行过 agent
             last_skill_name=None,  # 新建空会话时也还没有使用任何 skill
             last_reply_preview=None,  # 没有回复，自然没有 reply preview
+            
         )
         db.commit()  # 把新 session 真正提交到数据库
         db.refresh(record)  # 刷新 ORM 对象，确保 created_at / updated_at 等数据库字段可读
@@ -35,6 +54,7 @@ def create_session_service(payload:CreateSessionInput,db:Session)->SessionSummar
         last_skill_name=record.last_skill_name,  # 空会话还没有最近 skill，应该是 None
         message_count=record.message_count,  # 空会话消息数应为 0
         last_reply_preview=record.last_reply_preview,  # 空会话没有最后回复摘要
+        permission_profile=record.permission_profile,  # 权限档位，新建默认 conservative
     )
 
 

@@ -36,6 +36,7 @@ def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:  #
             last_skill_name=record.last_skill_name,  # 最近 skill
             message_count=record.message_count,  # 消息数
             last_reply_preview=record.last_reply_preview,  # 回复预览
+            permission_profile=record.permission_profile,  # 权限档位
         )  # 单条 summary 结束
         for record in records  # 遍历数据库记录
     ]  # 列表结束
@@ -60,6 +61,7 @@ def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionD
         last_skill_name=record.last_skill_name,  # 最近 skill
         message_count=record.message_count,  # 消息数
         state=state,  # session state
+        permission_profile=record.permission_profile,  # 权限档位
     )  # 响应结束
 
 @router.patch("/sessions/{session_id}")

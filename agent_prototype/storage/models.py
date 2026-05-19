@@ -27,6 +27,7 @@ class SessionRecord(Base):
     last_skill_name = Column(String, nullable=True, index=True)
     message_count = Column(Integer, nullable=False, default=0, server_default="0")
     last_reply_preview = Column(String(120), nullable=True)
+    permission_profile=Column(String,nullable=False,default="conservative")
 
 
 class SessionRunRecord(Base):
