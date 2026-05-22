@@ -7,11 +7,13 @@ import ChatPanel from './components/ChatPanel.vue';
 import ChildAgentPanel from './components/ChildAgentPanel.vue';
 import PluginMarketplace from './components/PluginMarketplace.vue';
 import AgentManager from './components/AgentManager.vue';
+import SettingsPanel from './components/SettingsPanel.vue';
 import type { ChildAgentInfo } from './types';
 
 const workspace = useWorkspace();
 const showPluginsModal = ref(false);
 const showAgentsModal = ref(false);
+const showSettingsModal = ref(false);
 
 // 子 Agent 标签页管理
 const openChildAgents = ref<ChildAgentInfo[]>([]);
@@ -58,6 +60,8 @@ const handleNavAction = (action: string) => {
     showPluginsModal.value = true;
   } else if (action === 'open-agents') {
     showAgentsModal.value = true;
+  } else if (action === 'open-settings' || action === 'open-models') {
+    showSettingsModal.value = true;
   }
 };
 
@@ -93,11 +97,21 @@ const handleCloseChildAgent = (index: number) => {
 
 onMounted(() => {
   workspace.initializeWorkspace();
+  // 读取本地缓存主题并应用到 body 元素
+  const savedTheme = localStorage.getItem('agent-build-theme') || 'default';
+  document.body.className = `theme-${savedTheme}`;
 });
 </script>
 
 <template>
   <div class="app-shell">
+    <!-- 💡 赛博深空漂移星云：三色霓虹环境光斑 -->
+    <div class="ambient-glow-blobs">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+
     <div v-if="workspace.isInitializing.value" class="layout-loading" style="color: var(--text-secondary);">
       INITIALIZING WORKSPACE...
     </div>
@@ -136,6 +150,17 @@ onMounted(() => {
           :isStreaming="workspace.isStreaming.value"
           :streamingTimeline="workspace.streamingTimeline.value"
           :lastCompletedRun="workspace.lastCompletedRun.value"
+          :isAwaitingApproval="workspace.isAwaitingApproval.value"
+          :pendingApprovalInfo="workspace.pendingApprovalInfo.value"
+          :permissionProfile="workspace.permissionProfile.value"
+          :contextTokens="workspace.activeSession.value?.context_tokens ?? 0"
+          :contextLength="workspace.activeModelContextLength.value"
+          :sessionId="workspace.activeSessionId.value"
+          :modelId="workspace.modelId.value"
+          :providerId="workspace.modelProviderId.value"
+          :thinkingEnabled="workspace.thinkingEnabled.value"
+          :thinkingEffort="workspace.thinkingEffort.value"
+          :sessionLoading="workspace.isChatLoading.value"
           @update:activeAgentId="id => workspace.activeAgentId.value = id"
           @send="workspace.sendMessage"
           @errorDismiss="workspace.errorMsg.value = null"
@@ -143,6 +168,13 @@ onMounted(() => {
           @compact="workspace.compactSession"
           @reset="workspace.resetSession"
           @stop="workspace.stopStreaming"
+          @approve="workspace.approveAction"
+          @reject="workspace.rejectAction"
+          @approveAll="workspace.approveAllAction"
+          @update:permissionProfile="workspace.updatePermissionProfile"
+          @update:model="val => workspace.updateModelConfig({ model_id: val.modelId, model_provider_id: val.providerId })"
+          @update:thinkingEnabled="val => workspace.updateModelConfig({ thinking_enabled: val })"
+          @update:thinkingEffort="val => workspace.updateModelConfig({ thinking_effort: val })"
         />
         
         <!-- 垂直分割线 + 子 Agent 右侧面板 -->
@@ -177,6 +209,12 @@ onMounted(() => {
       @close="showAgentsModal = false"
       @save="workspace.saveAgent"
       @delete="workspace.deleteAgent"
+    />
+
+    <!-- Settings Modal -->
+    <SettingsPanel
+      :isOpen="showSettingsModal"
+      @close="() => { showSettingsModal = false; workspace.loadEnabledModels(); }"
     />
   </div>
 </template>

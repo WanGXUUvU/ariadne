@@ -1,6 +1,5 @@
 {
   "disabled": [
-    "codex-native-lite-project-workflow",
     "codex-native-project-workflow",
     "device-point-import-builder",
     "doc",

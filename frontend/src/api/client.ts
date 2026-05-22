@@ -1,4 +1,4 @@
-import type { RunResponse, SessionDetail, SessionSummary, SkillMetadata, TraceResponse, CompactResponse, StreamFrame } from '../types';
+import type { RunResponse, SessionDetail, SessionSummary, SkillMetadata, TraceResponse, CompactResponse, StreamFrame, ApprovalInfo } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -29,12 +29,31 @@ async function* streamRun(
   agent_name?: string,
   signal?: AbortSignal,
 ): AsyncGenerator<StreamFrame> {
-  const res = await fetch(`${API_BASE}/run/stream`, {
+  yield* streamSse(`${API_BASE}/run/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id, user_input, agent_name }),
     signal,
   });
+}
+
+// 审批操作 SSE 流（approve / reject / approve_all）
+async function* streamApproval(
+  approvalId: string,
+  action: 'approve' | 'reject' | 'approve_all',
+  signal?: AbortSignal,
+): AsyncGenerator<StreamFrame> {
+  yield* streamSse(`${API_BASE}/approvals/${approvalId}/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+    signal,
+  });
+}
+
+// 公共 SSE 帧读取器
+async function* streamSse(url: string, init: RequestInit): AsyncGenerator<StreamFrame> {
+  const res = await fetch(url, init);
 
   if (!res.ok || !res.body) {
     throw new Error(`Stream request failed: ${res.status}`);
@@ -101,7 +120,7 @@ export const api = {
   getSkills: () => fetchApi<SkillMetadata[]>('/skills'),
   enableSkill: (skill_name: string) => fetchApi<SkillMetadata>(`/skills/${skill_name}/enable`, { method: 'POST' }),
   disableSkill: (skill_name: string) => fetchApi<SkillMetadata>(`/skills/${skill_name}/disable`, { method: 'POST' }),
-  compactSession: (session_id: string) => fetchApi<CompactResponse>(`/compact`, { method: 'POST', body: JSON.stringify({ session_id, trigger_threshold: 1 }) }), // 手动 compact 传 trigger_threshold:1，跳过默认 12 条阈值，确保任何时候都能触发
+  compactSession: (session_id: string) => fetchApi<CompactResponse>(`/compact`, { method: 'POST', body: JSON.stringify({ session_id, trigger_threshold: 1, force: true }) }), // 手动 compact 传 force:true，跳过 token 占用率阈值，确保任何时候都能触发
   resetSession: (session_id: string) => fetchApi<{ok: boolean}>(`/reset`, { method: 'POST', body: JSON.stringify({ session_id }) }),
   deleteSession: (session_id: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'DELETE' }),
   renameSession: (session_id: string, session_name: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'PATCH', body: JSON.stringify({ session_name }) }),
@@ -114,4 +133,15 @@ export const api = {
       body: JSON.stringify(definition),
     }),
   deleteAgent: (agent_id: string) => fetchApi<null>(`/agents/${agent_id}`, { method: 'DELETE' }),
+  // 审批操作
+  getApproval: (approval_id: string) => fetchApi<ApprovalInfo>(`/approvals/${approval_id}`),
+  streamApprove: (approval_id: string, signal?: AbortSignal) => streamApproval(approval_id, 'approve', signal),
+  streamReject: (approval_id: string, signal?: AbortSignal) => streamApproval(approval_id, 'reject', signal),
+  streamApproveAll: (approval_id: string, signal?: AbortSignal) => streamApproval(approval_id, 'approve_all', signal),
+  // 更新 session permission profile
+  updateSessionProfile: (session_id: string, permission_profile: string) =>
+    fetchApi<{ ok: boolean }>(`/sessions/${session_id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ permission_profile }),
+    }),
 };

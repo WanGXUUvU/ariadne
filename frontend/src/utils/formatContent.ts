@@ -9,8 +9,23 @@ export function formatContent(text: string | null): string {
   let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   html = html.replace(/```([\w-]*)\n([\s\S]*?)```/g, (_match, lang, code) => {
-    const langLabel = lang ? `<div class="code-lang mono-label">${lang}</div>` : '';
-    return `<div class="code-block">${langLabel}<pre><code>${code}</code></pre></div>`;
+    const cleanLang = lang ? lang.trim().toLowerCase() : 'code';
+    
+    // 💡 构造极奢代码头部，包含语言类型标签和带 SVG 图标的 Copy 按钮
+    const headerHtml = `
+      <div class="code-header">
+        <span class="code-lang">${cleanLang}</span>
+        <button class="copy-code-btn" type="button">
+          <svg class="copy-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span class="copy-text">Copy</span>
+        </button>
+      </div>
+    `.trim();
+
+    return `<div class="code-block">${headerHtml}<pre><code>${code}</code></pre></div>`;
   });
 
   html = html.replace(/((?:^\|.+\|$\n?){2,})/gm, (tableBlock) => {

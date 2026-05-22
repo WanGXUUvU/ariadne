@@ -4,11 +4,10 @@
 上层代码通过这些模型读写 SQLite，但不应该把 ORM 结构直接暴露给前端。
 """
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func,JSON,UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .db import Base
-
 
 class SessionRecord(Base):
     """session 主表。
@@ -28,6 +27,12 @@ class SessionRecord(Base):
     message_count = Column(Integer, nullable=False, default=0, server_default="0")
     last_reply_preview = Column(String(120), nullable=True)
     permission_profile=Column(String,nullable=False,default="conservative")
+    context_tokens=Column(Integer,nullable=True)
+    # 模型选择（可 NULL，NULL 表示用环境变量 RUN_MODEL）
+    model_provider_id = Column(Integer, ForeignKey("provider_configs.id", ondelete="SET NULL"), nullable=True)
+    model_id          = Column(String, nullable=True)
+    thinking_enabled  = Column(Integer, nullable=False, default=0)   # 0/1
+    thinking_effort   = Column(String, nullable=False, default="medium")
 
 
 class SessionRunRecord(Base):
@@ -54,7 +59,7 @@ class SessionRunRecord(Base):
     reply = Column(Text, nullable=False)
     event_count = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    finished_at = Column(DateTime,nullable=True)
+    finished_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     # `relationship()` 让 SQLAlchemy 知道父子表之间的对象关系。
     events = relationship(
@@ -115,6 +120,42 @@ class PendingApproval(Base):
     session_id = Column(String, nullable=False, index=True) # 关联 session
     run_id     = Column(String, nullable=False)             # 关联 run
     tool_name  = Column(String, nullable=False)             # 要执行的工具
+    tool_call_id = Column(String, nullable=True)
     arguments  = Column(Text, nullable=False)               # 工具参数 JSON 字符串
     status     = Column(String, nullable=False, default="pending")  # pending / approved / rejected
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    saved_messages=Column(JSON,nullable=False)
+    event_index=Column(Integer,nullable=False)
+
+class ProviderConfig(Base):
+    """Provider 配置表"""
+
+    __tablename__="provider_configs"
+
+    id=Column(Integer,primary_key=True,autoincrement=True)
+    name=Column(String,nullable=False)
+    base_url=Column(String,nullable=False)
+    api_key=Column(String,nullable=False)
+    created_at=Column(DateTime,server_default=func.now(),nullable=False)
+    is_default=Column(Integer,nullable=False,default=0,server_default="0")
+
+    models=relationship("ModelSetting",cascade="all,delete-orphan")
+
+class ModelSetting(Base):
+    """模型配置表。每行代表某 Provider 下的一个可用模型。"""
+
+    __tablename__ = "model_settings"
+
+    id                = Column(Integer, primary_key=True, autoincrement=True)
+    provider_id       = Column(Integer, ForeignKey("provider_configs.id", ondelete="CASCADE"), nullable=False, index=True)
+    model_id          = Column(String, nullable=False)      # 原始 model id，如 "deepseek-v4-flash"
+    display_name      = Column(String, nullable=True)       # 覆盖显示名
+    enabled           = Column(Integer, nullable=False, default=0)   # 0/1，是否出现在对话框
+    supports_thinking = Column(Integer, nullable=False, default=0)
+    thinking_style    = Column(String, nullable=True)       # "deepseek_style" | "sensenova_style" | "none"
+    effort_levels     = Column(Text, nullable=True)         # JSON 字符串，如 '["low","high"]'
+    context_length    = Column(Integer, nullable=True)
+    supports_tools    = Column(Integer, nullable=False, default=0)
+    created_at        = Column(DateTime, server_default=func.now(), nullable=False)
+    #同一个 Provider 下，同一个 model_id 不能重复   
+    __table_args__ = (UniqueConstraint("provider_id", "model_id"),)

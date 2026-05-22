@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  /* Linear / Vercel / Developer Tool Aesthetics */
+  /* Linear / Vercel / Developer Tool Aesthetics - Base Tokens */
   --bg-app: #000000;
   --bg-panel: #0A0A0A;
   --bg-hover: rgba(255, 255, 255, 0.04);
@@ -36,6 +36,134 @@
   --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ==================== 4种高端极客深色主题系统 (Premium Themes) ==================== */
+
+/* 1. 深空墨黑 (Deep Space - Vercel 极简暗影) - 默认样式 */
+body.theme-default {
+  --bg-app: #000000;
+  --bg-panel: #0A0A0A;
+  --bg-panel-rgb: 10, 10, 10;
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-active: rgba(255, 255, 255, 0.08);
+  --bg-elevated: #111111;
+  --border-dim: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --text-primary: #EDEDED;
+  --text-secondary: #A1A1AA;
+  --text-muted: #52525B;
+  --accent: #FFFFFF;
+  --accent-glow: rgba(255, 255, 255, 0.15);
+  --accent-subtle: rgba(255, 255, 255, 0.05);
+  --accent-blue: #60A5FA;
+  --accent-emerald: #34D399;
+}
+
+/* 2. 赛博魅紫 (Cyberpunk Violet - 魔法与极光科技) */
+body.theme-cyberpunk {
+  --bg-app: #090514;
+  --bg-panel: #0F0A24;
+  --bg-panel-rgb: 15, 10, 36;
+  --bg-hover: rgba(167, 139, 250, 0.06);
+  --bg-active: rgba(167, 139, 250, 0.12);
+  --bg-elevated: #171133;
+  --border-dim: rgba(167, 139, 250, 0.12);
+  --border-strong: rgba(167, 139, 250, 0.22);
+  --text-primary: #F3F1FB;
+  --text-secondary: #C0B7E5;
+  --text-muted: #7E74A6;
+  --accent: #A78BFA;
+  --accent-glow: rgba(167, 139, 250, 0.35);
+  --accent-subtle: rgba(167, 139, 250, 0.08);
+  --accent-blue: #D946EF;
+  --accent-emerald: #818CF8;
+}
+
+/* 3. 翡翠森林 (Emerald Forest - 护眼极客之境) */
+body.theme-emerald {
+  --bg-app: #040D0A;
+  --bg-panel: #0A1C16;
+  --bg-panel-rgb: 10, 28, 22;
+  --bg-hover: rgba(16, 185, 129, 0.06);
+  --bg-active: rgba(16, 185, 129, 0.12);
+  --bg-elevated: #112C22;
+  --border-dim: rgba(16, 185, 129, 0.12);
+  --border-strong: rgba(16, 185, 129, 0.22);
+  --text-primary: #ECFDF5;
+  --text-secondary: #86C0A6;
+  --text-muted: #4B7564;
+  --accent: #10B981;
+  --accent-glow: rgba(16, 185, 129, 0.35);
+  --accent-subtle: rgba(16, 185, 129, 0.08);
+  --accent-blue: #06B6D4;
+  --accent-emerald: #10B981;
+}
+
+/* 4. 琥珀古金 (Charcoal Amber - 复古暖风机械) */
+body.theme-amber {
+  --bg-app: #0D0C0A;
+  --bg-panel: #1C1812;
+  --bg-panel-rgb: 28, 24, 18;
+  --bg-hover: rgba(245, 158, 11, 0.06);
+  --bg-active: rgba(245, 158, 11, 0.12);
+  --bg-elevated: #2E281F;
+  --border-dim: rgba(245, 158, 11, 0.12);
+  --border-strong: rgba(245, 158, 11, 0.22);
+  --text-primary: #FFFDF9;
+  --text-secondary: #E5C38C;
+  --text-muted: #8E775F;
+  --accent: #F59E0B;
+  --accent-glow: rgba(245, 158, 11, 0.35);
+  --accent-subtle: rgba(245, 158, 11, 0.08);
+  --accent-blue: #F97316;
+  --accent-emerald: #D97706;
+}
+
+/* 5. 苹果极简 (Apple Minimalist White - Apple/Linear 雅白) */
+body.theme-light-apple {
+  --bg-app: #f5f5f7;
+  --bg-panel: #ffffff;
+  --bg-panel-rgb: 255, 255, 255;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.08);
+  --bg-elevated: #ffffff;
+  --border-dim: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --accent: #0071e3;
+  --accent-glow: rgba(0, 113, 227, 0.15);
+  --accent-subtle: rgba(0, 113, 227, 0.05);
+  --accent-blue: #0071e3;
+  --accent-emerald: #34c759;
+  --scrollbar-thumb-color: 0, 0, 0;
+  --shadow-app: 0 1px 3px rgba(0, 0, 0, 0.05), 0 20px 40px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 20px rgba(0, 113, 227, 0.05);
+}
+
+/* 6. OpenAI 经典 (OpenAI Light - 经典素绿) */
+body.theme-light-openai {
+  --bg-app: #f9f9f9;
+  --bg-panel: #ffffff;
+  --bg-panel-rgb: 255, 255, 255;
+  --bg-hover: rgba(0, 0, 0, 0.03);
+  --bg-active: rgba(0, 0, 0, 0.06);
+  --bg-elevated: #ffffff;
+  --border-dim: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --text-primary: #0d0d0d;
+  --text-secondary: #4e4e4e;
+  --text-muted: #8e8e8e;
+  --accent: #10a37f;
+  --accent-glow: rgba(16, 163, 127, 0.15);
+  --accent-subtle: rgba(16, 163, 127, 0.05);
+  --accent-blue: #2f80ed;
+  --accent-emerald: #10a37f;
+  --scrollbar-thumb-color: 0, 0, 0;
+  --shadow-app: 0 1px 3px rgba(0, 0, 0, 0.05), 0 20px 40px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 20px rgba(16, 163, 127, 0.05);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #app {
@@ -46,13 +174,15 @@ html, body, #app {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  /* 💡 增加平滑切换配色过渡，过渡体验极其高级 */
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Custom Scrollbar (Technical, invisible until hover) */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(var(--scrollbar-thumb-color, 255, 255, 255), 0.12); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 button, input, textarea, select {
   font-family: inherit;
@@ -66,6 +196,8 @@ button, input, textarea, select {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .layout-loading {
@@ -78,27 +210,32 @@ button, input, textarea, select {
   font-size: 12px;
   letter-spacing: 0.1em;
   animation: fadeIn 0.5s ease;
+  z-index: 2;
 }
 
 .app-layout {
   display: flex;
   width: 100%;
   height: 100%;
-  background: var(--bg-panel);
+  /* 💡 毛玻璃悬浮磨砂质感：高模糊度半透明背景 */
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: var(--radius-app);
   border: 1px solid var(--border-dim);
   box-shadow: var(--shadow-app);
   overflow: hidden;
   animation: fadeIn 0.3s ease;
+  z-index: 1; /* 确保在背景流光之上，在加载图层之下 */
 }
 
-/* Base Panel Styles */
+/* Base Panel Styles - 💡 进化为高级半透明磨砂材质，让背景星云流光朦胧穿透 */
 .global-nav {
   width: 64px;
   border-right: 1px solid var(--border-dim);
   display: flex;
   flex-direction: column;
-  background: var(--bg-app);
+  background: transparent !important; /* 彻底透光 */
 }
 
 .session-sidebar {
@@ -106,6 +243,9 @@ button, input, textarea, select {
   border-right: 1px solid var(--border-dim);
   display: flex;
   flex-direction: column;
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.3) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .chat-panel {
@@ -114,6 +254,7 @@ button, input, textarea, select {
   flex-direction: column;
   min-width: 0;
   position: relative;
+  background: transparent !important;
 }
 
 .trace-panel {
@@ -121,7 +262,9 @@ button, input, textarea, select {
   border-left: 1px solid var(--border-dim);
   display: flex;
   flex-direction: column;
-  background: var(--bg-app);
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.3) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 /* Technical Buttons */
@@ -203,6 +346,18 @@ select.tech-btn option {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Premium Spring Message entry animation */
+@keyframes messageSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* 工具事件入场动画：从左滑入 + 渐显 */
@@ -292,44 +447,107 @@ select.tech-btn option {
 
 .message-text strong {
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .message-text code.inline-code {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   padding: 2px 6px;
   border-radius: 4px;
-  color: #A78BFA;
+  color: var(--accent);
 }
 
-/* Premium Code Blocks */
+/* Premium Code Blocks with Headers and Copy buttons */
 .code-block {
-  background: #0D0D0D;
+  background: #09090B;
   border: 1px solid var(--border-dim);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  margin: 12px 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  margin: 16px 0;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.code-lang {
-  padding: 6px 12px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-dim);
+
+.code-block:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
   background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-dim);
+  user-select: none;
 }
+
+.code-lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.copy-code-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.copy-code-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.copy-code-btn:active {
+  transform: scale(0.95);
+}
+
+.copy-code-btn.copied {
+  color: #10B981 !important; /* success green */
+  background: rgba(16, 185, 129, 0.08) !important;
+  border-color: rgba(16, 185, 129, 0.15) !important;
+}
+
+.copy-code-btn .copy-icon {
+  transition: stroke 0.2s ease, transform 0.2s ease;
+}
+
+.copy-code-btn.copied .copy-icon {
+  stroke: #10B981;
+}
+
 .code-block pre {
-  padding: 12px;
+  padding: 16px;
   overflow-x: auto;
+  margin: 0;
+  background: transparent;
 }
+
 .code-block code {
   font-family: var(--font-mono);
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: #E5E7EB;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #E4E4E7;
+  display: block;
 }
 
 /* Premium Markdown Lists */
@@ -341,4 +559,473 @@ select.tech-btn option {
   position: relative;
   margin-bottom: 6px;
   line-height: 1.6;
+}
+
+/* ==================== 🌌 赛博朋克深空环境流光系统 ==================== */
+.ambient-glow-blobs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.15;
+  transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* 3个具有独立三维舒缓漂移路径的星云 */
+.blob-1 {
+  top: -10%;
+  left: -10%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
+  animation: ambient-drift-1 28s ease-in-out infinite alternate;
+}
+.blob-2 {
+  bottom: -15%;
+  right: -10%;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
+  animation: ambient-drift-2 36s ease-in-out infinite alternate;
+}
+.blob-3 {
+  top: 40%;
+  left: 50%;
+  width: 40%;
+  height: 40%;
+  background: radial-gradient(circle, var(--accent-blue, #60A5FA) 0%, transparent 80%);
+  animation: ambient-drift-3 32s ease-in-out infinite alternate;
+}
+
+/* 联动各个极客深色主题的柔和偏色 */
+body.theme-cyberpunk .blob-1 { background: radial-gradient(circle, rgba(167, 139, 250, 0.8) 0%, transparent 85%); opacity: 0.22; }
+body.theme-cyberpunk .blob-2 { background: radial-gradient(circle, rgba(96, 165, 250, 0.8) 0%, transparent 85%); opacity: 0.20; }
+body.theme-cyberpunk .blob-3 { background: radial-gradient(circle, rgba(236, 72, 153, 0.8) 0%, transparent 85%); opacity: 0.18; }
+
+body.theme-emerald .blob-1 { background: radial-gradient(circle, rgba(16, 185, 129, 0.8) 0%, transparent 85%); opacity: 0.18; }
+body.theme-emerald .blob-2 { background: radial-gradient(circle, rgba(52, 211, 153, 0.8) 0%, transparent 85%); opacity: 0.15; }
+body.theme-emerald .blob-3 { background: radial-gradient(circle, rgba(96, 165, 250, 0.8) 0%, transparent 85%); opacity: 0.12; }
+
+body.theme-amber .blob-1 { background: radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, transparent 85%); opacity: 0.18; }
+body.theme-amber .blob-2 { background: radial-gradient(circle, rgba(251, 191, 36, 0.8) 0%, transparent 85%); opacity: 0.15; }
+body.theme-amber .blob-3 { background: radial-gradient(circle, rgba(220, 38, 38, 0.8) 0%, transparent 85%); opacity: 0.12; }
+
+@keyframes ambient-drift-1 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate(12%, 18%) scale(1.15) rotate(120deg); }
+  100% { transform: translate(-8%, 5%) scale(0.9) rotate(360deg); }
+}
+@keyframes ambient-drift-2 {
+  0% { transform: translate(0, 0) scale(1.1) rotate(0deg); }
+  50% { transform: translate(-15%, -12%) scale(0.95) rotate(-180deg); }
+  100% { transform: translate(10%, 8%) scale(1.05) rotate(-360deg); }
+}
+@keyframes ambient-drift-3 {
+  0% { transform: translate(0, 0) scale(0.9) rotate(0deg); }
+  50% { transform: translate(-25%, 15%) scale(1.1) rotate(90deg); }
+  100% { transform: translate(15%, -15%) scale(1) rotate(270deg); }
+}
+
+/* 💡 顶级艺术：输入框高定呼吸律动光标 */
+@keyframes caret-fade {
+  0%, 100% { caret-color: var(--accent); }
+  50% { caret-color: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.15); }
+}
+.composer-input {
+  animation: caret-fade 1.2s ease-in-out infinite;
+}
+
+/* 💡 弹性春季脉冲环 (Spring Shockwaves) */
+.ai-avatar-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-avatar-wrapper.streaming-active .pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: avatar-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.ai-avatar-wrapper.streaming-active .ring-1 {
+  animation-delay: 0s;
+}
+.ai-avatar-wrapper.streaming-active .ring-2 {
+  animation-delay: 0.6s;
+}
+.ai-avatar-wrapper.streaming-active .ring-3 {
+  animation-delay: 1.2s;
+}
+
+@keyframes avatar-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* ==================== 💎 PREMIUM UX/UI 顶级重构样式 ==================== */
+
+/* A. 黄金视域限制器与对话空间对齐 */
+.message-row-inner {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  max-width: 820px; /* 💡 黄金列宽 */
+  margin: 0 auto;
+}
+
+/* User 消息：靠右、圆角微发光胶囊 */
+.role-user {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin: 8px 0 !important;
+}
+
+.role-user .message-row-inner {
+  justify-content: flex-end;
+}
+
+.role-user .message-avatar {
+  display: none !important; /* 💡 提问卡片不需要多余的用户头像，保持清爽 */
+}
+
+.role-user .message-content {
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-hover)) !important;
+  border: 1px solid var(--border-dim);
+  border-radius: 16px 16px 4px 16px; /* 不对称圆角（右下收紧） */
+  padding: 12px 18px;
+  max-width: 620px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), var(--shadow-glow);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.role-user .message-content:hover {
+  border-color: var(--accent);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), 0 0 16px var(--accent-glow);
+}
+
+.role-user .message-meta {
+  text-align: right;
+  margin-bottom: 6px;
+  opacity: 0.5;
+}
+
+/* Agent 消息：升级为浮空高端左置 Bento 气泡 */
+.role-assistant {
+  background: transparent !important; /* 💡 移除了外层行的卡片背景，使其完全透明 */
+  border: none !important;            /* 移除了外层行的边框 */
+  box-shadow: none !important;        /* 移除了外层行的投影 */
+  backdrop-filter: none !important;   /* 移除了外层行的毛玻璃 */
+  -webkit-backdrop-filter: none !important;
+  margin: 12px auto !important;       /* 统一的行外间距 */
+  padding: 8px 24px !important;       /* 保持消息行标准内边距 */
+}
+
+.role-assistant .message-row-inner {
+  justify-content: flex-start; /* 靠左对齐 */
+}
+
+.role-assistant .message-content {
+  /* 💡 将原属于外层行的毛玻璃卡片样式下沉到 content 气泡中 */
+  background: rgba(255, 255, 255, 0.012) !important;
+  border: 1px solid var(--border-dim) !important;
+  border-radius: 16px 16px 16px 4px !important; /* 不对称圆角（左下收紧，呼应头像） */
+  padding: 18px 22px !important;
+  max-width: 720px; /* AI 输出列稍微放宽，以便展示代码和表格 */
+  box-shadow: 0 6px 28px -2px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease !important;
+}
+
+.role-assistant .message-content:hover {
+  border-color: color-mix(in srgb, var(--accent) 15%, var(--border-dim)) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 16px var(--accent-glow) !important;
+  transform: translateY(-1px); /* 💡 只有气泡本体产生微浮空动效 */
+}
+
+/* B. Spotlight 侧边栏搜索框重塑与全局 Spotlight 聚焦环 */
+.session-sidebar .search-box {
+  padding: 8px 12px;
+  margin: 12px;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid var(--border-dim) !important;
+  border-radius: 8px !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition-fast);
+}
+
+/* 💡 全局高定 Spotlight 聚焦环：应用于输入框、下拉选择器等 */
+input:focus,
+select:focus,
+textarea:focus,
+.ms-trigger:focus,
+.ms-trigger.open,
+.session-sidebar .search-box:focus-within {
+  outline: none !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.session-sidebar .search-input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+}
+
+.search-kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--text-secondary);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.kbd-hide {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+/* C. Floating SaaS 会话卡片列表 */
+.session-item {
+  margin: 6px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  border-bottom: none !important; /* 💡 移出生硬的下划线 */
+  padding: 10px 14px !important;
+  background: transparent !important;
+  transition: var(--transition-smooth) !important;
+}
+
+.session-item:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-dim) !important;
+  transform: translateY(-1px);
+}
+
+.session-item.active {
+  background: var(--accent-subtle) !important;
+  border: 1px solid var(--accent) !important;
+  box-shadow: 0 0 14px var(--accent-glow) !important;
+}
+
+.session-item.active .session-title {
+  font-weight: 600;
+}
+
+/* D. Premium Markdown Tables (SaaS Datagrid style) */
+.md-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-dim);
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  margin: 16px 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.md-table th {
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  user-select: none;
+}
+
+.md-table td {
+  padding: 10px 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-dim);
+  line-height: 1.55;
+  font-family: var(--font-sans);
+}
+
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+
+.md-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ==================== 🌌 赛博朋克深空环境流光系统 ==================== */
+.ambient-glow-blobs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.15;
+  transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* 3个具有独立三维舒缓漂移路径的星云 */
+.blob-1 {
+  top: -10%;
+  left: -10%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
+  animation: ambient-drift-1 28s ease-in-out infinite alternate;
+}
+.blob-2 {
+  bottom: -15%;
+  right: -10%;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
+  animation: ambient-drift-2 36s ease-in-out infinite alternate;
+}
+.blob-3 {
+  top: 40%;
+  left: 50%;
+  width: 40%;
+  height: 40%;
+  background: radial-gradient(circle, var(--accent-blue, #60A5FA) 0%, transparent 80%);
+  animation: ambient-drift-3 32s ease-in-out infinite alternate;
+}
+
+/* 联动各个极客深色主题的柔和偏色 */
+body.theme-cyberpunk .blob-1 { background: radial-gradient(circle, rgba(167, 139, 250, 0.8) 0%, transparent 85%); opacity: 0.22; }
+body.theme-cyberpunk .blob-2 { background: radial-gradient(circle, rgba(96, 165, 250, 0.8) 0%, transparent 85%); opacity: 0.20; }
+body.theme-cyberpunk .blob-3 { background: radial-gradient(circle, rgba(236, 72, 153, 0.8) 0%, transparent 85%); opacity: 0.18; }
+
+body.theme-emerald .blob-1 { background: radial-gradient(circle, rgba(16, 185, 129, 0.8) 0%, transparent 85%); opacity: 0.18; }
+body.theme-emerald .blob-2 { background: radial-gradient(circle, rgba(52, 211, 153, 0.8) 0%, transparent 85%); opacity: 0.15; }
+body.theme-emerald .blob-3 { background: radial-gradient(circle, rgba(96, 165, 250, 0.8) 0%, transparent 85%); opacity: 0.12; }
+
+body.theme-amber .blob-1 { background: radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, transparent 85%); opacity: 0.18; }
+body.theme-amber .blob-2 { background: radial-gradient(circle, rgba(251, 191, 36, 0.8) 0%, transparent 85%); opacity: 0.15; }
+body.theme-amber .blob-3 { background: radial-gradient(circle, rgba(220, 38, 38, 0.8) 0%, transparent 85%); opacity: 0.12; }
+
+/* 联动各个极客浅色模式主题的超级柔和背景偏色 */
+body.theme-light-apple .blob-1 { background: radial-gradient(circle, rgba(0, 113, 227, 0.4) 0%, transparent 85%); opacity: 0.07; }
+body.theme-light-apple .blob-2 { background: radial-gradient(circle, rgba(96, 165, 250, 0.4) 0%, transparent 85%); opacity: 0.06; }
+body.theme-light-apple .blob-3 { background: radial-gradient(circle, rgba(52, 199, 89, 0.4) 0%, transparent 85%); opacity: 0.05; }
+
+body.theme-light-openai .blob-1 { background: radial-gradient(circle, rgba(16, 163, 127, 0.4) 0%, transparent 85%); opacity: 0.07; }
+body.theme-light-openai .blob-2 { background: radial-gradient(circle, rgba(47, 128, 237, 0.4) 0%, transparent 85%); opacity: 0.06; }
+body.theme-light-openai .blob-3 { background: radial-gradient(circle, rgba(16, 163, 127, 0.3) 0%, transparent 85%); opacity: 0.05; }
+
+@keyframes ambient-drift-1 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate(12%, 18%) scale(1.15) rotate(120deg); }
+  100% { transform: translate(-8%, 5%) scale(0.9) rotate(360deg); }
+}
+@keyframes ambient-drift-2 {
+  0% { transform: translate(0, 0) scale(1.1) rotate(0deg); }
+  50% { transform: translate(-15%, -12%) scale(0.95) rotate(-180deg); }
+  100% { transform: translate(10%, 8%) scale(1.05) rotate(-360deg); }
+}
+@keyframes ambient-drift-3 {
+  0% { transform: translate(0, 0) scale(0.9) rotate(0deg); }
+  50% { transform: translate(-25%, 15%) scale(1.1) rotate(90deg); }
+  100% { transform: translate(15%, -15%) scale(1) rotate(270deg); }
+}
+
+/* 💡 顶级艺术：输入框高定呼吸律动光标 */
+@keyframes caret-fade {
+  0%, 100% { caret-color: var(--accent); }
+  50% { caret-color: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.15); }
+}
+.composer-input {
+  animation: caret-fade 1.2s ease-in-out infinite;
+}
+
+/* 💡 弹性春季脉冲环 (Spring Shockwaves) */
+.ai-avatar-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-avatar-wrapper.streaming-active .pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: avatar-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.ai-avatar-wrapper.streaming-active .ring-1 {
+  animation-delay: 0s;
+}
+.ai-avatar-wrapper.streaming-active .ring-2 {
+  animation-delay: 0.6s;
+}
+.ai-avatar-wrapper.streaming-active .ring-3 {
+  animation-delay: 1.2s;
+}
+
+@keyframes avatar-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }

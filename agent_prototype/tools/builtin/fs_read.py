@@ -1,6 +1,6 @@
 from pathlib import Path  # 方便处理文件路径
 
-from ...core.tool_types import ToolDefinition  # 导入工具定义
+from ...core.tool_types import ToolDefinition,RiskLevel  # 导入工具定义
 
 
 def read_file(path: str) -> str:  # 真正读文件的函数
@@ -42,4 +42,5 @@ def build_read_file_tool_definition() -> ToolDefinition:  # 构造注册对象
         name="read_file",  # 工具名
         schema=READ_FILE_SCHEMA,  # schema
         handler=read_file,  # 真正执行逻辑
+        risk_level=RiskLevel.SAFE,
     )

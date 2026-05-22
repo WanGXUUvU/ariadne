@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, status  # 导入路由、依赖和状态码
 from sqlalchemy.orm import Session  # 导入数据库会话
 from ...core.schemas import CreateSessionInput, SessionDetail, SessionSummary,RenameSessionInput  # 导入 schema
-from ...application.session_service import create_session_service, delete_session_service,rename_session_service  # session 生命周期服务
+from ...application.session_service import (
+    create_session_service,
+    delete_session_service,
+    rename_session_service,
+    update_session_service,
+)  # session 生命周期服务
 from ...storage.db import get_db  # 导入数据库依赖
 from ...storage.stores.session_store import SqliteSessionStore  # 导入 session store
 from .common import error_response  # 导入统一错误响应
@@ -37,6 +42,7 @@ def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:  #
             message_count=record.message_count,  # 消息数
             last_reply_preview=record.last_reply_preview,  # 回复预览
             permission_profile=record.permission_profile,  # 权限档位
+            context_tokens=record.context_tokens,
         )  # 单条 summary 结束
         for record in records  # 遍历数据库记录
     ]  # 列表结束
@@ -62,11 +68,32 @@ def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionD
         message_count=record.message_count,  # 消息数
         state=state,  # session state
         permission_profile=record.permission_profile,  # 权限档位
-    )  # 响应结束
+        model_id=record.model_id,
+        model_provider_id=record.model_provider_id,
+        thinking_enabled=bool(record.thinking_enabled),
+        thinking_effort=record.thinking_effort or "medium",
+    )  
 
 @router.patch("/sessions/{session_id}")
 def rename_session_api(session_id:str,payload:RenameSessionInput,db:Session=Depends(get_db))->dict[str,bool]:
     try:
-        return rename_session_service(session_id,payload.session_name,db)
+        if payload.session_name is not None:
+            rename_session_service(session_id,payload.session_name,db)
+        store = SqliteSessionStore(db)
+        record = store.read_session_record(session_id)
+        if record is None:
+            return error_response(status.HTTP_404_NOT_FOUND,"not_found","Session not found")
+        if payload.permission_profile is not None:
+            record.permission_profile = payload.permission_profile
+        if payload.model_id is not None:
+            record.model_id = payload.model_id
+        if payload.model_provider_id is not None:
+            record.model_provider_id = payload.model_provider_id
+        if payload.thinking_enabled is not None:
+            record.thinking_enabled = 1 if payload.thinking_enabled else 0
+        if payload.thinking_effort is not None:
+            record.thinking_effort = payload.thinking_effort
+        db.commit()
+        return {"ok": True}
     except ValueError as exc:
         return error_response(status.HTTP_400_BAD_REQUEST,"bad_request",str(exc))

@@ -1,8 +1,8 @@
 import uuid
 import os
 from concurrent.futures import ThreadPoolExecutor
-from ...core.tool_types import ToolDefinition
-from ...core.schemas import AgentInput,AgentState,AgentEvent,ToolResult
+from ...core.tool_types import ToolDefinition,RiskLevel
+from ...core.schemas import AgentInput,AgentState,ToolResult
 from ...core.agent_definition import AgentDefinition
 from ...model.openai_adapter import ChatCompletionsAdapter
 
@@ -56,6 +56,7 @@ def build_spawn_child_agent_tool(parent_run_id:str, session_id:str, executor:Thr
         name="spawn_child_agent",
         schema=SCHEMA,
         handler=spawn_child_agent,
+        risk_level=RiskLevel.SAFE,
     )
     
 def _run_child(task: str, child_run_id: str, parent_run_id: str, session_id: str, agent_name: str = "子Agent"):

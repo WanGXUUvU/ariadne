@@ -160,9 +160,9 @@ watch(
 .trace-panel {
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 38%),
-    linear-gradient(180deg, #0c0c0c 0%, #080808 100%);
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.3) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-left: 1px solid var(--border-dim);
   height: 100%;
 }
@@ -270,13 +270,13 @@ watch(
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.15));
-  opacity: 0.6;
+  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 15%, transparent));
+  opacity: 0.75;
 }
 
 .run-card.latest {
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.26);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 6%, transparent), 0 18px 40px rgba(0, 0, 0, 0.26);
 }
 
 .run-card-top {

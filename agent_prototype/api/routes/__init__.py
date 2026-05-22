@@ -7,6 +7,7 @@ from .trace_routes import router as trace_router
 from .agent_routes import router as agent_router
 from .tool_routes import router as tool_router
 from .approval_routes import router as approval_router
+from .settings_routes import router as settings_router
 
 router = APIRouter()
 
@@ -17,3 +18,4 @@ router.include_router(trace_router)
 router.include_router(agent_router)
 router.include_router(tool_router)
 router.include_router(approval_router)
+router.include_router(settings_router)

@@ -19,10 +19,110 @@ class ChatCompletionsAdapter(ModelAdapter):
         api_key: Optional[str] = None,
         base_url: str = BASE_URL,
         model: str = DEFAULT_MODEL,
+        extra_payload: Optional[dict] = None,
+        thinking_style: str = "none",
     ):
         self.api_key = api_key or os.environ.get("API_KEY")
         self.base_url = base_url
         self.model = model
+        self.extra_payload = extra_payload or {}
+        self.thinking_style = thinking_style
+        self._in_think = False   # <think>...</think> 标签解析状态
+        self._tag_buf = ""       # 跨 chunk 的不完整标签缓冲
+
+    # ── thinking 解析工具 ──────────────────────────────────────────────────
+
+    def _reset_think_state(self) -> None:
+        """每次流式请求开始前重置跨 chunk 解析状态。"""
+        self._in_think = False
+        self._tag_buf = ""
+
+    @staticmethod
+    def _partial_suffix(text: str, tag: str) -> str:
+        """返回 text 末尾与 tag 开头匹配的最长前缀。
+        用于检测 chunk 边界处被切断的不完整标签，如 "<thi" 可能是 "<think>" 的开头。
+        """
+        for i in range(min(len(tag) - 1, len(text)), 0, -1):
+            if text.endswith(tag[:i]):
+                return text[-i:]
+        return ""
+
+    def _parse_think_content(self, raw: str, finish_reason) -> list[ModelStreamEvent]:
+        """将含 <think>...</think> 标签的 content 流切分为事件列表。
+
+        有状态：_in_think 和 _tag_buf 在多次调用间保持，直到 _reset_think_state() 重置。
+        同一个 delta 可能产生多个事件（如 </think>正文 → thinking_delta + delta）。
+        """
+        events: list[ModelStreamEvent] = []
+        text = self._tag_buf + raw
+        self._tag_buf = ""
+
+        while text:
+            if self._in_think:
+                close_idx = text.find("</think>")
+                if close_idx == -1:
+                    # 检查末尾是否是 </think> 的部分前缀，缓冲起来等下一个 chunk
+                    partial = self._partial_suffix(text, "</think>")
+                    emit = text[: len(text) - len(partial)] if partial else text
+                    if emit:
+                        events.append(ModelStreamEvent(type="thinking_delta", thinking_delta=emit))
+                    self._tag_buf = partial
+                    break
+                if close_idx > 0:
+                    events.append(ModelStreamEvent(type="thinking_delta", thinking_delta=text[:close_idx]))
+                self._in_think = False
+                text = text[close_idx + len("</think>"):]
+            else:
+                open_idx = text.find("<think>")
+                if open_idx == -1:
+                    partial = self._partial_suffix(text, "<think>")
+                    emit = text[: len(text) - len(partial)] if partial else text
+                    if emit:
+                        events.append(ModelStreamEvent(
+                            type="delta", content_delta=emit, finish_reason=finish_reason,
+                        ))
+                    self._tag_buf = partial
+                    break
+                if open_idx > 0:
+                    events.append(ModelStreamEvent(type="delta", content_delta=text[:open_idx]))
+                self._in_think = True
+                text = text[open_idx + len("<think>"):]
+
+        return events
+
+    def _parse_delta(self, delta: dict, finish_reason) -> list[ModelStreamEvent]:
+        """将单条 SSE delta 解析为 ModelStreamEvent 列表。
+
+        - always_on_style：thinking 嵌入 content 字段的 <think>...</think> 标签，需有状态解析
+        - 其他 style：thinking 在独立字段（reasoning_content / thinking_content / reasoning）
+        """
+        tool_calls = delta.get("tool_calls")
+        content = delta.get("content")
+
+        if self.thinking_style == "always_on_style":
+            if content:
+                return self._parse_think_content(content, finish_reason)
+            return [ModelStreamEvent(
+                type="tool_call_delta" if tool_calls else "done",
+                finish_reason=finish_reason,
+                raw_event=delta,
+            )]
+
+        # 标准字段 thinking
+        thinking = (delta.get("reasoning_content")
+                    or delta.get("thinking_content")
+                    or delta.get("reasoning"))
+        if thinking:
+            return [ModelStreamEvent(type="thinking_delta", thinking_delta=thinking, raw_event=delta)]
+
+        return [ModelStreamEvent(
+            type="delta" if content else ("tool_call_delta" if tool_calls else "done"),
+            content_delta=content,
+            finish_reason=finish_reason,
+            raw_event=delta,
+        )]
+
+    # ── 请求方法 ──────────────────────────────────────────────────────────
 
     def generate(self, request: ModelRequest) -> ModelResponse:
         if not self.api_key:
@@ -38,7 +138,6 @@ class ChatCompletionsAdapter(ModelAdapter):
         payload: dict[str, Any] = {
             "model": request.config.model or self.model,
             "messages": [msg.model_dump(exclude_none=True) for msg in request.messages],
-            "thinking": {"type": "disabled"},
             "stream": request.config.stream,
         }
 
@@ -57,6 +156,7 @@ class ChatCompletionsAdapter(ModelAdapter):
             payload["tools"] = request.tools
 
         payload.update(request.config.provider_options)
+        payload.update(self.extra_payload)
 
         response = None
         for attempt in range(2):
@@ -124,7 +224,6 @@ class ChatCompletionsAdapter(ModelAdapter):
         payload: dict[str, Any] = {
             "model": request.config.model or self.model,
             "messages": [msg.model_dump(exclude_none=True) for msg in request.messages],
-            "thinking": {"type": "disabled"},
             "stream": True,
         }
         if request.config.temperature is not None:
@@ -142,7 +241,8 @@ class ChatCompletionsAdapter(ModelAdapter):
             payload["tools"] = request.tools
 
         payload.update(request.config.provider_options)
-
+        payload.update(self.extra_payload)
+        payload["stream_options"] = {"include_usage": True}
         response = None
         for attempt in range(2):
             response = requests.post(url, headers=headers, json=payload, timeout=2100, stream=True)
@@ -169,7 +269,8 @@ class ChatCompletionsAdapter(ModelAdapter):
                     f"LLM request failed: url={url}, model={payload['model']}, "
                     f"status={response.status_code}, body={err_body}"
                 ) from exc
-            
+
+        self._reset_think_state()
         for line in response.iter_lines():
             if not line:
                 continue
@@ -182,19 +283,24 @@ class ChatCompletionsAdapter(ModelAdapter):
             chunk = json.loads(text)
             choices = chunk.get("choices") or []
             if not choices:
+                usage_data=chunk.get("usage")
+                if usage_data:
+                    yield ModelStreamEvent(
+                        type="done",
+                        usage=ModelUsage(
+                        input_tokens=usage_data.get("prompt_tokens"),
+                        output_tokens=usage_data.get("completion_tokens"),
+                        total_tokens=usage_data.get("total_tokens"),
+                        details=usage_data,
+                        )
+                    )
                 continue
             choice = choices[0]
             delta = choice.get("delta", {})
-            finish_reason=choice.get("finish_reason")
-            content = delta.get("content")
-            tool_calls=delta.get("tool_calls")
-            yield ModelStreamEvent(
-                type="delta" if content else ("tool_call_delta" if tool_calls else "done"),
-                content_delta=content,
-                finish_reason=finish_reason,
-                raw_event=delta,   # tool_calls 碎片放这里，上层去拼
-            )
-                        
+            finish_reason = choice.get("finish_reason")
+            for event in self._parse_delta(delta, finish_reason):
+                yield event
+
     async def async_stream_generate(self, request:ModelRequest)->AsyncIterator[ModelStreamEvent]:
         if not self.api_key:
             raise RuntimeError("Missing API_KEY")
@@ -209,7 +315,6 @@ class ChatCompletionsAdapter(ModelAdapter):
         payload: dict[str, Any] = {
             "model": request.config.model or self.model,
             "messages": [msg.model_dump(exclude_none=True) for msg in request.messages],
-            "thinking": {"type": "disabled"},
             "stream": True,
         }
         if request.config.temperature is not None:
@@ -227,6 +332,9 @@ class ChatCompletionsAdapter(ModelAdapter):
             payload["tools"] = request.tools
 
         payload.update(request.config.provider_options)
+        payload.update(self.extra_payload)
+        payload["stream_options"] = {"include_usage": True}
+        self._reset_think_state()
         #创建一个异步 HTTP 客户端（client），在代码块里使用它，离开时自动清理连接资源
         async with httpx.AsyncClient(timeout=2100) as client:
             async with client.stream("POST",url,headers=headers,json=payload) as response:
@@ -248,15 +356,20 @@ class ChatCompletionsAdapter(ModelAdapter):
                     chunk = json.loads(text)
                     choices = chunk.get("choices") or []
                     if not choices:
+                        usage_data=chunk.get("usage")
+                        if usage_data:
+                            yield ModelStreamEvent(
+                                type="done",
+                                usage=ModelUsage(
+                                input_tokens=usage_data.get("prompt_tokens"),
+                                output_tokens=usage_data.get("completion_tokens"),
+                                total_tokens=usage_data.get("total_tokens"),
+                                details=usage_data,
+                                )
+                            )
                         continue
                     choice = choices[0]
                     delta = choice.get("delta", {})
-                    finish_reason=choice.get("finish_reason")
-                    content = delta.get("content")
-                    tool_calls=delta.get("tool_calls")
-                    yield ModelStreamEvent(
-                        type="delta" if content else ("tool_call_delta" if tool_calls else "done"),
-                        content_delta=content,
-                        finish_reason=finish_reason,
-                        raw_event=delta,   # tool_calls 碎片放这里，上层去拼
-                    )
+                    finish_reason = choice.get("finish_reason")
+                    for event in self._parse_delta(delta, finish_reason):
+                        yield event

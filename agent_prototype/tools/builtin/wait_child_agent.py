@@ -1,6 +1,5 @@
-import json
 from concurrent.futures import TimeoutError
-from ...core.tool_types import ToolDefinition
+from ...core.tool_types import ToolDefinition,RiskLevel
 from ...core.schemas import ToolResult, ToolError
 
 SCHEMA = {
@@ -60,4 +59,4 @@ def build_wait_child_agent_tool(futures: dict) -> ToolDefinition:
                 metadata={"tool_name": "wait_child_agent"}
             )
 
-    return ToolDefinition(name="wait_child_agent", schema=SCHEMA, handler=wait_child_agent)
+    return ToolDefinition(name="wait_child_agent", schema=SCHEMA, handler=wait_child_agent,risk_level=RiskLevel.SAFE)

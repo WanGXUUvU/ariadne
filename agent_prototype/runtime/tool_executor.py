@@ -19,6 +19,7 @@ class ToolTurnResult:
     events: list[AgentEvent]
     tool_messages: list[ChatMessage]
     next_event_index: int
+    paused_for_approval:bool=False  # 默认 False，只有遇到审批拦截时才是 True
 
 
 def handle_tool_calls(
@@ -114,6 +115,7 @@ async def async_handle_tool_calls(
     on_tool_finish=None,
     approval_policy:ApprovalPolicy=ApprovalPolicy.NEVER,
     on_approval_required=None,
+    saved_messages:Optional[list[ChatMessage]]=None,
 ) -> AsyncIterator[Union[AgentEvent, ToolTurnResult]]:
     """处理一轮模型返回的 tool calls。 AsyncIterator 是告诉类型检查器"这个函数会逐条产出 AgentEvent 或 ToolTurnResult"""
 
@@ -140,8 +142,11 @@ async def async_handle_tool_calls(
             approval_id = None
             if on_approval_required:
                 approval_id = on_approval_required(
+                    tool_call.id,
                     tool_call.function.name,
                     tool_call.function.arguments,
+                    saved_messages,
+                    current_index,
                 )
             yield AgentEvent(
                 index=current_index,
@@ -151,7 +156,13 @@ async def async_handle_tool_calls(
                 content=approval_id or tool_call.function.arguments,
             )
             current_index+=1
-            continue
+            yield ToolTurnResult(
+                events=[],
+                tool_messages=[],
+                next_event_index=current_index,
+                paused_for_approval=True,
+            )
+            return
         if on_tool_start:
             record_id=on_tool_start(
                 tool_call.function.name,

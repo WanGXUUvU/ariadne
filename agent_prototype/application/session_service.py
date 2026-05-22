@@ -1,8 +1,9 @@
 import uuid  # 生成新的 session_id  # 这一行负责唯一 ID
 from sqlalchemy.orm import Session  # 数据库会话类型  # 这一行负责事务上下文
 
-from ..core.schemas import AgentState, CreateSessionInput, ResetInput, SessionSummary,PermissionProfile,SandboxMode,ApprovalPolicy  # session 相关 schema  # 这一行负责输入输出类型
+from ..core.schemas import AgentState, CreateSessionInput, ResetInput, SessionSummary,PermissionProfile,SandboxMode,ApprovalPolicy, RenameSessionInput  # session 相关 schema  # 这一行负责输入输出类型
 from ..storage.stores.session_store import SqliteSessionStore  # session 持久化仓库  # 这一行负责读写数据库记录
+from ..storage.models import ProviderConfig, ModelSetting
 
 PROFILES = {
     "conservative": PermissionProfile(
@@ -29,6 +30,18 @@ def create_session_service(payload:CreateSessionInput,db:Session)->SessionSummar
     session_id=uuid.uuid4().hex
     state=AgentState()
 
+    # 查找默认 provider，自动填入初始模型
+    default_provider = db.query(ProviderConfig).filter(ProviderConfig.is_default == 1).first()
+    default_provider_id = None
+    default_model_id = None
+    if default_provider:
+        default_model = db.query(ModelSetting).filter(
+            ModelSetting.provider_id == default_provider.id,
+            ModelSetting.enabled == 1,
+        ).first()
+        default_provider_id = default_provider.id
+        default_model_id = default_model.model_id if default_model else None
+
     try:
         record = store.upsert_session_snapshot(
             session_id,  # 把新生成的 session_id 写入主表
@@ -37,8 +50,9 @@ def create_session_service(payload:CreateSessionInput,db:Session)->SessionSummar
             last_agent_name=None,  # 新建空会话时还没有运行过 agent
             last_skill_name=None,  # 新建空会话时也还没有使用任何 skill
             last_reply_preview=None,  # 没有回复，自然没有 reply preview
-            
         )
+        record.model_provider_id = default_provider_id
+        record.model_id = default_model_id
         db.commit()  # 把新 session 真正提交到数据库
         db.refresh(record)  # 刷新 ORM 对象，确保 created_at / updated_at 等数据库字段可读
     except Exception:
@@ -122,5 +136,35 @@ def rename_session_service(session_id:str,new_name:str,db:Session)->dict[str,boo
         raise
 
     return{"ok":True}
+
+
+def update_session_service(session_id: str, payload: RenameSessionInput, db: Session) -> dict[str, bool]:
+    """更新 session 配置，支持重命名、修改权限档位、模型 ID、服务商 ID 以及深度思考参数。"""
+    store = SqliteSessionStore(db)
+    record = store.read_session_record(session_id)
+    if record is None:
+        raise ValueError("Session not found")
+
+    try:
+        if payload.session_name is not None:
+            store.rename_session(session_id, payload.session_name)
+        if payload.permission_profile is not None:
+            record.permission_profile = payload.permission_profile
+        if payload.model_id is not None:
+            # 支持传入空（即取消绑定）
+            record.model_id = payload.model_id
+        if payload.model_provider_id is not None:
+            record.model_provider_id = payload.model_provider_id
+        if payload.thinking_enabled is not None:
+            record.thinking_enabled = 1 if payload.thinking_enabled else 0
+        if payload.thinking_effort is not None:
+            record.thinking_effort = payload.thinking_effort
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return {"ok": True}
 
 

@@ -9,11 +9,12 @@
 """
 
 import json
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-
+from ...model.model_types import ModelUsage
 from ...core.schemas import AgentEvent, AgentState,ChatMessage
 from ..models import SessionRecord, SessionRunEventRecord, SessionRunRecord,ToolCallRecord
 
@@ -39,6 +40,7 @@ class SqliteSessionStore:
         last_agent_name=_UNSET,
         last_skill_name=_UNSET,
         last_reply_preview=_UNSET,
+        context_tokens:Optional[int]=None
     ) -> SessionRecord:
         """输入：session 标识、状态快照和若干元数据。输出：插入或更新后的 SessionRecord。
 
@@ -68,6 +70,8 @@ class SqliteSessionStore:
 
             if last_skill_name is not _UNSET:
                 record.last_skill_name = last_skill_name
+            
+            record.context_tokens=context_tokens
         else:
             record = SessionRecord(
                 session_id=session_id,  # 新记录直接使用传入的 session_id
@@ -77,6 +81,7 @@ class SqliteSessionStore:
                 last_skill_name=None if last_skill_name is _UNSET else last_skill_name,  # 同理处理 skill
                 message_count=message_count,  # 新记录的消息数直接来自当前 state
                 last_reply_preview=None if last_reply_preview is _UNSET else last_reply_preview,  # 没传就 None，显式传 None 也还是 None
+                context_tokens=context_tokens,
             )
             self.db.add(record)  # 把新建记录加入当前事务
 
@@ -104,6 +109,7 @@ class SqliteSessionStore:
             user_input=user_input,
             reply=reply,
             event_count=len(events),
+            finished_at=datetime.utcnow(),
         )
         self.db.add(run_record)
 
@@ -138,6 +144,7 @@ class SqliteSessionStore:
             user_input:str,
             partial_reply:str,
             state:AgentState,
+            events:list = [],
     )->SessionRunRecord:
         # 用 run_id 查 run 明细表，防止重复插入同一条 run 记录
         existing=self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id==run_id).first()
@@ -150,12 +157,31 @@ class SqliteSessionStore:
             skill_name=skill_name,
             user_input=user_input,
             reply=partial_reply,
-            event_count=0,
+            event_count=len(events),
+            finished_at=datetime.utcnow(),
         )
-        
         self.db.add(run_record)
 
-        state.messages.append(ChatMessage(role="assistant",content=partial_reply))
+        # 保存第一阶段 events（工具调用、approval_required 等）
+        for index, event in enumerate(events):
+            event_dict = event.model_dump(exclude_none=True)
+            self.db.add(
+                SessionRunEventRecord(
+                    run_id=run_id,
+                    event_index=index,
+                    type=event_dict["type"],
+                    content=event_dict.get("content") or "",
+                    tool_name=event_dict.get("tool_name"),
+                    tool_call_id=event_dict.get("tool_call_id"),
+                    tool_result_json=(
+                        json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
+                        if event_dict.get("tool_result") else None
+                    ),
+                )
+            )
+
+        if partial_reply:
+            state.messages.append(ChatMessage(role="assistant", content=partial_reply))
 
         record=self.db.query(SessionRecord).filter(SessionRecord.session_id==session_id).first()
         if record:
@@ -205,6 +231,37 @@ class SqliteSessionStore:
             .order_by(SessionRunEventRecord.event_index.asc(), SessionRunEventRecord.id.asc())
             .all()
         )
+    def append_run_events(self,*,run_id,new_events:list[AgentEvent],final_reply:str,)->None:
+        run_record=self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id==run_id).first()
+        if not run_record:
+            raise ValueError(f"run_id{run_id} not found")
+        from sqlalchemy import func as sqlfunc
+        max_index=self.db.query(sqlfunc.max(SessionRunEventRecord.event_index)).filter(SessionRunEventRecord.run_id==run_id).scalar()
+        next_index =(max_index+1) if max_index is not None else 0
+        for event in new_events:
+            event_dict = event.model_dump(exclude_none=True)
+            self.db.add(
+                SessionRunEventRecord(
+                    run_id=run_id,
+                    event_index=next_index,
+                    type=event_dict["type"],
+                    content=event_dict.get("content") or "",
+                    tool_name=event_dict.get("tool_name"),
+                    tool_call_id=event_dict.get("tool_call_id"),
+                    tool_result_json=(
+                        json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
+                        if event_dict.get("tool_result")
+                        else None
+                    ),
+                )
+            )
+            next_index += 1
+        
+        run_record.reply = final_reply
+        run_record.event_count = (max_index + 1 if max_index is not None else 0) + len(new_events)
+        run_record.run_status = "completed"
+        run_record.finished_at = sqlfunc.now()
+
 
     def list_sessions(self) -> list[SessionRecord]:
         """输入：无。输出：按更新时间倒序排列的 SessionRecord 列表。"""
@@ -308,6 +365,7 @@ class SqliteSessionStore:
             reply=reply,
             event_count=len(events),
             run_status="completed",  # create_child_run 只在子 Agent 执行完后调用，直接写 completed
+            finished_at=datetime.utcnow(),
         )
         self.db.add(run_record)
 

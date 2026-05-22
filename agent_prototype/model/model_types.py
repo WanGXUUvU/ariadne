@@ -70,6 +70,7 @@ class ModelStreamEvent(BaseModel):
     type: str  # 事件类型，先保持通用
     response_id: Optional[str] = None  # 事件所属 response id
     content_delta: Optional[str] = None  # 增量文本
+    thinking_delta:Optional[str]=None
     tool_call_id: Optional[str] = None  # 工具调用 id
     tool_name: Optional[str] = None  # 工具名
     finish_reason: Optional[str] = None  # 流结束原因

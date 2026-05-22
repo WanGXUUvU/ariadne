@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import type { SessionSummary, ChildAgentInfo } from '../types';
 
 const props = defineProps<{
@@ -38,6 +38,37 @@ const cancelEdit = () => {
 };
 
 const searchQuery = ref('');
+const isFocused = ref(false);
+const searchInputRef = ref<HTMLInputElement | null>(null);
+
+// 全局快捷键监听逻辑
+const handleGlobalKeyDown = (e: KeyboardEvent) => {
+  // 如果当前焦点已经在 input、textarea 或可编辑元素上，则不抢夺焦点（除非是快捷键操作 searchInput 本身）
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return;
+  }
+
+  // 1. 斜杠 `/` 键聚焦搜索框 (需防止输入斜杠字符)
+  if (e.key === '/') {
+    e.preventDefault();
+    searchInputRef.value?.focus();
+  }
+
+  // 2. ⌘K 或 Ctrl+K 聚焦搜索框
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    searchInputRef.value?.focus();
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeyDown);
+});
 
 const filteredSessions = computed(() => {
   const normalized = searchQuery.value.trim().toLowerCase();
@@ -58,8 +89,26 @@ const isUuid = (s: string) => /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{
 
 const getSessionTitle = (session: SessionSummary) => {
   const name = session.session_name;
-  if (!name || name === session.session_id || isUuid(name)) return null;
-  return name;
+  if (name && name !== session.session_id && !isUuid(name)) {
+    return name;
+  }
+  // Try to use last reply preview or first sentence of it as fallback
+  if (session.last_reply_preview) {
+    const preview = session.last_reply_preview.trim();
+    if (preview) {
+      // Find sentence ending characters (Chinese/English)
+      const sentenceEnd = preview.match(/[。？！.?!]/);
+      let fallbackTitle = preview;
+      if (sentenceEnd && sentenceEnd.index !== undefined && sentenceEnd.index > 0) {
+        fallbackTitle = preview.slice(0, sentenceEnd.index + 1);
+      }
+      if (fallbackTitle.length > 28) {
+        fallbackTitle = fallbackTitle.slice(0, 26) + '...';
+      }
+      return fallbackTitle;
+    }
+  }
+  return null;
 };
 
 const getSessionId = (session: SessionSummary) => {
@@ -87,7 +136,15 @@ const getChildrenForSession = (sessionId: string): ChildAgentInfo[] => {
 
     <div class="search-box">
       <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-      <input v-model="searchQuery" placeholder="Filter..." class="search-input" />
+      <input 
+        ref="searchInputRef" 
+        v-model="searchQuery" 
+        placeholder="Filter..." 
+        class="search-input" 
+        @focus="isFocused = true"
+        @blur="isFocused = false"
+      />
+      <kbd class="search-kbd" :class="{ 'kbd-hide': isFocused }">⌘K</kbd>
     </div>
 
     <div class="session-list">
@@ -124,7 +181,6 @@ const getChildrenForSession = (sessionId: string): ChildAgentInfo[] => {
               <span v-else class="session-title-untitled">Untitled <span class="session-hash">{{ getSessionId(session) }}</span></span>
             </template>
           </div>
-          <div class="session-preview" v-if="session.last_reply_preview">{{ session.last_reply_preview }}</div>
           <div class="session-meta mono-label">{{ session.message_count || 0 }} MSG &middot; {{ formatTime(session.updated_at || session.created_at) }}</div>
         </div>
         <div class="session-actions">
@@ -159,30 +215,7 @@ const getChildrenForSession = (sessionId: string): ChildAgentInfo[] => {
 </template>
 
 <style scoped>
-.search-box {
-  padding: 12px;
-  border-bottom: 1px solid var(--border-dim);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.search-icon {
-  color: var(--text-muted);
-}
-
-.search-input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-size: 13px;
-  width: 100%;
-}
-
-.search-input::placeholder {
-  color: var(--text-muted);
-}
+/* 💡 .search-box and search input scoped rules removed to let global spotlight styling in index.css take effect */
 
 .session-list {
   flex: 1;
@@ -198,26 +231,7 @@ const getChildrenForSession = (sessionId: string): ChildAgentInfo[] => {
   text-align: center;
 }
 
-.session-item {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-dim);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  transition: var(--transition-fast);
-  animation: fadeIn 0.3s ease both;
-}
-
-.session-item:hover {
-  background: var(--bg-hover);
-}
-
-.session-item.active {
-  background: var(--accent-subtle, rgba(255,255,255,0.06));
-  border-left: 2px solid var(--accent);
-  padding-left: 14px;
-}
+/* 💡 .session-item, hover and active scoped rules removed to enable high-end floating cards from index.css */
 
 .session-info {
   display: flex;
@@ -336,9 +350,7 @@ const getChildrenForSession = (sessionId: string): ChildAgentInfo[] => {
   box-sizing: border-box;
 }
 
-.session-item.active .session-title {
-  color: var(--accent);
-}
+/* 💡 Active state title color override removed to let theme accent color apply */
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }

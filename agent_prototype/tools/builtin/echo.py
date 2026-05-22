@@ -1,5 +1,6 @@
 from ...core.tool_types import ToolDefinition
 from ...core.schemas import ToolResult
+from ...core.tool_types import RiskLevel
 
 def echo_tool(text: str) -> ToolResult:
     """输入：文本字符串。输出：回显该文本的 ToolResult。"""
@@ -36,4 +37,5 @@ def build_echo_tool_definition() -> ToolDefinition:  # 构造注册对象
         name="echo_tool",  # 工具名
         schema=ECHO_TOOL_SCHEMA,  # schema
         handler=echo_tool,  # 执行函数
+        risk_level=RiskLevel.SAFE
     )

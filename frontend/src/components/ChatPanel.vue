@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import type { AgentMessage, TraceRunSummary } from '../types';
+import type { AgentMessage, TraceRunSummary, ApprovalInfo } from '../types';
 import type { UiAgentOption } from '../types/ui';
 import MessageList from './MessageList.vue';
 import MessageComposer from './MessageComposer.vue';
+import ApprovalCard from './ApprovalCard.vue';
 
 const props = defineProps<{
   messages: AgentMessage[];
@@ -19,6 +20,20 @@ const props = defineProps<{
   isStreaming?: boolean;
   streamingTimeline?: import('../types').StreamingItem[];
   lastCompletedRun?: TraceRunSummary | null;
+  isAwaitingApproval?: boolean;
+  pendingApprovalInfo?: ApprovalInfo | null;
+  permissionProfile?: string;
+  /** 当前已使用的 token 数（来自 session.context_tokens） */
+  contextTokens?: number;
+  /** 模型最大上下文长度（来自选中模型的 context_length） */
+  contextLength?: number;
+  sessionId: string | null;
+  modelId: string | null;
+  providerId: number | null;
+  thinkingEnabled: boolean;
+  thinkingEffort: string;
+  /** 当前 session 详情正在加载中 */
+  sessionLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -29,10 +44,18 @@ const emit = defineEmits<{
   (e: 'compact'): void;
   (e: 'reset'): void;
   (e: 'stop'): void;
+  (e: 'approve'): void;
+  (e: 'reject'): void;
+  (e: 'approveAll'): void;
+  (e: 'update:permissionProfile', profile: string): void;
+  (e: 'update:model', val: { modelId: string | null; providerId: number | null }): void;
+  (e: 'update:thinkingEnabled', val: boolean): void;
+  (e: 'update:thinkingEffort', val: string): void;
 }>();
 
 const agentDropdownOpen = ref(false);
 const agentSelectorRef = ref<HTMLElement | null>(null);
+
 const activeAgentName = computed(() => props.agents.find(a => a.id === props.activeAgentId)?.name ?? props.activeAgentId);
 const selectAgent = (id: string) => {
   emit('update:activeAgentId', id);
@@ -107,14 +130,7 @@ const handleReset = () => {
 
         <div class="header-divider"></div>
 
-        <button class="icon-btn" @click="$emit('compact')" :disabled="isCompacting || isLoading" title="Compact context">
-          <template v-if="isCompacting">
-            <span class="blink" style="font-size:8px;">●</span>
-          </template>
-          <template v-else>
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 14h6v6"></path><path d="M20 10h-6V4"></path><path d="M14 10l7-7"></path><path d="M3 21l7-7"></path></svg>
-          </template>
-        </button>
+
 
         <button class="icon-btn danger" @click="handleReset" title="Reset session">
           <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 .49-4.95"></path></svg>
@@ -144,12 +160,36 @@ const handleReset = () => {
       :lastCompletedRun="lastCompletedRun"
     />
 
+    <ApprovalCard
+      v-if="isAwaitingApproval && pendingApprovalInfo"
+      :approval="pendingApprovalInfo"
+      :isLoading="isLoading"
+      @approve="$emit('approve')"
+      @approve-all="$emit('approveAll')"
+      @reject="$emit('reject')"
+    />
+
     <MessageComposer
       :disabled="isLoading || isCompacting"
       :messageCount="messages.length"
       :isStreaming="isStreaming"
+      :permissionProfile="permissionProfile"
+      :sessionId="sessionId"
+      :modelId="modelId"
+      :providerId="providerId"
+      :thinkingEnabled="thinkingEnabled"
+      :thinkingEffort="thinkingEffort"
+      :sessionLoading="sessionLoading"
+      :contextTokens="contextTokens"
+      :contextLength="contextLength"
+      :isCompacting="isCompacting"
       @send="$emit('send', $event)"
       @stop="$emit('stop')"
+      @update:permissionProfile="$emit('update:permissionProfile', $event)"
+      @update:model="$emit('update:model', $event)"
+      @update:thinkingEnabled="$emit('update:thinkingEnabled', $event)"
+      @update:thinkingEffort="$emit('update:thinkingEffort', $event)"
+      @compact="$emit('compact')"
     />
   </main>
 </template>
@@ -159,7 +199,7 @@ const handleReset = () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-app);
+  background: transparent !important;
   position: relative;
 }
 
@@ -201,9 +241,10 @@ const handleReset = () => {
   justify-content: space-between;
   padding: 10px 20px;
   border-bottom: 1px solid var(--border-dim);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: rgba(10, 10, 10, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  /* 💡 顶级设计：半透明，完美穿透流动星云，随极客主题底色自适应变色 */
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.4) !important;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -336,11 +377,14 @@ const handleReset = () => {
   top: calc(100% + 6px);
   right: 0;
   min-width: 200px;
-  background: var(--bg-elevated);
+  /* 💡 磨砂半透明高阶材质，配合光晕阴影 */
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 4px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), var(--shadow-glow);
   z-index: 100;
 }
 .agent-option {
@@ -436,4 +480,6 @@ const handleReset = () => {
   border-radius: 4px;
 }
 .notice-close:hover { opacity: 1; }
+
+
 </style>

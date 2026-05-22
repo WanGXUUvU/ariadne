@@ -15,6 +15,7 @@ from typing import Iterator, Optional, Union,AsyncIterator
 from ..core.agent_definition import AgentDefinition, DEFAULT_AGENT_DEFINITION
 from ..core.schemas import AgentEvent, AgentInput, AgentOutput, AgentState, ChatMessage, RunMetadata,ToolCall, ToolCallFunction,ApprovalPolicy
 from ..model.adapter import ModelAdapter
+from ..model.model_types import ModelStreamEvent
 from ..tools.tool_registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
 from .message_builder import build_model_request
 from .response_handler import build_final_turn
@@ -38,7 +39,7 @@ class Agent:
         self.allow_tool_names = allow_tool_names if allow_tool_names is not None else self.definition.tool_names
         self.model_adapter = model_adapter
         self.approval_policy=approval_policy
-
+        self.last_usage=None
     def run(self, agent_input: AgentInput) -> AgentOutput:
         """输入：AgentInput 请求对象。输出：包含 reply、state、events 的 AgentOutput。"""
 
@@ -86,6 +87,7 @@ class Agent:
                 reply=reply,
                 state=self.state,
                 events=events,
+                usage=response.usage,
                 metadata=RunMetadata(
                     session_id=agent_input.session_id,
                 ),
@@ -114,6 +116,12 @@ class Agent:
             finish_reason: Optional[str]=None
 
             for event in self.model_adapter.stream_generate(request):
+                if event.type=="done" and event.usage:
+                    self.last_usage=event.usage
+                    continue
+                if event.type == "thinking_delta":
+                    yield event   # 直接透传给 run_service，不改 finish_reason
+                    continue
                 finish_reason = event.finish_reason or finish_reason
 
                 if event.content_delta:
@@ -168,11 +176,12 @@ class Agent:
             self.state.messages.append(assistant_message)
             break
 
-    async def async_stream_run(self, agent_input: AgentInput,on_tool_start=None,on_tool_finish=None,on_approval_required=None) -> AsyncIterator[Union[AgentEvent, str]]:
+    async def async_stream_run(self, agent_input: AgentInput,on_tool_start=None,on_tool_finish=None,on_approval_required=None,skip_user_message:bool=False,event_index = 0) -> AsyncIterator[Union[AgentEvent, str]]:
         """输入：AgentInput。输出：逐步 yield AgentEvent（工具阶段）或 str（delta，最终回答阶段）。"""
 
-        event_index = 0
-        self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
+
+        if not skip_user_message:
+            self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
         self.state.step += 1
 
         while True:
@@ -191,6 +200,12 @@ class Agent:
             finish_reason: Optional[str]=None
 
             async for event in self.model_adapter.async_stream_generate(request):
+                if event.type=="done" and event.usage:
+                    self.last_usage= event.usage
+                    continue
+                if event.type == "thinking_delta":
+                    yield event   # 直接透传给 run_service，不改 finish_reason
+                    continue
                 finish_reason = event.finish_reason or finish_reason
 
                 if event.content_delta:
@@ -236,11 +251,14 @@ class Agent:
                     on_tool_finish=on_tool_finish,
                     approval_policy=self.approval_policy,
                     on_approval_required=on_approval_required,
+                    saved_messages=list(self.state.messages),
                 ):
                     if isinstance(item,AgentEvent):
                         yield item
                     else:
                         tool_turn = item
+                if tool_turn.paused_for_approval:
+                    break
                 if tool_turn.next_event_index is None:
                     raise RuntimeError("tool turn miss result")
                 event_index = tool_turn.next_event_index

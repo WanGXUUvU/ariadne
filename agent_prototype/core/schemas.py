@@ -11,7 +11,6 @@ FastAPI 会基于这些模型做参数校验、类型转换和响应序列化。
 from datetime import datetime
 from enum import Enum
 from typing import Any, Literal, Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -109,9 +108,12 @@ class StreamFrame(BaseModel):
     - delta      : 最终回答阶段的 token 级增量内容
     - end        : 运行完成，包含完整 reply / state / metadata
     - error      : 运行失败，包含错误码和错误信息
+    - paused     : 运行因审批暂停，包含 run_id
+    - resume         : 审批通过后恢复运行，包含 run_id
+    - thinking_delta : 思考过程的 token 级增量内容
     """
 
-    type: Literal["start", "agent_event", "delta", "end", "error"]
+    type: Literal["start", "agent_event", "delta", "end", "error", "paused", "resume", "thinking_delta"]
     data: dict[str, Any]
 
 
@@ -144,6 +146,7 @@ class AgentOutput(BaseModel):
     state: AgentState
     events: list[AgentEvent]
     metadata: RunMetadata
+    usage: Optional[Any] = None  # ModelUsage，运行时由 agent_runtime 填入
 
 
 class FinalizeRunInput(BaseModel):
@@ -180,10 +183,14 @@ class CreateSessionInput(BaseModel):
 
 
 class RenameSessionInput(BaseModel):
-    """session 重命名请求体。"""
+    """session 重命名/更新请求体。"""
 
-    session_name: str  # 新的会话名称
-
+    session_name: Optional[str] = None  # 新的会话名称（可选）
+    permission_profile: Optional[str] = None  # 权限档位（可选）：conservative / standard / full-auto
+    model_id: Optional[str] = None
+    model_provider_id: Optional[int] = None
+    thinking_enabled: Optional[bool] = None
+    thinking_effort: Optional[str] = None
 
 class ResetInput(BaseModel):
     """`/reset` 请求体。"""
@@ -203,12 +210,17 @@ class SessionSummary(BaseModel):
     message_count: int = 0
     last_reply_preview: Optional[str] = None
     permission_profile: str = "conservative"
+    context_tokens:Optional[int]=None
 
 
 class SessionDetail(SessionSummary):
     """session 详情，继承摘要信息并补上完整 state。"""
 
     state: AgentState
+    model_id: Optional[str] = None
+    model_provider_id: Optional[int] = None
+    thinking_enabled: bool = False
+    thinking_effort: str = "medium"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -247,6 +259,7 @@ class CompactInput(BaseModel):
     session_id: str = Field(min_length=1)
     trigger_threshold: int = Field(default=12, ge=1)  # 触发 compact 的消息阈值，默认 12，最小 1
     keep_recent_count: int = Field(default=2, ge=1)   # 压缩后保留最近几条原始消息，默认 2，最小 1
+    force: bool = Field(default=False)               # 手动触发时置 True，跳过 token 占用率阈值
 
 
 class CompactOutput(BaseModel):
@@ -255,6 +268,7 @@ class CompactOutput(BaseModel):
     state: AgentState
     did_compact: bool
     removed_count: int = 0  # 一共折叠了多少条旧消息
+    compact_tokens: Optional[int] = None  # 压缩后实际 input_tokens（来自模型 usage），用于更新 context_tokens
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -312,3 +326,47 @@ class RiskLevel(str, Enum):
     SAFE   = "safe"    # 只读，永远不需要审批
     WRITE  = "write"   # 写操作，视策略决定
     DANGER = "danger"  # 高危，除非 never 否则都要审批
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 设置 — Settings (TASK-072a)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class CreateProviderInput(BaseModel):
+    name: str
+    base_url: str
+    api_key: str
+
+
+class ProviderOut(BaseModel):
+    id: int
+    name: str
+    base_url: str
+    api_key_hint: Optional[str] = None
+    is_default: bool
+    created_at: datetime
+
+
+class PatchProviderInput(BaseModel):
+    name: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    is_default: Optional[bool] = None
+
+
+class PatchModelInput(BaseModel):
+    enabled: Optional[bool] = None
+    display_name: Optional[str] = None
+
+
+class ModelOut(BaseModel):
+    id: int
+    provider_id: int
+    model_id: str
+    display_name: str
+    enabled: bool
+    supports_thinking: bool
+    thinking_style: str
+    effort_levels: list[str]
+    context_length: Optional[int]
+    supports_tools: bool

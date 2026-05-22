@@ -1,4 +1,4 @@
-from ...core.tool_types import ToolDefinition
+from ...core.tool_types import ToolDefinition,RiskLevel
 
 from pathlib import Path
 
@@ -40,4 +40,5 @@ def build_list_dir_definition()->ToolDefinition:
         name="list_dir",
         schema=LIST_DIR_SCHEMA,
         handler=list_dir,
+        risk_level=RiskLevel.SAFE,
     )

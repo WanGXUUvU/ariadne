@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue';
 import { api } from '../api/client';
+import { settingsApi, type ModelSetting } from '../api/settings';
 import type {
   SessionSummary,
   AgentMessage,
@@ -10,6 +11,7 @@ import type {
   TraceRunSummary,
   StreamingItem,
   ChildAgentInfo,
+  ApprovalInfo,
 } from '../types';
 import type { ViewMode } from '../types/ui';
 import type { UiAgentOption } from '../types/ui';
@@ -129,6 +131,33 @@ export function useWorkspace() {
   const lastCompletedRun = ref<TraceRunSummary | null>(null);
   const errorMsg = ref<string | null>(null);
   const infoMsg = ref<string | null>(null);
+
+  // 审批等待状态
+  const isAwaitingApproval = ref(false);
+  const pendingApprovalInfo = ref<ApprovalInfo | null>(null);
+  // 当前 session 的权限档位（本地跟踪，从 session 读取或更新后同步）
+  const permissionProfile = ref<string>('conservative');
+
+  // 当前 session 的模型配置（model_id / thinking_enabled / thinking_effort）
+  const modelId = ref<string | null>(null);
+  const modelProviderId = ref<number | null>(null);
+  const thinkingEnabled = ref<boolean>(false);
+  const thinkingEffort = ref<string>('medium');
+
+  const enabledModels = ref<ModelSetting[]>([]);
+  const loadEnabledModels = async () => {
+    try {
+      enabledModels.value = await settingsApi.listEnabledModels();
+    } catch {
+      // 容错处理
+    }
+  };
+
+  const activeModelContextLength = computed(() => {
+    if (!modelId.value) return 128000;
+    const currentModel = enabledModels.value.find((m) => m.model_id === modelId.value);
+    return currentModel?.context_length ?? 128000;
+  });
 
   // 子 Agent 追踪：key = session_id，value = 当前 session spawn 出的子 Agent 列表
   const childAgentsBySession = ref<Record<string, ChildAgentInfo[]>>({});
@@ -272,8 +301,14 @@ export function useWorkspace() {
       errorMsg.value = null;
     } catch (err: any) {
       errorMsg.value = 'Failed to create session: ' + err.message;
+      return;
     } finally {
       isChatLoading.value = false;
+    }
+    // watch(activeSessionId) 在 isChatLoading=true 时被跳过，新 session 的模型配置不会自动加载。
+    // 在这里显式调用 loadSessionDetail，确保新 session 的 modelId 等字段从后端正确同步。
+    if (activeSessionId.value) {
+      await loadSessionDetail(activeSessionId.value);
     }
   };
 
@@ -310,6 +345,13 @@ export function useWorkspace() {
       
       currentMessages.value = msgs;
       extractChildAgents(id, msgs);
+      // 同步 permission_profile
+      permissionProfile.value = detail.permission_profile ?? 'conservative';
+      // 同步模型配置字段（后端 session 记录里存的选项）
+      modelId.value = (detail as any).model_id ?? null;
+      modelProviderId.value = (detail as any).model_provider_id ?? null;
+      thinkingEnabled.value = (detail as any).thinking_enabled ?? false;
+      thinkingEffort.value = (detail as any).thinking_effort ?? 'medium';
       errorMsg.value = null;
     } catch (err: any) {
       if (err.message.includes('not found') || err.message.includes('404')) {
@@ -358,15 +400,62 @@ export function useWorkspace() {
           } else {
             streamingTimeline.value = [...tl, { kind: 'text', content: frame.data.content }];
           }
+        } else if (frame.type === 'thinking_delta') {
+          const tl = streamingTimeline.value;
+          const last = tl[tl.length - 1];
+          if (last?.kind === 'thinking') {
+            last.content += frame.data.content;
+            streamingTimeline.value = [...tl];
+          } else {
+            streamingTimeline.value = [...tl, { kind: 'thinking', content: frame.data.content }];
+          }
         } else if (frame.type === 'agent_event') {
           // 工具事件直接追加（跳过 final_answer，那是文字回答的元数据）
           if (frame.data.type !== 'final_answer') {
             streamingTimeline.value = [...streamingTimeline.value, { kind: 'event', event: frame.data }];
           }
+          // 提取 approval_required 事件，记录 approval_id 和 tool 信息
+          if (frame.data.type === 'approval_required' && frame.data.content) {
+            // content 字段存的是 approval_id
+            const approvalId = frame.data.content;
+            pendingApprovalInfo.value = {
+              approval_id: approvalId,
+              tool_name: frame.data.tool_name ?? '',
+              arguments: '',  // 从后端 GET 获取，稍后填充
+              run_id: capturedRunId ?? '',
+            };
+            // 异步获取完整的 arguments
+            api.getApproval(approvalId).then(info => {
+              if (pendingApprovalInfo.value?.approval_id === approvalId) {
+                pendingApprovalInfo.value = { ...pendingApprovalInfo.value, arguments: info.arguments };
+              }
+            }).catch(() => {});
+          }
           // 实时检测 spawn_child_agent，让侧边栏立即出现子 Agent
           if (activeSessionId.value) {
             onLiveAgentEvent(activeSessionId.value, frame.data);
           }
+        } else if (frame.type === 'paused') {
+          // Agent 因审批暂停
+          isAwaitingApproval.value = true;
+          // 冻结当前 streaming timeline 保留已输出内容
+          const partialTimeline = [...streamingTimeline.value];
+          if (capturedRunId) {
+            writeTimelineToStore(capturedRunId, partialTimeline);
+          }
+          // 追加 assistant 消息（含已有内容）
+          const partialText = partialTimeline
+            .filter(i => i.kind === 'text').map(i => i.content).join('');
+          const newMsgs = [...currentMessages.value];
+          if (partialText) {
+            for (let i = newMsgs.length - 1; i >= 0; i--) {
+              if (newMsgs[i].role === 'assistant') {
+                newMsgs[i] = { ...newMsgs[i], timeline: partialTimeline };
+                break;
+              }
+            }
+          }
+          currentMessages.value = newMsgs;
         } else if (frame.type === 'end') {
           // 冻结时间线，patch 进新消息里，再替换 currentMessages
           const frozenTimeline = [...streamingTimeline.value];
@@ -408,6 +497,7 @@ export function useWorkspace() {
       }
     } finally {
       isChatLoading.value = false;
+      // 如果正在等待审批，保持 isStreaming=false 但不清空 approval 状态
       isStreaming.value = false;
       streamingTimeline.value = [];
       streamAbortController.value = null;
@@ -446,6 +536,159 @@ export function useWorkspace() {
         ...currentMessages.value,
         { role: 'assistant', content: partialReply, stopped: true },
       ];
+    }
+  };
+
+  // 审批操作：通用 SSE 流处理
+  async function _handleApprovalStream(streamFn: () => AsyncGenerator<any>) {
+    if (!pendingApprovalInfo.value) return;
+
+    // 捕获初始运行（assistant_tool_call + approval_required）的 timeline，后面合并进续跑结果
+    const initialTimeline: StreamingItem[] = [];
+    for (let i = currentMessages.value.length - 1; i >= 0; i--) {
+      const m = currentMessages.value[i];
+      if (m.role === 'assistant' && m.timeline && m.timeline.length > 0) {
+        initialTimeline.push(...m.timeline);
+        break;
+      }
+    }
+
+    isStreaming.value = true;
+    isChatLoading.value = true;
+    streamingTimeline.value = [];
+    errorMsg.value = null;
+    let capturedRunId: string | null = null;
+
+    try {
+      for await (const frame of streamFn()) {
+        if (frame.type === 'start' || frame.type === 'resume') {
+          capturedRunId = frame.data.run_id;
+        } else if (frame.type === 'delta') {
+          const tl = streamingTimeline.value;
+          const last = tl[tl.length - 1];
+          if (last?.kind === 'text') {
+            last.content += frame.data.content;
+            streamingTimeline.value = [...tl];
+          } else {
+            streamingTimeline.value = [...tl, { kind: 'text', content: frame.data.content }];
+          }
+        } else if (frame.type === 'thinking_delta') {
+          const tl = streamingTimeline.value;
+          const last = tl[tl.length - 1];
+          if (last?.kind === 'thinking') {
+            last.content += frame.data.content;
+            streamingTimeline.value = [...tl];
+          } else {
+            streamingTimeline.value = [...tl, { kind: 'thinking', content: frame.data.content }];
+          }
+        } else if (frame.type === 'agent_event') {
+          if (frame.data.type !== 'final_answer') {
+            streamingTimeline.value = [...streamingTimeline.value, { kind: 'event', event: frame.data }];
+          }
+          if (activeSessionId.value) {
+            onLiveAgentEvent(activeSessionId.value, frame.data);
+          }
+        } else if (frame.type === 'end') {
+          // 合并：初始运行的工具调用事件 + 续跑的工具结果/文字事件
+          const frozenTimeline = [...initialTimeline, ...streamingTimeline.value];
+          if (capturedRunId) {
+            writeTimelineToStore(capturedRunId, frozenTimeline);
+          }
+          const newMsgs = [...(frame.data.state?.messages ?? currentMessages.value)];
+          for (let i = newMsgs.length - 1; i >= 0; i--) {
+            if (newMsgs[i].role === 'assistant') {
+              newMsgs[i] = { ...newMsgs[i], timeline: frozenTimeline };
+              break;
+            }
+          }
+          currentMessages.value = newMsgs;
+          if (activeSessionId.value) {
+            extractChildAgents(activeSessionId.value, newMsgs);
+            const [, traceResult] = await Promise.allSettled([
+              api.getSessions().then(data => { sessions.value = data || []; }),
+              api.getTrace(activeSessionId.value!),
+            ]);
+            if (traceResult.status === 'fulfilled') {
+              traceRuns.value = (traceResult.value as any).runs || [];
+            }
+            if (capturedRunId) {
+              lastCompletedRun.value = traceRuns.value.find(r => r.run_id === capturedRunId) ?? null;
+            }
+          }
+        } else if (frame.type === 'error') {
+          errorMsg.value = frame.data.message ?? 'Approval error';
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        errorMsg.value = 'Resume failed: ' + err.message;
+      }
+    } finally {
+      isAwaitingApproval.value = false;
+      pendingApprovalInfo.value = null;
+      isStreaming.value = false;
+      isChatLoading.value = false;
+      streamingTimeline.value = [];
+    }
+  }
+
+  const approveAction = async () => {
+    if (!pendingApprovalInfo.value) return;
+    const id = pendingApprovalInfo.value.approval_id;
+    await _handleApprovalStream(() => api.streamApprove(id));
+  };
+
+  const rejectAction = async () => {
+    if (!pendingApprovalInfo.value) return;
+    const id = pendingApprovalInfo.value.approval_id;
+    await _handleApprovalStream(() => api.streamReject(id));
+  };
+
+  const approveAllAction = async () => {
+    if (!pendingApprovalInfo.value) return;
+    const id = pendingApprovalInfo.value.approval_id;
+    // 切换到全自动模式，同步更新本地状态和后端
+    await updatePermissionProfile('full-auto');
+    await _handleApprovalStream(() => api.streamApproveAll(id));
+  };
+
+  const updatePermissionProfile = async (profile: string) => {
+    if (!activeSessionId.value) return;
+    permissionProfile.value = profile;
+    try {
+      await api.updateSessionProfile(activeSessionId.value, profile);
+    } catch (err: any) {
+      errorMsg.value = 'Failed to update profile: ' + err.message;
+    }
+  };
+
+  /**
+   * 更新当前 session 的模型配置（model_id / thinking_enabled / thinking_effort）
+   * 乐观更新本地状态后，PATCH 到后端 session 记录。
+   */
+  const updateModelConfig = async (config: {
+    model_id?: string | null;
+    model_provider_id?: number | null;
+    thinking_enabled?: boolean;
+    thinking_effort?: string;
+  }) => {
+    if (!activeSessionId.value) return;
+    // 乐观更新本地
+    if (config.model_id !== undefined) modelId.value = config.model_id;
+    if (config.model_provider_id !== undefined) modelProviderId.value = config.model_provider_id;
+    if (config.thinking_enabled !== undefined) thinkingEnabled.value = config.thinking_enabled;
+    if (config.thinking_effort !== undefined) thinkingEffort.value = config.thinking_effort;
+    try {
+      await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/sessions/${activeSessionId.value}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        },
+      );
+    } catch (err: any) {
+      errorMsg.value = 'Failed to update model config: ' + err.message;
     }
   };
 
@@ -577,7 +820,7 @@ export function useWorkspace() {
 
   const initializeWorkspace = async () => {
     isInitializing.value = true;
-    await Promise.all([loadSessions(), loadSkills(), fetchAgents()]);
+    await Promise.all([loadSessions(), loadSkills(), fetchAgents(), loadEnabledModels()]);
     isInitializing.value = false;
   };
 
@@ -614,12 +857,19 @@ export function useWorkspace() {
     lastCompletedRun,
     errorMsg,
     infoMsg,
+    isAwaitingApproval,
+    pendingApprovalInfo,
+    permissionProfile,
     childAgentsBySession,
     api,
     initializeWorkspace,
     createNewSession,
     sendMessage,
     stopStreaming,
+    approveAction,
+    rejectAction,
+    approveAllAction,
+    updatePermissionProfile,
     compactSession,
     resetSession,
     deleteSession,
@@ -629,5 +879,15 @@ export function useWorkspace() {
     customAgents: computed(() => availableAgents.value.filter(a => !a.is_builtin)),
     saveAgent,
     deleteAgent,
+    // 模型配置
+    modelId,
+    modelProviderId,
+    thinkingEnabled,
+    thinkingEffort,
+    updateModelConfig,
+    enabledModels,
+    loadEnabledModels,
+    activeModelContextLength,
+    settingsApi,
   };
 }

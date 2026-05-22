@@ -15,6 +15,8 @@ export interface SessionSummary {
   last_skill_name?: string | null;
   message_count: number;
   last_reply_preview?: string | null;
+  permission_profile?: string | null;
+  context_tokens?: number | null;
 }
 
 export interface AgentMessage {
@@ -60,11 +62,18 @@ export interface ToolResult {
 
 export interface AgentEvent {
   index: number;
-  type: 'assistant_tool_call' | 'tool_result' | 'tool_error' | 'final_answer';
+  type: 'assistant_tool_call' | 'tool_result' | 'tool_error' | 'final_answer' | 'approval_required' | 'approval_rejected';
   content?: string | null;
   tool_name?: string | null;
   tool_call_id?: string | null;
   tool_result?: ToolResult | null;
+}
+
+export interface ApprovalInfo {
+  approval_id: string;
+  tool_name: string;
+  arguments: string;
+  run_id: string;
 }
 
 export interface TraceRunSummary {
@@ -111,6 +120,10 @@ export interface StreamDeltaData {
   content: string;
 }
 
+export interface StreamThinkingDeltaData {
+  content: string;
+}
+
 export interface StreamEndData {
   reply: string;
   state: SessionState;
@@ -121,14 +134,23 @@ export interface StreamErrorData {
   message: string;
 }
 
+export interface StreamPausedData {
+  run_id: string;
+  approval_id?: string;
+}
+
 export type StreamFrame =
-  | { type: 'start';       data: StreamStartData }
-  | { type: 'agent_event'; data: AgentEvent }
-  | { type: 'delta';       data: StreamDeltaData }
-  | { type: 'end';         data: StreamEndData }
-  | { type: 'error';       data: StreamErrorData };
+  | { type: 'start';          data: StreamStartData }
+  | { type: 'agent_event';    data: AgentEvent }
+  | { type: 'delta';          data: StreamDeltaData }
+  | { type: 'thinking_delta'; data: StreamThinkingDeltaData }
+  | { type: 'end';            data: StreamEndData }
+  | { type: 'error';          data: StreamErrorData }
+  | { type: 'paused';         data: StreamPausedData }
+  | { type: 'resume';         data: StreamStartData };
 
 // 统一时间线：文字和工具事件按到达顺序混排
 export type StreamingItem =
-  | { kind: 'text';  content: string }
-  | { kind: 'event'; event: AgentEvent };
+  | { kind: 'text';     content: string }
+  | { kind: 'thinking'; content: string }
+  | { kind: 'event';    event: AgentEvent };

@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: done
-- Task: specs/TASK-041.md
+- Phase: completed
+- Task: specs/TASK-072b.md + UI Premium Refactoring
 - Gate: Verify / Review
-- Allowed Now: next task selection
+- Allowed Now: coach
 - Lane: Fast
 - Blocked: None
-- Next action: 选择下一张任务卡
+- Next action: Waiting for next task instructions.
 
 ## 读取规则
 - `STATUS.md` 是当前唯一权威入口，先看这里再看路线图。
@@ -22,6 +22,10 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
+| 2026-05-22 | 已完成任务卡归档 | — | 将 TASK-030/035/036/037/038/038-1/038-2/040/040b/041/071/072a/072b 移入 `specs/done/`；SUPP-03/04 未完成保留原位。 |
+| 2026-05-22 | 极精细镂空 SVG 图标与高内聚工具卡片重构 | Verify / Review | 成功手绘 9 个 1.5px 圆角镂空 SVG 图标，实现事件流按 `tool_call_id` 高度聚拢为单卡片，支持手风琴展开查看参数、耗时及响应，完美通过严格打包。 |
+| 2026-05-21 | UI Premium 顶奢重构完成 | Verify / Review | 成功实现 820px 黄金视域消息列、右置不对称微光对话气泡、Spotlight 侧边栏浮雕会话卡片、以及随主题变色的半透明磨砂 Header，打包构建 100% 通过。 |
+| 2026-05-21 | `TASK-072b` 与 UI 视觉动效升级收口 | Verify / Review | 成功实现 4 套极客深色主题、输入框毛玻璃拟态与 3D 聚焦悬浮发光轮廓、以及符合弹簧物理特性的消息上滑滑动动效，前端严格构建 `npm run build` 100% 通过。 |
 | 2026-05-19 | `TASK-041` 收口 | Verify / Review | Agent 管理全链路完成：builtin agent 从 .md 文件加载（is_builtin 标记）、自定义 agent CRUD（POST/DELETE /agents）、前端 AgentManager 面板（新建/编辑/删除）、工具多选下拉（GET /tools）、dropdown 绑定真实后端数据替换 MOCK_AGENTS。 |
 | 2026-05-18 | 子 Agent 面板 bug 修复 & code review | Verify / Review | 修复 save_partial_run 查错表、_global_futures 内存泄漏、子 Agent 未透传 RUN_MODEL；前端修复 AgentEvent 导入缺失、extractChildAgents 状态硬编码、localStorage 无限增长；子 Agent 最终输出支持 Markdown 渲染，formatContent 提取为共享工具；面板滚动问题修复。 |
 | 2026-05-17 | `TASK-040` 收口 | Verify / Review | 多 Agent 子任务模型完成：parent_run_id 字段+migration、create_child_run/get_children_runs、spawn_child_agent 工具、build_run_registry 动态注册、5个单测全通过。 |

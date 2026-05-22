@@ -1,5 +1,5 @@
 from ...core.tool_types import ToolDefinition
-from ...core.schemas import ToolResult
+from ...core.schemas import ToolResult, RiskLevel
 import json
 
 def build_check_child_status_tool(futures:dict)->ToolDefinition:
@@ -57,4 +57,5 @@ def build_check_child_status_tool(futures:dict)->ToolDefinition:
         name="check_child_status",      # ← 工具名
         schema=SCHEMA,
         handler=check_child_status,     # ← handler 函数名
+        risk_level=RiskLevel.SAFE,
     )

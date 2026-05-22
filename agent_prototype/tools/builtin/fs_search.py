@@ -1,4 +1,4 @@
-from ...core.tool_types import ToolDefinition
+from ...core.tool_types import ToolDefinition,RiskLevel
 
 from pathlib import Path
 
@@ -59,5 +59,6 @@ def build_search_text_definition()->ToolDefinition:
     return ToolDefinition(
         name="search_text",
         schema=SEARCH_TEXT_SCHEMA,
-        handler=search_text
+        handler=search_text,
+        risk_level=RiskLevel.SAFE
     )

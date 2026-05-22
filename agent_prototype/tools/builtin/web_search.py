@@ -1,5 +1,5 @@
 import os,httpx,json
-from ...core.tool_types import ToolDefinition
+from ...core.tool_types import ToolDefinition,RiskLevel
 from ...core.schemas import ToolResult
 
 def web_search(query:str,num_results:int=5)->ToolResult:
@@ -60,4 +60,5 @@ def build_web_search_tool_definition() -> ToolDefinition:
         name="web_search",
         schema=WEB_SEARCH_TOOL_SCHEMA,
         handler=web_search,
+        risk_level=RiskLevel.SAFE,
     )

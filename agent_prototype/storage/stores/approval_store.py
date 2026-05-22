@@ -1,9 +1,10 @@
-import uuid
+import uuid,json
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from ..models import PendingApproval
+from ...core.schemas import ChatMessage
 
 class SqliteApprovalStore:
 
@@ -15,7 +16,10 @@ class SqliteApprovalStore:
             session_id:str,
             run_id:str,
             tool_name:str,
+            tool_call_id:str,
             arguments:str,
+            saved_messages:list[ChatMessage],
+            event_index:int,
     )->PendingApproval:
         
         record=PendingApproval(
@@ -23,8 +27,11 @@ class SqliteApprovalStore:
             session_id=session_id,
             run_id=run_id,
             tool_name=tool_name,
+            tool_call_id=tool_call_id,
             arguments=arguments,
             status="pending",
+            saved_messages=[saved_message.model_dump(exclude_none=True) for saved_message in saved_messages],
+            event_index=event_index,
         )
 
         self.db.add(record)
@@ -42,3 +49,7 @@ class SqliteApprovalStore:
             return None
         record.status=status
         return record
+    
+    def restore_messages(self,approval:PendingApproval)->list[ChatMessage]:
+
+        return [ChatMessage.model_validate(msg) for msg in approval.saved_messages]

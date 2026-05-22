@@ -1,7 +1,7 @@
 import os
-
+from typing import Optional
+from ..storage.models import SessionRecord,ModelSetting
 from sqlalchemy.orm import Session  # 数据库会话类型  # 这一行负责事务上下文
-
 from ..core.schemas import AgentState, CompactInput, CompactOutput,ChatMessage  # compact 相关 schema  # 这一行负责输入输出类型
 from ..storage.stores.session_store import SqliteSessionStore  # session 持久化仓库  # 这一行负责读写数据库记录
 from ..context.compaction import build_compact_prompt, compact_state_with_summary, split_messages_for_compaction  # compact 相关工具  # 这一行负责消息压缩算法
@@ -13,14 +13,18 @@ COMPACT_MODEL = os.getenv("COMPACT_MODEL", "deepseek-v4-flash")
 
 def _compact_in_memory(
     state: AgentState,
-    trigger_threshold: int,
-    keep_recent_count: int,
+    context_tokens:int,
+    context_length: int,
+    keep_recent_count:int,
+    force: bool = False,
 ) -> CompactOutput:
-    """输入：当前会话 state、触发阈值、recent 保留数量。输出：只在内存中计算出的 compact 结果。"""  # 这个内部函数只负责“算 compact”，不负责写库或提交事务
+    """输入：当前会话 state、触发阈值、recent 保留数量。输出：只在内存中计算出的 compact 结果。"""  # 这个内部函数只负责"算 compact"，不负责写库或提交事务
 
-    if len(state.messages) <= trigger_threshold:  # 如果当前消息数还没达到触发阈值，就不用压缩
-        return CompactOutput(state=state, did_compact=False, removed_count=0)  # 原样返回，不产生任何副作用
-
+    if not force:
+        if context_tokens == 0 or context_length == 0:
+            return CompactOutput(state=state, did_compact=False, removed_count=0)
+        if context_tokens / context_length < 0.7:
+            return CompactOutput(state=state, did_compact=False, removed_count=0)
     _, middle_messages, _ = split_messages_for_compaction(
         state.messages,  # 把完整消息切成锚点、中段、recent 三段
         keep_recent_count=keep_recent_count,  # recent 保留数量继续由调用方控制
@@ -43,28 +47,41 @@ def _compact_in_memory(
     summary_response = adapter.generate(request)
     summary_text = (summary_response.content or "").strip()
 
-
     if not summary_text:  # 如果模型没有产出有效摘要
         raise ValueError("Compact summary is empty")  # 抛业务错误，阻止后续写入空摘要
 
-    return compact_state_with_summary(
+    # 从模型返回的 usage 中提取实际 input_tokens（即压缩后 context 的真实 token 数）
+    compact_tokens: Optional[int] = None
+    if summary_response.usage and summary_response.usage.input_tokens:
+        compact_tokens = summary_response.usage.input_tokens
+
+    compact_result = compact_state_with_summary(
         state=state,  # 基于原始 state 生成 compact 后的新 state
         summary_text=summary_text,  # 用模型摘要替换中段历史
         keep_recent_count=keep_recent_count,  # 保持 recent 截断策略一致
     )
+    if compact_tokens is not None:
+        compact_result = compact_result.model_copy(update={"compact_tokens": compact_tokens})
+    return compact_result
 
 def compact_session_service(payload:CompactInput,db:Session)->CompactOutput:
     """输入 压缩前的CompactInput和 db 输出 压缩后的对象"""
     store = SqliteSessionStore(db)
     state = store.get(payload.session_id)
+    record=db.query(SessionRecord).filter(SessionRecord.session_id==payload.session_id).first()
+    context_tokens=record.context_tokens or 0 if record else 0
 
+    model_setting=db.query(ModelSetting).filter(ModelSetting.model_id==record.model_id,ModelSetting.provider_id==record.model_provider_id).first() if record and record.model_id and record.model_provider_id else None
+    context_length=model_setting.context_length or  0 if model_setting else 0
     if state is None:
         raise ValueError("Session not found")
     
     compact_result = _compact_in_memory(
         state=state,
-        trigger_threshold=payload.trigger_threshold,
+        context_tokens=context_tokens,
+        context_length=context_length,
         keep_recent_count=payload.keep_recent_count,
+        force=payload.force,
     )
 
     if not compact_result.did_compact:
@@ -72,6 +89,14 @@ def compact_session_service(payload:CompactInput,db:Session)->CompactOutput:
     
     record = store.read_session_record(payload.session_id)
     try:
+        # 优先使用压缩请求的模型返回的 usage.input_tokens（精确值）
+        # 如果 usage 缺失则退而估算：字符数 / 4 ≈ tokens
+        if compact_result.compact_tokens is not None:
+            new_context_tokens = compact_result.compact_tokens
+        else:
+            new_context_tokens = sum(
+                len(m.content or "") for m in compact_result.state.messages
+            ) // 4
         store.upsert_session_snapshot(
             payload.session_id,
             state=compact_result.state,
@@ -79,6 +104,7 @@ def compact_session_service(payload:CompactInput,db:Session)->CompactOutput:
             last_agent_name=record.last_agent_name if record else None,
             last_skill_name= record.last_skill_name if record else None,
             last_reply_preview= record.last_reply_preview if record else None,
+            context_tokens=new_context_tokens,
         )
         db.commit()
     except Exception:
