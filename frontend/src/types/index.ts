@@ -17,6 +17,15 @@ export interface SessionSummary {
   last_reply_preview?: string | null;
   permission_profile?: string | null;
   context_tokens?: number | null;
+  workspace_path?: string | null;
+  workspace_name?: string | null;
+}
+
+export interface WorkspaceSummary {
+  id: number;
+  name: string;
+  path: string;
+  registered_at: string;
 }
 
 export interface AgentMessage {
@@ -24,6 +33,10 @@ export interface AgentMessage {
   content: string | null;
   timeline?: StreamingItem[];   // 客户端专属：本轮 streaming 时间线，持久保留
   stopped?: boolean;            // 客户端专属：用户主动 Stop，内容为截断版本
+  skill_name?: string | null;   // 客户端专属：本条用户消息使用的 skill
+  run_id?: string | null;       // 客户端专属：关联的物理运行 ID
+  isActive?: boolean;           // 客户端专属：是否在模型活跃记忆中
+  summary_text?: string;        // 客户端专属：挂载的压缩总结文本
 }
 
 export interface SessionState {
@@ -62,7 +75,7 @@ export interface ToolResult {
 
 export interface AgentEvent {
   index: number;
-  type: 'assistant_tool_call' | 'tool_result' | 'tool_error' | 'final_answer' | 'approval_required' | 'approval_rejected';
+  type: 'assistant_tool_call' | 'tool_result' | 'tool_error' | 'final_answer' | 'approval_required' | 'approval_rejected' | 'thinking';
   content?: string | null;
   tool_name?: string | null;
   tool_call_id?: string | null;
@@ -79,6 +92,7 @@ export interface ApprovalInfo {
 export interface TraceRunSummary {
   run_id: string;
   session_id: string;
+  parent_run_id?: string | null; // 后端返回：关联的父运行 ID
   agent_name?: string | null;
   skill_name?: string | null;
   user_input: string;
@@ -87,6 +101,7 @@ export interface TraceRunSummary {
   created_at: string;
   finished_at: string;
   events: AgentEvent[];
+  is_active?: number;          // 后端返回：是否在模型活跃记忆中 (1为活跃，0为非活跃)
 }
 
 export interface TraceResponse {

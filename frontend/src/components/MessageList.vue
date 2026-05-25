@@ -90,20 +90,18 @@ const chunkTimeline = (timeline: StreamingItem[] | undefined, msgIdx: number = 0
   
   for (const item of timeline) {
     if (item.kind === 'thinking') {
-      // 进入/继续思考状态
+      // 新一轮思考开始：先把上一个思考块 flush 掉（多轮工具调用之间有多段 thinking 时保持分块）
+      if (inThinking) {
+        flushThinking();
+      }
       flushStandaloneTools();
       if (currentText.length > 0) {
         chunks.push({ type: 'text', content: currentText, id: `msg-${msgIdx}-text-${chunks.length}` });
         currentText = '';
       }
       inThinking = true;
-      // 追加到最后一段文字，或新建文字段
-      const lastSeg = thinkingSegments.at(-1);
-      if (lastSeg && lastSeg.kind === 'text') {
-        lastSeg.content += item.content;
-      } else {
-        thinkingSegments.push({ kind: 'text', content: item.content });
-      }
+      // 新思考块的第一段文字
+      thinkingSegments.push({ kind: 'text', content: item.content });
     } else if (item.kind === 'text') {
       // 遇到最终回答：冲刷思考 + 独立工具
       flushThinking();
@@ -311,8 +309,7 @@ const listRef = ref<HTMLElement | null>(null);
 const visibleMessages = computed(() =>
   props.messages.filter((message) => 
     message.role === 'user' || 
-    (message.role === 'assistant' && !!message.content) ||
-    (message.role === 'system' && (message.content?.includes('[COMPACT_SUMMARY]') || message.content?.includes('[RESET_MARKER]')))
+    (message.role === 'assistant' && !!message.content)
   )
 );
 
@@ -377,25 +374,33 @@ const handleCodeBlockClick = (e: MouseEvent) => {
 <template>
   <div v-if="visibleMessages.length === 0 && !isCompacting" class="message-list empty"></div>
   <div v-else class="message-list" ref="listRef">
-    <div v-for="(m, idx) in visibleMessages" :key="idx" :class="['message-row', `role-${m.role}`]">
-      <template v-if="m.role === 'system'">
+    <template v-for="(m, idx) in visibleMessages" :key="idx">
+      <!-- 💡 A-2 动态分割线注入：上一条为非活跃，当前为活跃时 -->
+      <div 
+        v-if="idx > 0 && !visibleMessages[idx - 1].isActive && m.isActive" 
+        class="memory-boundary-divider-row"
+      >
         <!-- 💡 限制系统提示卡片的列宽在 820px 黄金视域内 -->
-        <div class="message-row-inner">
-          <div v-if="m.content?.includes('[COMPACT_SUMMARY]')" class="compact-alert" style="width: 100%;">
+        <div class="message-row-inner" style="width: 100%;">
+          <!-- 如果 m 带有 summary_text，说明是 Compaction，渲染记忆折叠线 -->
+          <div v-if="m.summary_text" class="compact-alert premium-compaction" style="width: 100%;" :title="m.summary_text">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="M8 17l4 4 4-4"></path></svg>
-            上下文已压缩 — 部分历史已折叠为摘要 (Context Compacted)
+            <span class="pulse-dot"></span>
+            <span>AI 记忆分割线 · 线上消息已折叠压缩 (Context Compacted)</span>
           </div>
-          <div v-else-if="m.content?.includes('[RESET_MARKER]')" class="reset-alert" style="width: 100%;">
+          <!-- 如果没有 summary_text，说明是重置会话导致的划分，渲染重置分割线 -->
+          <div v-else class="reset-alert" style="width: 100%;">
             <div class="reset-line"></div>
             <div class="reset-text">
               <span>上下文已重设 (Context Reset)</span>
-              <span class="sub">以上内容已不再被模型感知</span>
+              <span class="sub">以上内容已不再被模型记忆感知</span>
             </div>
             <div class="reset-line"></div>
           </div>
         </div>
-      </template>
-      <template v-else>
+      </div>
+
+      <div :class="['message-row', `role-${m.role}`, m.isActive ? 'active-context' : 'compacted-context']">
         <!-- 💡 核心注入：黄金列宽与不对称对话空间限制器 -->
         <div class="message-row-inner">
           <div class="message-avatar">
@@ -542,12 +547,16 @@ const handleCodeBlockClick = (e: MouseEvent) => {
             </template>
 
             <template v-else>
+              <div v-if="m.skill_name" class="msg-skill-badge">
+                <span class="msg-skill-icon">📚</span>
+                <span class="msg-skill-name">{{ m.skill_name }}</span>
+              </div>
               <div class="message-text" v-html="formatContent(m.content)" @click="handleCodeBlockClick"></div>
             </template>
           </div>
         </div>
-      </template>
     </div>
+  </template>
     
     <div v-if="isCompacting" class="message-row role-assistant pending">
       <div class="message-row-inner">
@@ -742,6 +751,63 @@ const handleCodeBlockClick = (e: MouseEvent) => {
   border-bottom: 1px solid var(--border-dim);
   /* 💡 优雅而自然的物理弹簧入场滑动效果，让每一条新消息都带有灵动的生命力 */
   animation: messageSlideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── 遗忘/压缩状态的微光灰色调 ── */
+.message-row.compacted-context {
+  opacity: 0.55;
+  filter: grayscale(35%) contrast(90%);
+}
+
+.message-row.compacted-context:hover {
+  opacity: 0.9;
+  filter: grayscale(0%) contrast(100%);
+}
+
+/* ── A-2 动态记忆/重置分割线 ── */
+.memory-boundary-divider-row {
+  display: flex;
+  justify-content: center;
+  padding: 28px 24px;
+  animation: messageSlideUp 0.5s ease both;
+}
+
+.memory-boundary-divider-row .message-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.compact-alert.premium-compaction {
+  background: rgba(var(--accent-rgb, 99, 102, 241), 0.08);
+  border: 1px solid rgba(var(--accent-rgb, 99, 102, 241), 0.35);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb, 99, 102, 241), 0.15);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--accent, #6366f1);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent, #6366f1);
+  animation: pulse 2s infinite;
+  margin-right: 4px;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(99, 102, 241, 0);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
 }
 
 .message-row:last-child {
@@ -750,6 +816,30 @@ const handleCodeBlockClick = (e: MouseEvent) => {
 
 .role-user {
   background: transparent;
+}
+
+/* ── 用户消息里的 skill 标签 ── */
+.msg-skill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-glow);
+  border-radius: 6px;
+  padding: 3px 8px 3px 6px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+}
+
+.msg-skill-icon {
+  font-size: 12px;
+}
+
+.msg-skill-name {
+  letter-spacing: 0.02em;
 }
 
 .role-assistant {

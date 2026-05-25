@@ -15,10 +15,11 @@ from unittest.mock import patch, MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.core.schemas import AgentOutput, AgentState, AgentEvent, RunMetadata
-from agent_prototype.storage.db import Base
-from agent_prototype.storage.stores.session_store import SqliteSessionStore
-from agent_prototype.tools.tool_registry import build_run_registry
+from agent_prototype.infrastructure.database.models import ModelSetting, ProviderConfig
+from agent_prototype.interface.dto.schemas import AgentOutput, AgentState, AgentEvent, RunMetadata
+from agent_prototype.infrastructure.database.db import Base
+from agent_prototype.infrastructure.database.repositories.session_store import SqliteSessionStore
+from agent_prototype.infrastructure.tools.tool_registry import build_run_registry
 
 
 def _make_db(temp_dir):
@@ -26,6 +27,41 @@ def _make_db(temp_dir):
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     return engine, sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def _seed_session_model(session_local, session_id: str, model_id: str = "test-model") -> None:
+    db = session_local()
+    try:
+        provider = ProviderConfig(
+            name="default-provider",
+            base_url="https://example.com/v1",
+            api_key="test-key",
+            is_default=1,
+        )
+        db.add(provider)
+        db.flush()
+
+        model = ModelSetting(
+            provider_id=provider.id,
+            model_id=model_id,
+            display_name="Test Model",
+            enabled=1,
+            supports_thinking=0,
+            thinking_style="none",
+            effort_levels="[]",
+            context_length=4096,
+            supports_tools=1,
+        )
+        db.add(model)
+        db.flush()
+
+        store = SqliteSessionStore(db)
+        record = store.upsert_session_snapshot(session_id, state=AgentState())
+        record.model_provider_id = provider.id
+        record.model_id = model_id
+        db.commit()
+    finally:
+        db.close()
 
 
 class TestBuildRunRegistry(unittest.TestCase):
@@ -42,7 +78,7 @@ class TestBuildRunRegistry(unittest.TestCase):
 
     def test_spawn_child_agent_not_in_default_registry(self):
         """默认 registry 没有 spawn_child_agent，确保它是动态注册的。"""
-        from agent_prototype.tools.tool_registry import build_default_tool_registry
+        from agent_prototype.infrastructure.tools.tool_registry import build_default_tool_registry
         registry = build_default_tool_registry()
         tool_names = [s["function"]["name"] for s in registry.get_tool_schemas()]
         self.assertNotIn("spawn_child_agent", tool_names)
@@ -63,6 +99,8 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
 
     def test_child_run_persisted_with_correct_parent_run_id(self):
         parent_run_id = "parent-run-abc"
+        session_id = "session-with-model"
+        _seed_session_model(self.session_local, session_id)
         fake_output = AgentOutput(
             reply="子任务完成",
             state=AgentState(),
@@ -72,13 +110,13 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
 
         futures = {}
         # mock Agent，避免真实 LLM 调用；patch SessionLocal 让 _run_child 写入测试 DB
-        with patch("agent_prototype.runtime.agent_runtime.Agent") as MockAgent, \
-             patch("agent_prototype.tools.builtin.spawn_child_agent.SessionLocal", self.session_local):
+        with patch("agent_prototype.application.runtime.agent_runtime.AgentRunner") as MockAgent, \
+             patch("agent_prototype.infrastructure.tools.builtin.spawn_child_agent.SessionLocal", self.session_local):
             mock_instance = MagicMock()
             mock_instance.run.return_value = fake_output
             MockAgent.return_value = mock_instance
 
-            registry = build_run_registry(parent_run_id=parent_run_id, executor=self.executor, futures=futures)
+            registry = build_run_registry(parent_run_id=parent_run_id, executor=self.executor, futures=futures, session_id=session_id)
             result = registry.execute_tool_call(
                 "spawn_child_agent",
                 '{"task": "帮我查一下天气"}',
@@ -99,11 +137,14 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             self.assertEqual(children[0].parent_run_id, parent_run_id)
             self.assertEqual(children[0].user_input, "帮我查一下天气")
             self.assertEqual(children[0].reply, "子任务完成")
+            self.assertEqual(MockAgent.call_args.kwargs["model_adapter"].model, "test-model")
         finally:
             db.close()
 
     def test_multiple_children_all_link_to_same_parent(self):
         parent_run_id = "parent-run-multi"
+        session_id = "session-with-model-multi"
+        _seed_session_model(self.session_local, session_id)
         fake_output = AgentOutput(
             reply="完成",
             state=AgentState(),
@@ -112,13 +153,13 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         )
 
         futures = {}
-        with patch("agent_prototype.runtime.agent_runtime.Agent") as MockAgent, \
-             patch("agent_prototype.tools.builtin.spawn_child_agent.SessionLocal", self.session_local):
+        with patch("agent_prototype.application.runtime.agent_runtime.AgentRunner") as MockAgent, \
+             patch("agent_prototype.infrastructure.tools.builtin.spawn_child_agent.SessionLocal", self.session_local):
             mock_instance = MagicMock()
             mock_instance.run.return_value = fake_output
             MockAgent.return_value = mock_instance
 
-            registry = build_run_registry(parent_run_id=parent_run_id, executor=self.executor, futures=futures)
+            registry = build_run_registry(parent_run_id=parent_run_id, executor=self.executor, futures=futures, session_id=session_id)
             r1 = registry.execute_tool_call("spawn_child_agent", '{"task": "任务一"}')
             r2 = registry.execute_tool_call("spawn_child_agent", '{"task": "任务二"}')
 
@@ -134,6 +175,7 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             self.assertEqual(len(children), 2)
             for child in children:
                 self.assertEqual(child.parent_run_id, parent_run_id)
+            self.assertEqual(MockAgent.call_args.kwargs["model_adapter"].model, "test-model")
         finally:
             db.close()
 

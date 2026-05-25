@@ -12,6 +12,7 @@ import type {
   StreamingItem,
   ChildAgentInfo,
   ApprovalInfo,
+  WorkspaceSummary,
 } from '../types';
 import type { ViewMode } from '../types/ui';
 import type { UiAgentOption } from '../types/ui';
@@ -102,10 +103,76 @@ function clearSessionResetHistory(sessionId: string) {
   writeResetHistoryStore(store);
 }
 
+/** 从 trace run 的 events 列表重建前端 StreamingItem[] timeline。
+ *  不依赖 localStorage，stop/刷新后均可从数据库恢复。
+ */
+function reconstructTimelineFromEvents(events: AgentEvent[]): StreamingItem[] {
+  // events 已按 event_index 从 DB 读出，顺序即为执行顺序（thinking 在对应工具调用之前）
+  const timeline: StreamingItem[] = [];
+  for (const e of events) {
+    if (e.type === 'thinking') {
+      // 后端合并保存的 thinking 全文
+      if (e.content) timeline.push({ kind: 'thinking', content: e.content });
+    } else if (e.type === 'final_answer') {
+      // final_answer 是文字回答的元数据，不进 timeline
+    } else {
+      timeline.push({ kind: 'event', event: e });
+    }
+  }
+  return timeline;
+}
+
+/** 方案 A-2 核心重构函数：完全基于 traceRuns 重构视觉消息气泡，彻底与 state.messages 物理展示解耦。
+ *  同时从 state.messages 中提取大模型活跃窗口外的 [COMPACT_SUMMARY] 总结内容。
+ */
+function reconstructUiMessages(
+  traceRuns: TraceRunSummary[],
+  stateMessages: AgentMessage[]
+): AgentMessage[] {
+  // 1. 过滤掉所有子 Agent 运行记录，只保留主 Runs (Scenario C 过滤)
+  const mainRuns = traceRuns.filter(r => !r.parent_run_id);
+
+  // 2. 提取压缩总结文本
+  const summaryMsg = stateMessages.find(
+    m => m.role === 'system' && m.content?.includes('[COMPACT_SUMMARY]')
+  );
+  const summaryText = (summaryMsg && summaryMsg.content)
+    ? summaryMsg.content.replace('[COMPACT_SUMMARY]', '').trim()
+    : '';
+
+  const uiMessages: AgentMessage[] = [];
+
+  mainRuns.forEach(run => {
+    const isActive = run.is_active !== 0; // A-2 物理活跃判定：默认活跃 (1)，仅在压缩/重置后由后端置 0
+
+    // A. 重构 User 气泡
+    uiMessages.push({
+      role: 'user',
+      content: run.user_input,
+      run_id: run.run_id,
+      isActive: isActive,
+      summary_text: summaryText,
+    } as AgentMessage);
+
+    // B. 重构 Assistant 气泡（含 timeline, thinking, tools）
+    uiMessages.push({
+      role: 'assistant',
+      content: run.reply,
+      run_id: run.run_id,
+      isActive: isActive,
+      timeline: reconstructTimelineFromEvents(run.events),
+      summary_text: summaryText,
+    } as AgentMessage);
+  });
+
+  return uiMessages;
+}
+
 export function useWorkspace() {
   const activeView = ref<ViewMode>('chat');
 
   const sessions = ref<SessionSummary[]>([]);
+  const workspaces = ref<WorkspaceSummary[]>([]);
   const activeSessionId = ref<string | null>(null);
   const currentMessages = ref<AgentMessage[]>([]);
   const historyMessages = ref<AgentMessage[]>([]);
@@ -116,6 +183,7 @@ export function useWorkspace() {
   const activeAgentId = ref<string>('default');
 
   const isInitializing = ref(true);
+  const isWorkspacesLoading = ref(false);
   const isChatLoading = ref(false);
   const isTraceLoading = ref(false);
   const isSkillsLoading = ref(false);
@@ -290,10 +358,33 @@ export function useWorkspace() {
     }
   };
 
-  const createNewSession = async () => {
+  const loadWorkspaces = async () => {
+    isWorkspacesLoading.value = true;
+    try {
+      workspaces.value = await api.getWorkspaces();
+    } catch (err: any) {
+      errorMsg.value = 'Failed to load workspaces: ' + err.message;
+    } finally {
+      isWorkspacesLoading.value = false;
+    }
+  };
+
+  const selectWorkspaceDialog = async () => {
+    try {
+      errorMsg.value = null;
+      const ws = await api.selectWorkspaceDialog();
+      await loadWorkspaces();
+      return ws;
+    } catch (err: any) {
+      errorMsg.value = err.message || 'Folder selection failed or cancelled';
+      return null;
+    }
+  };
+
+  const createNewSession = async (workspacePath?: string | null, workspaceName?: string | null, sessionName?: string) => {
     try {
       isChatLoading.value = true;
-      const newSession = await api.createSession();
+      const newSession = await api.createSession(workspacePath, workspaceName, sessionName);
       await loadSessions(newSession.session_id);
       historyMessages.value = [];
       currentMessages.value = [];
@@ -322,29 +413,8 @@ export function useWorkspace() {
       const msgs = detail.state?.messages || [];
       await loadTraceRuns(id);
 
-      // 从本地存储恢复 timeline (交错视图)，保证刷新后视觉一致
-      const timelineStore = readTimelineStore();
-      if (traceRuns.value.length > 0) {
-        for (let i = 0; i < msgs.length; i++) {
-          if (msgs[i].role === 'assistant') {
-            // 往前找对应的 user 消息，通过内容去匹配 trace run
-            let correspondingRun: TraceRunSummary | undefined;
-            for (let j = i - 1; j >= 0; j--) {
-              if (msgs[j].role === 'user') {
-                const userText = (msgs[j].content ?? '').trim();
-                correspondingRun = traceRuns.value.find(r => r.user_input.trim() === userText);
-                break;
-              }
-            }
-            if (correspondingRun && timelineStore[correspondingRun.run_id]) {
-              msgs[i] = { ...msgs[i], timeline: timelineStore[correspondingRun.run_id] };
-            }
-          }
-        }
-      }
-      
-      currentMessages.value = msgs;
-      extractChildAgents(id, msgs);
+      currentMessages.value = reconstructUiMessages(traceRuns.value, msgs);
+      extractChildAgents(id, currentMessages.value);
       // 同步 permission_profile
       permissionProfile.value = detail.permission_profile ?? 'conservative';
       // 同步模型配置字段（后端 session 记录里存的选项）
@@ -368,7 +438,7 @@ export function useWorkspace() {
     }
   };
 
-  const sendMessage = async (input: string) => {
+  const sendMessage = async (input: string, skillName?: string | null) => {
     if (!activeSessionId.value) return;
 
     isChatLoading.value = true;
@@ -377,7 +447,7 @@ export function useWorkspace() {
     lastCompletedRun.value = null;
     errorMsg.value = null;
 
-    currentMessages.value.push({ role: 'user', content: input });
+    currentMessages.value.push({ role: 'user', content: input, skill_name: skillName ?? null });
 
     let capturedRunId: string | null = null;
     const abortController = new AbortController();
@@ -386,7 +456,7 @@ export function useWorkspace() {
     pendingAgentName.value = activeAgent.value?.id;
 
     try {
-      for await (const frame of api.streamRun(activeSessionId.value, input, activeAgent.value?.id, abortController.signal)) {
+      for await (const frame of api.streamRun(activeSessionId.value, input, activeAgent.value?.id, skillName, abortController.signal)) {
         if (frame.type === 'start') {
           capturedRunId = frame.data.run_id;
           pendingRunId.value = capturedRunId;
@@ -457,31 +527,28 @@ export function useWorkspace() {
           }
           currentMessages.value = newMsgs;
         } else if (frame.type === 'end') {
-          // 冻结时间线，patch 进新消息里，再替换 currentMessages
+          // 冻结时间线，供持久恢复使用
           const frozenTimeline = [...streamingTimeline.value];
           if (capturedRunId) {
             writeTimelineToStore(capturedRunId, frozenTimeline);
           }
-          const newMsgs = [...(frame.data.state?.messages ?? currentMessages.value)];
-          for (let i = newMsgs.length - 1; i >= 0; i--) {
-            if (newMsgs[i].role === 'assistant') {
-              newMsgs[i] = { ...newMsgs[i], timeline: frozenTimeline };
-              break;
-            }
-          }
-          currentMessages.value = newMsgs;
-          // 解析新消息里的子 Agent 事件，触发轮询
-          if (activeSessionId.value) {
-            extractChildAgents(activeSessionId.value, newMsgs);
-          }
-          // 只刷新 sessions 列表（更新预览文字），不传 preferredSessionId 避免触发 watch → loadSessionDetail
-          // loadSessionDetail 会覆盖 currentMessages，把刚写入的 timeline 冲掉
+
+          // 刷新 sessions 列表并拉取最新的 traceRuns
           const [, traceResult] = await Promise.allSettled([
             api.getSessions().then(data => { sessions.value = data || []; }),
             api.getTrace(activeSessionId.value!),
           ]);
           if (traceResult.status === 'fulfilled') {
             traceRuns.value = (traceResult.value as any).runs || [];
+          }
+
+          // 双流无损重塑主对话视觉队列
+          const activeMsgs = frame.data.state?.messages || [];
+          currentMessages.value = reconstructUiMessages(traceRuns.value, activeMsgs);
+
+          // 解析子 Agent 事件，触发轮询
+          if (activeSessionId.value) {
+            extractChildAgents(activeSessionId.value, currentMessages.value);
           }
           if (capturedRunId) {
             lastCompletedRun.value = traceRuns.value.find(r => r.run_id === capturedRunId) ?? null;
@@ -508,8 +575,9 @@ export function useWorkspace() {
   const stopStreaming = async () => {
     if (!isStreaming.value || !streamAbortController.value) return;
 
-    // 1. 截取当前已输出的内容
-    const partialReply = streamingTimeline.value
+    // 1. 冻结完整 timeline（含 thinking / tool_call / text），供落库和恢复使用
+    const frozenTimeline = [...streamingTimeline.value];
+    const partialReply = frozenTimeline
       .filter(item => item.kind === 'text')
       .map(item => item.content)
       .join('');
@@ -518,10 +586,15 @@ export function useWorkspace() {
     const userInput = pendingUserInput.value;
     const agentName = pendingAgentName.value;
 
-    // 2. 中止 SSE
+    // 2. 把 timeline 写入 localStorage，刷新后 loadSessionDetail 能恢复
+    if (runId && frozenTimeline.length > 0) {
+      writeTimelineToStore(runId, frozenTimeline);
+    }
+
+    // 3. 中止 SSE
     streamAbortController.value.abort();
 
-    // 3. 如果已有 run_id，调 finalize 接口落库
+    // 4. 如果已有 run_id，调 finalize 接口落库
     if (runId && sessionId && userInput) {
       try {
         await api.finalizeRun(sessionId, runId, userInput, partialReply, agentName);
@@ -530,11 +603,12 @@ export function useWorkspace() {
       }
     }
 
-    // 4. 把截断内容追加到对话框，标记 stopped=true
-    if (partialReply) {
+    // 5. 把截断内容追加到对话框，timeline 一并挂上，标记 stopped=true
+    // 纯空白 partialReply（模型只吐换行就被 Stop）不算有效内容，避免写入空消息卡片
+    if (partialReply.trim() || frozenTimeline.length > 0) {
       currentMessages.value = [
         ...currentMessages.value,
-        { role: 'assistant', content: partialReply, stopped: true },
+        { role: 'assistant', content: partialReply || null, stopped: true, timeline: frozenTimeline },
       ];
     }
   };
@@ -594,16 +668,9 @@ export function useWorkspace() {
           if (capturedRunId) {
             writeTimelineToStore(capturedRunId, frozenTimeline);
           }
-          const newMsgs = [...(frame.data.state?.messages ?? currentMessages.value)];
-          for (let i = newMsgs.length - 1; i >= 0; i--) {
-            if (newMsgs[i].role === 'assistant') {
-              newMsgs[i] = { ...newMsgs[i], timeline: frozenTimeline };
-              break;
-            }
-          }
-          currentMessages.value = newMsgs;
+
           if (activeSessionId.value) {
-            extractChildAgents(activeSessionId.value, newMsgs);
+            // 刷新 sessions 列表并拉取最新的 traceRuns
             const [, traceResult] = await Promise.allSettled([
               api.getSessions().then(data => { sessions.value = data || []; }),
               api.getTrace(activeSessionId.value!),
@@ -611,6 +678,13 @@ export function useWorkspace() {
             if (traceResult.status === 'fulfilled') {
               traceRuns.value = (traceResult.value as any).runs || [];
             }
+
+            // 双流无损重塑主对话视觉队列
+            const activeMsgs = frame.data.state?.messages || [];
+            currentMessages.value = reconstructUiMessages(traceRuns.value, activeMsgs);
+
+            // 解析子 Agent 事件，触发轮询
+            extractChildAgents(activeSessionId.value, currentMessages.value);
             if (capturedRunId) {
               lastCompletedRun.value = traceRuns.value.find(r => r.run_id === capturedRunId) ?? null;
             }
@@ -820,7 +894,7 @@ export function useWorkspace() {
 
   const initializeWorkspace = async () => {
     isInitializing.value = true;
-    await Promise.all([loadSessions(), loadSkills(), fetchAgents(), loadEnabledModels()]);
+    await Promise.all([loadSessions(), loadSkills(), fetchAgents(), loadEnabledModels(), loadWorkspaces()]);
     isInitializing.value = false;
   };
 
@@ -889,5 +963,10 @@ export function useWorkspace() {
     loadEnabledModels,
     activeModelContextLength,
     settingsApi,
+    // Workspaces
+    workspaces,
+    isWorkspacesLoading,
+    loadWorkspaces,
+    selectWorkspaceDialog,
   };
 }

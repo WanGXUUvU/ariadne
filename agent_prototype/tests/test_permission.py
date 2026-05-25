@@ -13,18 +13,18 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.core.schemas import (
+from agent_prototype.interface.dto.schemas import (
     ApprovalPolicy,
     CreateSessionInput,
     PermissionProfile,
     SandboxMode,
 )
-from agent_prototype.application.session_service import (
+from agent_prototype.application.services.session_service import (
     PROFILES,
-    create_session_service,
+    SessionService,
 )
-from agent_prototype.storage.db import Base
-from agent_prototype.storage.stores.session_store import SqliteSessionStore
+from agent_prototype.infrastructure.database.db import Base
+from agent_prototype.infrastructure.database.repositories.session_store import SqliteSessionStore
 
 
 class TestPermissionSchema(unittest.TestCase):
@@ -79,7 +79,7 @@ class TestSessionPermission(unittest.TestCase):
         """新建 session 的 permission_profile 应默认为 conservative。"""
         db = self.session_local()
         try:
-            summary = create_session_service(CreateSessionInput(session_name="test"), db)
+            summary = SessionService(db).create_session(CreateSessionInput(session_name="test"))
             self.assertEqual(summary.permission_profile, "conservative")
         finally:
             db.close()
@@ -88,7 +88,7 @@ class TestSessionPermission(unittest.TestCase):
         """数据库里的 session 记录也应携带 permission_profile。"""
         db = self.session_local()
         try:
-            summary = create_session_service(CreateSessionInput(), db)
+            summary = SessionService(db).create_session(CreateSessionInput())
             store = SqliteSessionStore(db)
             record = store.read_session_record(summary.session_id)
             self.assertIsNotNone(record)

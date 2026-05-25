@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import type { AgentMessage, TraceRunSummary, ApprovalInfo } from '../types';
+import type { AgentMessage, TraceRunSummary, ApprovalInfo, SkillMetadata } from '../types';
 import type { UiAgentOption } from '../types/ui';
 import MessageList from './MessageList.vue';
 import MessageComposer from './MessageComposer.vue';
@@ -34,10 +34,12 @@ const props = defineProps<{
   thinkingEffort: string;
   /** 当前 session 详情正在加载中 */
   sessionLoading?: boolean;
+  /** 已加载的 skill 列表，用于斜杠命令菜单 */
+  skills?: SkillMetadata[];
 }>();
 
 const emit = defineEmits<{
-  (e: 'send', text: string): void;
+  (e: 'send', text: string, skillName?: string | null): void;
   (e: 'errorDismiss'): void;
   (e: 'infoDismiss'): void;
   (e: 'update:activeAgentId', id: string): void;
@@ -183,7 +185,8 @@ const handleReset = () => {
       :contextTokens="contextTokens"
       :contextLength="contextLength"
       :isCompacting="isCompacting"
-      @send="$emit('send', $event)"
+      :skills="skills ?? []"
+      @send="(text, skillName) => $emit('send', text, skillName)"
       @stop="$emit('stop')"
       @update:permissionProfile="$emit('update:permissionProfile', $event)"
       @update:model="$emit('update:model', $event)"

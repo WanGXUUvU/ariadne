@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_prototype.skills.skill_loader import list_skills
+from agent_prototype.infrastructure.skills.skill_loader import list_skills
 
 
 class TestSkillLoader(unittest.TestCase):

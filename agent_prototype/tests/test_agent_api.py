@@ -8,16 +8,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from agent_prototype.core.agent_definition import AgentDefinition
-from agent_prototype.core.schemas import AgentState, ChatMessage, SkillSummary, ToolCall, ToolCallFunction
-from agent_prototype.model.model_types import ModelResponse
-from agent_prototype.storage.stores.session_store import SqliteSessionStore
-from agent_prototype.storage.stores.agent_definition_store import SqliteAgentDefinitionStore
-from agent_prototype.api.app import app
-from agent_prototype.application.agent_definition_service import load_agent_definition
-from agent_prototype.skills.skill_loader import list_skills
-from agent_prototype.tools.tool_registry import build_default_tool_registry
-from agent_prototype.storage.db import Base, get_db
-from agent_prototype.storage.models import SessionRecord, SessionRunEventRecord, SessionRunRecord
+from agent_prototype.interface.dto.schemas import AgentState, ChatMessage, SkillSummary, ToolCall, ToolCallFunction
+from agent_prototype.infrastructure.llm.model_types import ModelResponse
+from agent_prototype.infrastructure.database.repositories.session_store import SqliteSessionStore
+from agent_prototype.infrastructure.database.repositories.agent_definition_store import SqliteAgentDefinitionStore
+from agent_prototype.interface.api.app import app
+from agent_prototype.infrastructure.skills.skill_loader import list_skills
+from agent_prototype.infrastructure.tools.tool_registry import build_default_tool_registry
+from agent_prototype.infrastructure.database.db import Base, get_db
+from agent_prototype.infrastructure.database.models import SessionRecord, SessionRunEventRecord, SessionRunRecord
 
 
 class TestAgentApi(unittest.TestCase):
@@ -39,7 +38,28 @@ class TestAgentApi(unittest.TestCase):
         app.dependency_overrides[get_db] = override_get_db
         self.client = TestClient(app)
 
+        # 每次测试前清空 skill 列表缓存，防止 TTL 30s 内缓存影响 mock 效果
+        import agent_prototype.infrastructure.skills.skill_loader as _sl
+        _sl._list_skills_cache = None
+        _sl._list_skills_cache_ts = 0.0
+
+        # Mock RunContextBuilder._build_adapter 绕过物理数据库配置校验，直接返回一个 mock 好的 ChatCompletionsAdapter
+        from agent_prototype.application.services.run.run_context_builder import RunContextBuilder
+        from agent_prototype.infrastructure.llm.chat_completions_adapter import ChatCompletionsAdapter
+        self.build_adapter_patcher = patch.object(
+            RunContextBuilder,
+            "_build_adapter",
+            return_value=ChatCompletionsAdapter(
+                api_key="mock-api-key",
+                base_url="mock-base-url",
+                model="mock-model",
+            )
+        )
+        self.mock_build_adapter = self.build_adapter_patcher.start()
+
     def tearDown(self):
+        if hasattr(self, "build_adapter_patcher"):
+            self.build_adapter_patcher.stop()
         app.dependency_overrides.clear()
         self.engine.dispose()
         self.temp_dir.cleanup()
@@ -58,7 +78,7 @@ class TestAgentApi(unittest.TestCase):
             )
         )
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="mock reply")
         response = self.client.post("/run", json={"session_id": "session-a", "user_input": "你好"})
@@ -93,7 +113,7 @@ class TestAgentApi(unittest.TestCase):
             ],
         )
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_returns_metadata_with_explicit_agent_and_skill(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="skill reply")
         db = self.session_local()
@@ -113,7 +133,7 @@ class TestAgentApi(unittest.TestCase):
             db.close()
 
         with patch(
-            "agent_prototype.application.run_service.list_skills",
+            "agent_prototype.application.services.skill_context_service.loader_list_skills",
             return_value=[
                 SkillSummary(
                     name="openai-docs",
@@ -123,7 +143,7 @@ class TestAgentApi(unittest.TestCase):
                 )
             ],
         ), patch(
-            "agent_prototype.application.run_service.load_skill_content",
+            "agent_prototype.application.services.skill_context_service.loader_load_skill_content",
             return_value="FULL SKILL BODY",
         ):
             response = self.client.post(
@@ -143,7 +163,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["metadata"]["agent_name"], "reviewer")
         self.assertEqual(data["metadata"]["skill_name"], "openai-docs")
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_compact_endpoint_returns_compacted_state(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="中段历史摘要")
         db = self.session_local()
@@ -191,7 +211,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["state"]["messages"][-1]["content"], "现在开始做 compact")
         mock_generate.assert_called_once()
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_auto_compacts_long_session_before_reply(self, mock_generate):
         mock_generate.side_effect = [
             self._assistant_response(content="自动压缩后的中段摘要"),
@@ -218,7 +238,7 @@ class TestAgentApi(unittest.TestCase):
                     {"role": "user", "content": "现在开始做 compact"},
                 ]
             )
-            store.upsert_session_snapshot("auto-compact-session", state=state)
+            store.upsert_session_snapshot("auto-compact-session", state=state, context_tokens=90000)
             db.commit()
         finally:
             db.close()
@@ -246,7 +266,7 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(mock_generate.call_count, 2)
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_does_not_persist_auto_compact_when_run_fails(self, mock_generate):
         mock_generate.side_effect = [
             self._assistant_response(content="自动压缩后的中段摘要"),
@@ -273,7 +293,7 @@ class TestAgentApi(unittest.TestCase):
         try:
             store = SqliteSessionStore(db)
             state = AgentState(messages=original_messages)
-            store.upsert_session_snapshot("auto-compact-fail-session", state=state)
+            store.upsert_session_snapshot("auto-compact-fail-session", state=state, context_tokens=90000)
             db.commit()
         finally:
             db.close()
@@ -302,7 +322,7 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_updates_session_metadata(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="mock reply\nwith preview")
         response = self.client.post(
@@ -329,11 +349,11 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.application.run_service.load_agent_definition")
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
-    def test_run_endpoint_uses_explicit_agent_name(self, mock_generate, mock_load_agent_definition):
+    @patch("agent_prototype.application.services.agent_definition_service.AgentDefinitionService.load_definition")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
+    def test_run_endpoint_uses_explicit_agent_name(self, mock_generate, mock_load_definition):
         mock_generate.return_value = self._assistant_response(content="review reply")
-        mock_load_agent_definition.return_value = AgentDefinition(
+        mock_load_definition.return_value = AgentDefinition(
             id="reviewer",
             name="Reviewer Agent",
             system_prompt="你是一个严格的代码审查助手",
@@ -347,14 +367,14 @@ class TestAgentApi(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(mock_load_agent_definition.call_args.args[0], "reviewer")
+        self.assertEqual(mock_load_definition.call_args.args[0], "reviewer")
         self.assertEqual(response.json()["reply"], "review reply")
         self.assertEqual(response.json()["state"]["messages"][0]["role"], "user")
         self.assertEqual(response.json()["state"]["messages"][1]["role"], "assistant")
 
-    @patch("agent_prototype.application.run_service.load_skill_content", return_value="---\nname: openai-docs\ndescription: 查文档\n---\nFULL SKILL BODY")
-    @patch("agent_prototype.application.run_service.list_skills")
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.application.services.skill_context_service.loader_load_skill_content", return_value="---\nname: openai-docs\ndescription: 查文档\n---\nFULL SKILL BODY")
+    @patch("agent_prototype.application.services.skill_context_service.loader_list_skills")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_loads_selected_skill_content_into_system_prompt(
         self,
         mock_generate,
@@ -403,9 +423,9 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.application.run_service.load_skill_content")
-    @patch("agent_prototype.application.run_service.list_skills")
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.application.services.skill_context_service.loader_load_skill_content")
+    @patch("agent_prototype.application.services.skill_context_service.loader_list_skills")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_run_endpoint_without_skill_name_only_includes_catalog_prompt(
         self,
         mock_generate,
@@ -453,8 +473,8 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.application.run_service.load_skill_content")
-    @patch("agent_prototype.application.run_service.list_skills")
+    @patch("agent_prototype.application.services.skill_context_service.loader_load_skill_content")
+    @patch("agent_prototype.application.services.skill_context_service.loader_list_skills")
     def test_run_endpoint_rejects_disabled_skill_before_loading_content(
         self,
         mock_list_skills,
@@ -480,10 +500,10 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"]["code"], "bad_request")
-        self.assertEqual(response.json()["error"]["message"], "Skill is disabled:openai-docs")
+        self.assertEqual(response.json()["error"]["message"], "Skill is disabled: openai-docs")
         mock_load_skill_content.assert_not_called()
 
-    @patch("agent_prototype.application.run_service.list_skills", return_value=[])
+    @patch("agent_prototype.application.services.skill_context_service.loader_list_skills", return_value=[])
     def test_run_endpoint_returns_structured_error_when_skill_not_found(self, mock_list_skills):
         response = self.client.post(
             "/run",
@@ -497,7 +517,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertEqual(data["error"]["code"], "bad_request")
-        self.assertEqual(data["error"]["message"], "Skill not found:openai-docs")
+        self.assertEqual(data["error"]["message"], "Skill not found: openai-docs")
         mock_list_skills.assert_called_once()
 
     def test_create_session_endpoint_returns_summary_and_persists_empty_session(self):
@@ -542,7 +562,7 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_reset_endpoint_clears_messages_but_keeps_same_session(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="reset reply")
         self.client.post(
@@ -595,7 +615,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["error"]["code"], "bad_request")
         self.assertEqual(data["error"]["message"], "Session not found")
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_delete_session_endpoint_removes_existing_session(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="delete reply")
         self.client.post(
@@ -632,7 +652,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["error"]["code"], "bad_request")
         self.assertEqual(data["error"]["message"], "Session not found")
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_list_sessions_endpoint_returns_summaries(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="first reply")
         self.client.post("/run", json={"session_id": "session-b", "user_input": "你好"})
@@ -655,7 +675,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertIn("created_at", data[0])
         self.assertIn("updated_at", data[0])
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_read_session_endpoint_returns_detail(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="detail reply")
         self.client.post("/run", json={"session_id": "session-detail", "user_input": "你好"})
@@ -683,8 +703,8 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "session_not_found")
         self.assertEqual(response.json()["error"]["message"], "Session not found")
 
-    @patch("agent_prototype.skills.skill_loader.get_default_skill_config_path")
-    @patch("agent_prototype.skills.skill_loader.get_default_skill_roots")
+    @patch("agent_prototype.infrastructure.skills.skill_loader.get_default_skill_config_path")
+    @patch("agent_prototype.infrastructure.skills.skill_loader.get_default_skill_roots")
     def test_list_skills_endpoint_returns_summaries(
         self,
         mock_get_default_skill_roots,
@@ -728,8 +748,8 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(by_name["broken-skill"]["path"], "user-codex/broken-skill/SKILL.md")
         self.assertIn("Missing frontmatter", by_name["broken-skill"]["error"])
 
-    @patch("agent_prototype.skills.skill_loader.get_default_skill_config_path")
-    @patch("agent_prototype.skills.skill_loader.get_default_skill_roots")
+    @patch("agent_prototype.infrastructure.skills.skill_loader.get_default_skill_config_path")
+    @patch("agent_prototype.infrastructure.skills.skill_loader.get_default_skill_roots")
     def test_disable_and_enable_skill_endpoints_update_config(
         self,
         mock_get_default_skill_roots,
@@ -763,7 +783,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertTrue(enable_response.json()["enabled"])
         self.assertEqual(config_path.read_text(encoding="utf-8"), '{\n  "disabled": []\n}')
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_trace_endpoint_returns_runs_in_order(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="trace reply")
         first_response = self.client.post("/run", json={"session_id": "trace-session", "user_input": "第一轮"})
@@ -792,7 +812,7 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.model.openai_adapter.ChatCompletionsAdapter.generate")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.ChatCompletionsAdapter.generate")
     def test_trace_endpoint_supports_run_id_filter(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="filtered trace reply")
         first_response = self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第一轮"})

@@ -95,6 +95,13 @@ const handleCloseChildAgent = (index: number) => {
   }
 };
 
+const handleSelectWorkspaceDialog = async () => {
+  const ws = await workspace.selectWorkspaceDialog();
+  if (ws) {
+    await workspace.createNewSession(ws.path, ws.name);
+  }
+};
+
 onMounted(() => {
   workspace.initializeWorkspace();
   // 读取本地缓存主题并应用到 body 元素
@@ -125,13 +132,15 @@ onMounted(() => {
       <!-- 2. Main Chat Workspace (Always visible as background) -->
       <SessionSidebar 
         :sessions="workspace.sessions.value"
+        :workspaces="workspace.workspaces.value"
         :activeId="workspace.activeSessionId.value"
         :childAgentsBySession="workspace.childAgentsBySession.value"
         @select="id => workspace.activeSessionId.value = id"
-        @new="workspace.createNewSession"
+        @new="(wsPath, wsName) => workspace.createNewSession(wsPath, wsName)"
         @delete="workspace.deleteSession"
         @rename="workspace.renameSession"
         @open-child-agent="handleOpenChildAgent"
+        @select-workspace-dialog="handleSelectWorkspaceDialog"
       />
       
       <!-- 3. 主聊天面板 + 子 Agent 右侧面板 -->
@@ -161,8 +170,9 @@ onMounted(() => {
           :thinkingEnabled="workspace.thinkingEnabled.value"
           :thinkingEffort="workspace.thinkingEffort.value"
           :sessionLoading="workspace.isChatLoading.value"
+          :skills="workspace.skills.value"
           @update:activeAgentId="id => workspace.activeAgentId.value = id"
-          @send="workspace.sendMessage"
+          @send="(text, skillName) => workspace.sendMessage(text, skillName)"
           @errorDismiss="workspace.errorMsg.value = null"
           @infoDismiss="workspace.infoMsg.value = null"
           @compact="workspace.compactSession"

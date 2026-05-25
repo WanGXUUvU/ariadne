@@ -11,9 +11,9 @@ import unittest
 from unittest.mock import MagicMock
 from typing import Callable
 
-from agent_prototype.core.schemas import ApprovalPolicy, RiskLevel, ToolCall, ToolCallFunction
-from agent_prototype.runtime.tool_executor import needs_approval, async_handle_tool_calls
-from agent_prototype.tools.tool_registry import ToolRegistry
+from agent_prototype.interface.dto.schemas import ApprovalPolicy, RiskLevel, ToolCall, ToolCallFunction
+from agent_prototype.application.runtime.tool_executor import needs_approval, async_handle_tool_calls
+from agent_prototype.infrastructure.tools.tool_registry import ToolRegistry
 from agent_prototype.core.tool_types import ToolDefinition
 
 
@@ -42,17 +42,19 @@ def make_tool_call(name: str = "fake_tool") -> ToolCall:
 
 async def collect_events(registry, tool_calls, policy, on_approval_required=None):
     """运行 async_handle_tool_calls，收集所有 AgentEvent，返回事件列表。"""
-    from agent_prototype.core.schemas import AgentEvent
+    from agent_prototype.interface.dto.schemas import AgentEvent
     events = []
     async for item in async_handle_tool_calls(
         tool_registry=registry,
         tool_calls=tool_calls,
         allow_tool_names=None,
         event_index=0,
+        session_id="mock_session",
+        run_id="mock_run",
         approval_policy=policy,
         on_approval_required=on_approval_required,
     ):
-        from agent_prototype.runtime.tool_executor import ToolTurnResult
+        from agent_prototype.application.runtime.tool_executor import ToolTurnResult
         if isinstance(item, AgentEvent):
             events.append(item)
     return events
@@ -134,7 +136,7 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
             registry, [make_tool_call()], ApprovalPolicy.UNTRUSTED,
             on_approval_required=callback,
         ))
-        callback.assert_called_once_with("fake_tool", "{}")
+        callback.assert_called_once_with("call_001", "fake_tool", "{}", None, 1)
 
     def test_approval_required_event_content_is_approval_id(self):
         """approval_required 事件的 content 包含回调返回的 approval_id。"""

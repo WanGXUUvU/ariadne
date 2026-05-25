@@ -1,4 +1,14 @@
 {
-  "disabled": ["openai-docs"], 
-  "protected": ["default"]
+  "disabled": [
+    "codex-native-project-workflow",
+    "device-point-import-builder",
+    "doc",
+    "find-skills",
+    "frontend-skill",
+    "officecli",
+    "openai-docs",
+    "playwright",
+    "rtk-shell",
+    "technical-writing"
+  ]
 }

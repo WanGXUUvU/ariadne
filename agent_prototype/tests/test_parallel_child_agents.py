@@ -7,7 +7,7 @@
 4. 多个子 Agent 并行 spawn，全部完成
 """
 
-_MOCK_PATH = "agent_prototype.runtime.agent_runtime.Agent"
+_MOCK_PATH = "agent_prototype.application.runtime.agent_runtime.AgentRunner"
 
 import json
 import tempfile
@@ -19,9 +19,9 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.core.schemas import AgentOutput, AgentState, AgentEvent, RunMetadata
-from agent_prototype.storage.db import Base
-from agent_prototype.tools.tool_registry import build_run_registry
+from agent_prototype.interface.dto.schemas import AgentOutput, AgentState, AgentEvent, RunMetadata
+from agent_prototype.infrastructure.database.db import Base
+from agent_prototype.infrastructure.tools.tool_registry import build_run_registry
 
 
 def _make_db(temp_dir):

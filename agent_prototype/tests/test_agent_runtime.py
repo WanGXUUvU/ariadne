@@ -1,9 +1,9 @@
 import unittest
 
 from agent_prototype.core.agent_definition import AgentDefinition
-from agent_prototype.core.schemas import AgentInput, ChatMessage, ToolCall, ToolCallFunction
-from agent_prototype.model.model_types import ModelResponse
-from agent_prototype.runtime.agent_runtime import Agent
+from agent_prototype.interface.dto.schemas import AgentInput, ChatMessage, ToolCall, ToolCallFunction
+from agent_prototype.infrastructure.llm.model_types import ModelResponse
+from agent_prototype.application.runtime.agent_runtime import AgentRunner
 
 
 class FakeModelAdapter:
@@ -39,7 +39,7 @@ class TestAgent(unittest.TestCase):
             build_assistant_response(content="mock reply"),
         ])
 
-        agent = Agent(definition=custom_definition, model_adapter=fake_adapter)
+        agent = AgentRunner(definition=custom_definition, model_adapter=fake_adapter)
         output = agent.run(AgentInput(session_id="session-a", user_input="你好"))
 
         self.assertEqual(output.reply, "mock reply")
@@ -52,7 +52,7 @@ class TestAgent(unittest.TestCase):
             build_assistant_response(content="mock reply"),
         ])
 
-        agent = Agent(model_adapter=fake_adapter)
+        agent = AgentRunner(model_adapter=fake_adapter)
         output = agent.run(AgentInput(session_id="session-a", user_input="你好"))
 
         self.assertEqual(output.reply, "mock reply")
@@ -80,7 +80,7 @@ class TestAgent(unittest.TestCase):
             ]
         )
 
-        agent = Agent(model_adapter=fake_adapter)
+        agent = AgentRunner(model_adapter=fake_adapter)
         output = agent.run(AgentInput(session_id="session-a", user_input="帮我测试工具"))
 
         self.assertEqual(output.reply, "final reply")
@@ -107,7 +107,7 @@ class TestAgent(unittest.TestCase):
             ]
         )
 
-        agent = Agent(model_adapter=fake_adapter)
+        agent = AgentRunner(model_adapter=fake_adapter)
         output = agent.run(AgentInput(session_id="session-a", user_input="帮我测试错误 trace"))
 
         self.assertEqual(output.reply, "final reply after error")
@@ -132,7 +132,7 @@ class TestAgent(unittest.TestCase):
             ]
         )
 
-        agent = Agent(
+        agent = AgentRunner(
             definition=AgentDefinition(
                 id="default",
                 name="Default Agent",
@@ -146,5 +146,5 @@ class TestAgent(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             agent.run(AgentInput(session_id="session-a", user_input="帮我测试权限"))
 
-        self.assertIn("Tool not allowed:write_file", str(ctx.exception))
+        self.assertIn("Tool not allowed: write_file", str(ctx.exception))
         self.assertEqual(len(fake_adapter.calls), 1)

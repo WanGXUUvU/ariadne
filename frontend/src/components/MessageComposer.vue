@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue';
+import type { SkillMetadata } from '../types';
 import ModelSelector from './ModelSelector.vue';
 
 // 点击组件外部时关闭菜单的自定义指令
@@ -30,14 +31,17 @@ const props = withDefaults(defineProps<{
   isCompacting?: boolean;
   /** 当前 session 详情正在加载中，张 ModelSelector 自动选模型 */
   sessionLoading?: boolean;
+  /** 可用的 skill 列表，用于斜杠命令菜单 */
+  skills?: SkillMetadata[];
 }>(), {
   contextTokens: 0,
   contextLength: 128000,
   isCompacting: false,
+  skills: () => [] as SkillMetadata[],
 });
 
 const emit = defineEmits<{
-  (e: 'send', text: string): void;
+  (e: 'send', text: string, skillName?: string | null): void;
   (e: 'stop'): void;
   (e: 'update:permissionProfile', profile: string): void;
   (e: 'update:model', val: { modelId: string | null; providerId: number | null }): void;
@@ -79,6 +83,29 @@ const isFocused = ref(false);
 const showProfileMenu = ref(false);
 const showComposerCtx = ref(false);
 
+// ── 斜杠命令菜单 ──
+const showSlashMenu = ref(false);
+const slashQuery = ref('');
+const selectedSkillName = ref<string | null>(null);
+const slashMenuIndex = ref(0);
+
+// 固定命令列表
+const FIXED_COMMANDS = [
+  { id: 'compact', label: 'compact', description: '压缩当前对话上下文', icon: '⚡️' },
+];
+
+// 合并固定命令 + skill 列表的过滤结果
+const slashMenuItems = computed(() => {
+  const q = slashQuery.value.toLowerCase();
+  const fixed = FIXED_COMMANDS
+    .filter(c => c.label.includes(q))
+    .map(c => ({ type: 'command' as const, id: c.id, label: c.label, description: c.description, icon: c.icon }));
+  const skills = (props.skills ?? [])
+    .filter(s => s.enabled && s.name.toLowerCase().includes(q))
+    .map(s => ({ type: 'skill' as const, id: s.name, label: s.name, description: s.description ?? '', icon: '📚' }));
+  return [...fixed, ...skills];
+});
+
 const currentProfile = () =>
   PROFILES.find(p => p.id === (props.permissionProfile ?? 'conservative')) ?? PROFILES[0];
 
@@ -93,22 +120,78 @@ const adjustHeight = () => {
   textareaRef.value.style.height = `${Math.min(textareaRef.value.scrollHeight, 160)}px`;
 };
 
-watch(text, () => {
+watch(text, (val) => {
   nextTick(adjustHeight);
+  // 检测是否输入 / 开头的命令
+  if (val.startsWith('/')) {
+    slashQuery.value = val.slice(1).toLowerCase();
+    showSlashMenu.value = true;
+    slashMenuIndex.value = 0;
+  } else {
+    showSlashMenu.value = false;
+    slashQuery.value = '';
+  }
 });
+
+const selectSlashItem = (item: typeof slashMenuItems.value[number]) => {
+  if (item.type === 'command' && item.id === 'compact') {
+    text.value = '';
+    showSlashMenu.value = false;
+    emit('compact');
+    return;
+  }
+  if (item.type === 'skill') {
+    selectedSkillName.value = item.id;
+    text.value = '';
+    showSlashMenu.value = false;
+    nextTick(() => textareaRef.value?.focus());
+  }
+};
+
+const clearSelectedSkill = () => {
+  selectedSkillName.value = null;
+};
 
 const handleSend = () => {
   if (!text.value.trim() || props.disabled) return;
-  emit('send', text.value.trim());
+  emit('send', text.value.trim(), selectedSkillName.value);
   text.value = '';
+  selectedSkillName.value = null;
   nextTick(adjustHeight);
 };
 
 const handleKeyDown = (e: KeyboardEvent) => {
+  // 菜单开着时用方向键和 Enter 导航
+  if (showSlashMenu.value && slashMenuItems.value.length > 0) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      slashMenuIndex.value = (slashMenuIndex.value + 1) % slashMenuItems.value.length;
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      slashMenuIndex.value = (slashMenuIndex.value - 1 + slashMenuItems.value.length) % slashMenuItems.value.length;
+      return;
+    }
+    if (e.key === 'Enter') {
+      if (e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      selectSlashItem(slashMenuItems.value[slashMenuIndex.value]);
+      return;
+    }
+    if (e.key === 'Escape') {
+      showSlashMenu.value = false;
+      return;
+    }
+  }
   if (e.key === 'Enter' && !e.shiftKey) {
     if (e.isComposing || e.keyCode === 229) return;
     e.preventDefault();
     handleSend();
+  }
+  // Backspace 清除已选 skill
+  if (e.key === 'Backspace' && selectedSkillName.value && !text.value) {
+    selectedSkillName.value = null;
   }
 };
 
@@ -142,6 +225,27 @@ const handleCompact = () => {
 
 <template>
   <div class="composer-container">
+    <!-- 斜杠命令菜单 -->
+    <Transition name="slash-menu">
+      <div v-if="showSlashMenu && slashMenuItems.length > 0" class="slash-menu">
+        <div class="slash-menu-header">命令 &amp; 技能</div>
+        <div
+          v-for="(item, idx) in slashMenuItems"
+          :key="item.id"
+          class="slash-item"
+          :class="{ active: idx === slashMenuIndex, 'is-skill': item.type === 'skill' }"
+          @mousedown.prevent="selectSlashItem(item)"
+          @mouseover="slashMenuIndex = idx"
+        >
+          <div class="slash-item-main">
+            <span class="slash-item-label"><span class="slash-prefix">/</span>{{ item.label }}</span>
+            <span v-if="item.type === 'skill'" class="slash-item-tag">skill</span>
+          </div>
+          <span class="slash-item-desc">{{ item.description }}</span>
+        </div>
+      </div>
+    </Transition>
+
     <div class="composer-header mono-label">
       <span class="composer-hint">Ask anything</span>
       <div style="display: flex; gap: 16px; align-items: center;">
@@ -212,6 +316,9 @@ const handleCompact = () => {
     </div>
 
     <div class="composer-wrapper" :class="{ 'is-disabled': disabled, 'is-focused': isFocused, 'is-streaming': isStreaming }">
+      <span v-if="selectedSkillName" class="inline-skill-chip">
+        /{{ selectedSkillName }}<button class="inline-skill-clear" @click="clearSelectedSkill" tabindex="-1">×</button>
+      </span>
       <textarea 
         ref="textareaRef"
         class="composer-input"
@@ -220,7 +327,7 @@ const handleCompact = () => {
         @keydown="handleKeyDown"
         @focus="isFocused = true"
         @blur="isFocused = false"
-        placeholder="Ask anything or request a tool..."
+        :placeholder="selectedSkillName ? '' : 'Ask anything or request a tool...'"
         :disabled="disabled"
         rows="1"
       ></textarea>
@@ -300,6 +407,135 @@ const handleCompact = () => {
 </template>
 
 <style scoped>
+/* ── 斜杠命令菜单 ── */
+.slash-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated, #111111);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), 0 1px 0 var(--border-dim) inset;
+  z-index: 100;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.slash-menu-header {
+  padding: 8px 14px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.slash-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-left: 2px solid transparent;
+}
+
+.slash-item.active,
+.slash-item:hover {
+  background: var(--bg-hover);
+  border-left-color: var(--accent);
+}
+
+.slash-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slash-item-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.slash-prefix {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.slash-item-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.slash-item-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 10px;
+}
+
+/* ── 对话框内行内 skill 标签 ── */
+.inline-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  flex-shrink: 0;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 2px 4px 2px 8px;
+  margin-right: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: chipIn 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes chipIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.inline-skill-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.inline-skill-clear:hover {
+  color: var(--danger, #ff453a);
+}
+
+/* ── 菜单进出动画 ── */
+.slash-menu-enter-active,
+.slash-menu-leave-active {
+  transition: opacity 0.12s, transform 0.12s;
+}
+.slash-menu-enter-from,
+.slash-menu-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
 .composer-container {
   padding: 20px 32px 32px;
   background: linear-gradient(to top, var(--bg-app) 75%, transparent);

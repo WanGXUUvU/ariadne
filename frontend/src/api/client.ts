@@ -1,4 +1,4 @@
-import type { RunResponse, SessionDetail, SessionSummary, SkillMetadata, TraceResponse, CompactResponse, StreamFrame, ApprovalInfo } from '../types';
+import type { RunResponse, SessionDetail, SessionSummary, SkillMetadata, TraceResponse, CompactResponse, StreamFrame, ApprovalInfo, WorkspaceSummary } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -27,12 +27,13 @@ async function* streamRun(
   session_id: string,
   user_input: string,
   agent_name?: string,
+  skill_name?: string | null,
   signal?: AbortSignal,
 ): AsyncGenerator<StreamFrame> {
   yield* streamSse(`${API_BASE}/run/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id, user_input, agent_name }),
+    body: JSON.stringify({ session_id, user_input, agent_name, skill_name: skill_name ?? undefined }),
     signal,
   });
 }
@@ -87,19 +88,21 @@ async function* streamSse(url: string, init: RequestInit): AsyncGenerator<Stream
 
 export const api = {
   getSessions: () => fetchApi<SessionSummary[]>('/sessions'),
-  createSession: () =>
+  createSession: (workspace_path?: string | null, workspace_name?: string | null, session_name?: string) =>
     fetchApi<SessionSummary>('/sessions', {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ workspace_path, workspace_name, session_name }),
     }),
+  getWorkspaces: () => fetchApi<WorkspaceSummary[]>('/workspaces'),
+  selectWorkspaceDialog: () => fetchApi<WorkspaceSummary>('/workspaces/select-dialog', { method: 'POST' }),
   getSessionDetail: (id: string) => fetchApi<SessionDetail>(`/sessions/${id}`),
   runPass: (session_id: string, user_input: string, agent_name?: string) => 
     fetchApi<RunResponse>('/run', {
       method: 'POST',
       body: JSON.stringify({ session_id, user_input, agent_name }),
     }),
-  streamRun: (session_id: string, user_input: string, agent_name?: string, signal?: AbortSignal) =>
-    streamRun(session_id, user_input, agent_name, signal),
+  streamRun: (session_id: string, user_input: string, agent_name?: string, skill_name?: string | null, signal?: AbortSignal) =>
+    streamRun(session_id, user_input, agent_name, skill_name, signal),
   finalizeRun: (
     session_id: string,
     run_id: string,

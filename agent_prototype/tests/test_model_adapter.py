@@ -3,14 +3,14 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from agent_prototype.core.schemas import ChatMessage
-from agent_prototype.model.model_types import ModelConfig, ModelRequest
-from agent_prototype.model.openai_adapter import ChatCompletionsAdapter
+from agent_prototype.interface.dto.schemas import ChatMessage
+from agent_prototype.infrastructure.llm.model_types import ModelConfig, ModelRequest
+from agent_prototype.infrastructure.llm.chat_completions_adapter import ChatCompletionsAdapter
 
 
 class TestChatCompletionsAdapter(unittest.TestCase):
     @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
-    @patch("agent_prototype.model.openai_adapter.requests.post")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.requests.post")
     def test_generate_wraps_http_error_with_runtime_error(self, mock_post):
         mock_response = Mock()
         mock_response.status_code = 500
@@ -35,7 +35,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         mock_response.json.assert_not_called()
 
     @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
-    @patch("agent_prototype.model.openai_adapter.requests.post")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.requests.post")
     def test_generate_raises_when_choices_missing(self, mock_post):
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
@@ -55,7 +55,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "LLM response missing choices")
 
     @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
-    @patch("agent_prototype.model.openai_adapter.requests.post")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.requests.post")
     def test_generate_raises_when_message_missing(self, mock_post):
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
@@ -75,7 +75,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "LLM response missing message")
 
     @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
-    @patch("agent_prototype.model.openai_adapter.requests.post")
+    @patch("agent_prototype.infrastructure.llm.chat_completions_adapter.requests.post")
     def test_generate_returns_model_response(self, mock_post):
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None

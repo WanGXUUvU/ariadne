@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_prototype.tools.tool_registry import build_default_tool_registry
+from agent_prototype.infrastructure.tools.tool_registry import build_default_tool_registry
 
 
 class TestToolRegistry(unittest.TestCase):

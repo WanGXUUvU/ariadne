@@ -5,9 +5,9 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.core.schemas import AgentState
-from agent_prototype.storage.db import Base
-from agent_prototype.storage.stores.session_store import SqliteSessionStore
+from agent_prototype.interface.dto.schemas import AgentState
+from agent_prototype.infrastructure.database.db import Base
+from agent_prototype.infrastructure.database.repositories.session_store import SqliteSessionStore
 
 
 class TestSessionStore(unittest.TestCase):
