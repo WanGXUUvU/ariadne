@@ -22,4 +22,14 @@ router=APIRouter()
 
 @router.get("/tools")
 def list_tools_api():
+    """这个函数是用来获取系统里目前注册的所有工具名称列表的。
+    
+    工具是 Agent 用来完成具体现实任务的武器（比如查询天气、计算器等），前端需要知道有哪些武器可以用。
+    
+    需要拿到的东西：
+    - 无需传入额外参数。
+    
+    会给出来的结果：
+    - 包含所有已注册工具名称的字典列表，形如 [{"name": "tool_a"}, {"name": "tool_b"}]。
+    """
     return [{"name":name} for name in DEFAULT_TOOL_REGISTRY._tools.keys()]

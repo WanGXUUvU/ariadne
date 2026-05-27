@@ -28,7 +28,17 @@ router = APIRouter()
 
 @router.post("/compact", response_model=CompactOutput)
 def compact_session_api(payload: CompactInput, db: Session = Depends(get_db)) -> CompactOutput:
-    """输入：CompactInput 历史压缩参数、数据库会话。输出：CompactOutput 压缩结果。"""
+    """这个函数是用来手动触发会话历史消息压缩（瘦身）的。
+    
+    当聊天记录太长、太占内存或者容易超出大模型 Token 限制时，调用这个接口可以把老的消息进行摘要压缩，只留下关键信息。
+    
+    Need 拿到的东西：
+    - payload: CompactInput 对象，里面包含了要压缩哪一个会话（session_id）以及具体的压缩策略和参数。
+    - db: 数据库连接会话，用来读写会话里的历史消息。
+    
+    会给出来的结果：
+    - CompactOutput 对象，里面会告诉你压缩是否成功，以及压缩后的摘要内容或者精简后的状态。
+    """
     try:
         service = CompactService(db)
         return service.compact_session(payload)

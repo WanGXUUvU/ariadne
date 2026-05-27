@@ -30,18 +30,32 @@ COMPACT_MODEL = os.getenv("COMPACT_MODEL", "deepseek-v4-flash")
 class CompactService:
     """上下文长历史压缩管理服务类 (OOP)
     
-    职责：
-    1. 评估会话历史占用的 Token 比率是否超过阈值并执行有损压缩；
-    2. 提供无状态的纯内存计算，以及有状态的 Snapshot 持久化落库。
+    大白话解释：
+    这个类是“聊天历史瘦身教练”。它的主要任务是防止聊天记录太长，导致 AI 记不住或者消耗太多 Token（算力话费）。当聊天历史太长时，它会把旧的聊天内容打包总结成一段简短的“前情提要”，只留下最近的几条聊天消息，从而给聊天上下文“减肥瘦身”。
     """
     
     def __init__(self, db: Session):
-        """注入 db 会话并聚合 SqliteSessionStore 仓储"""
+        """
+        大白话解释：
+        初始化瘦身教练，带上数据库的钥匙并叫上底下的“数据仓库”。
+
+        需要拿到的东西：
+        - db (Session): 操作数据库的钥匙。
+        """
         self.db = db
         self.store = SqliteSessionStore(db)
 
     def _build_session_adapter(self, session_id: str) -> ChatCompletionsAdapter:
-        """从数据库读取配置并独立构建 LLM Adapter，避免向上依赖 L8 执行层。"""
+        """
+        大白话解释：
+        根据会话 ID 去数据库里查找这个会话关联的 AI 模型和 API Key，并创建对应的 AI 客户端适配器，好让它一会儿能找 AI 进行历史压缩总结。
+
+        需要拿到的东西：
+        - session_id (str): 会话 ID。
+
+        会给出来的结果：
+        - ChatCompletionsAdapter: 已经配置妥当、随时能向大模型发请求的 AI 客户端适配器。
+        """
         from agent_prototype.prompt.strategies.thinking import build_thinking_payload
 
         record = self.db.query(SessionRecord).filter(
@@ -83,7 +97,22 @@ class CompactService:
         force: bool = False,
         compactor: Optional[HistoryCompactor] = None,
     ) -> CompactOutput:
-        """评估并计算无状态压缩结果（纯内存评估，不涉及物理落库或事务控制）"""
+        """
+        大白话解释：
+        在内存里模拟做一次瘦身，不做持久化落库。
+        它会先看看目前的 Token 消耗是不是已经到了临界线（通常占用了模型总容量的 70% 以上）。如果是，或者被强制要求压缩，它就会把除了最近留底（keep_recent_count 条）以外的历史消息，交给大模型做个提炼总结，然后把总结出的“前情提要”放到第一条，把其余旧消息删掉，从而给聊天历史减负。
+
+        需要拿到的东西：
+        - state (AgentState): 当前的聊天状态（也就是包含哪些消息）。
+        - context_tokens (int): 目前聊天内容大约消耗了多少 Token。
+        - context_length (int): 这个模型最大支持多少 Token 上下文。
+        - keep_recent_count (int): 瘦身时，最少需要在底部原封不动保留几条最新的消息。
+        - force (bool, 默认 False): 是否强制进行压缩（即使还没达到 70% 阈值）。
+        - compactor (HistoryCompactor, 可选): 执行压缩总结的压缩器实例。
+
+        会给出来的结果：
+        - CompactOutput: 瘦身结果数据包。包含did_compact（有没有做瘦身）、瘦身后的 state（如果做了，就包含前情提要+最近消息；没做就是原样），以及被删掉的消息数量。
+        """
         if not force:
             if context_tokens == 0 or context_length == 0:
                 return CompactOutput(state=state, did_compact=False, removed_count=0)
@@ -121,7 +150,17 @@ class CompactService:
         return compact_result
 
     def compact_session(self, payload: CompactInput) -> CompactOutput:
-        """有状态压缩入口：读取数据库 Session 快照，执行压缩，更新 Snapshot 并持久化"""
+        """
+        大白话解释：
+        正式执行聊天历史有损压缩（瘦身）的入口。
+        它会去数据库读出指定会话的全部聊天历史，判断是否达到了触发压缩的条件（或者用户强制触发）。一旦决定压缩，它就调用内存压缩算法搞定总结，然后把压缩后带有“前情提要”的最新历史快照存回数据库。同时它还会贴心地把很多历史运行记录标记为非活跃，防止前端界面加载时过于臃肿。
+
+        需要拿到的东西：
+        - payload (CompactInput): 压缩请求入参，主要有会话 ID（session_id）、触发消息数阈值（trigger_threshold）、底保留消息数（keep_recent_count）和是否强压（force）。
+
+        会给出来的结果：
+        - CompactOutput: 包含有没有真正做压缩、压缩后聊天状态等信息的瘦身数据包。
+        """
         state = self.store.get(payload.session_id)
         if state is None:
             raise ValueError("Session not found")

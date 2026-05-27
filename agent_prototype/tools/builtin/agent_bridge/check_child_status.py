@@ -15,8 +15,30 @@ from agent_prototype.model.types.domain import ToolResult, RiskLevel
 import json
 
 def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -> ToolDefinition:
+    """
+    大白话解释：
+    这是一个“子智能体状态查询工具的加工厂（构建函数）”。
+    它接收一个用来真正干活的查询回调函数，然后把真正的工具定义（ToolDefinition）给加工并打包出来。
+
+    需要拿到的东西：
+    - status_checker (Callable): 一个帮它打听状态的回调函数，只要给出一串子 Agent ID，这个回调就能返回它们现在的最新状态。
+
+    会给出来的结果：
+    - ToolDefinition: 最终可以在 AI 面前登记注册的“查询子智能体状态”的工具定义对象。
+    """
 
     def check_child_status(child_run_ids: str) -> ToolResult:
+        """
+        大白话解释：
+        这是真正的“查询子智能体状态”的工具执行函数。
+        它会去查一查之前派出去干异步任务的“子智能体小帮手们”现在都进行到哪一步了（是还在跑、已经跑完、出错了、还是根本找不到这个小帮手）。它不会傻等小帮手干完，而是“非阻塞”地看一眼状态就走。
+
+        需要拿到的东西：
+        - child_run_ids (str): 一串需要查询的子任务 ID 列表，需要是 JSON 数组格式（例如：`'["id1", "id2"]'`）。
+
+        会给出来的结果：
+        - ToolResult: 一个包含查询结果的数据包。如果成功，里面的 content 就是各个 ID 的状态（比如running、done、error）；如果解析失败或出错，ok 就会是 False。
+        """
         try:
             ids = json.loads(child_run_ids)  # "[\"aaa\",\"bbb\"]" → ["aaa", "bbb"]
         except json.JSONDecodeError as exc:

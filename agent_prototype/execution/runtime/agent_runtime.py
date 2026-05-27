@@ -27,6 +27,12 @@ from agent_prototype.execution.runtime.tool_runner import (
 # ── AgentRunner ───────────────────────────────────────────────────────────────
 
 class AgentRunner:
+    """【大白话解释】
+    这是一个“智能体运行载体（发动机）”。
+    它的核心工作是驱动智能体与大模型之间的多轮对话循环。
+    它接收用户的输入，整理当前的聊天历史，把请求发给大模型；
+    如果大模型说“我要调用工具”，它就会通过工具注册中心（ToolRegistry）去执行工具，再把执行结果反馈给大模型，直到大模型最终给出一个人类可读的文字回答。
+    """
 
     def __init__(
         self,
@@ -38,6 +44,18 @@ class AgentRunner:
         approval_policy: ApprovalPolicy = ApprovalPolicy.NEVER,
         session_type:str="coding",
     ):
+        """【大白话解释】
+        组装这个智能体发动机，给他配置好初始聊天状态、人设定义、可用的工具箱、大模型电话线、审批策略等参数。
+
+        需要拿到的东西：
+        - state: 智能体当前的聊天状态，比如历史聊天记录（不传就默认新建一个空状态）。
+        - definition: 智能体的人设定义（比如系统提示词是什么）。
+        - tool_registry: 工具注册中心（工具箱）。
+        - allow_tool_names: 这次运行允许调用的工具名字清单（不传就用人设定义里的）。
+        - model_adapter: 大模型适配器（大模型电话线）。
+        - approval_policy: 审批策略，决定调用工具时需不需要人类手动审批（默认从不审批）。
+        - session_type: 会话类型（默认是写代码模式 "coding"）。
+        """
         self.state            = state or AgentState()
         self.definition       = definition or DEFAULT_AGENT_DEFINITION
         self.tool_registry    = tool_registry or DEFAULT_TOOL_REGISTRY
@@ -53,7 +71,17 @@ class AgentRunner:
     # ── 非流式（保留备用） ────────────────────────────────────────────────────
 
     def run(self, agent_input: AgentInput) -> AgentOutput:
-        """同步非流式运行一次，返回完整 AgentOutput。"""
+        """【大白话解释】
+        同步普通运行模式：让发动机一口气轰鸣运转到结束！
+        把用户输入塞进历史，然后在大模型和工具调用之间来回循环，直到大模型给出最终文字回答，最后把整个运行包成一个 AgentOutput 吐出来。
+        这个方法是“同步阻塞”的，会一直等完全部过程。
+
+        需要拿到的东西：
+        - agent_input: 用户的本轮输入参数对象。
+
+        会给出来的结果：
+        - 一个完整的 AgentOutput 运行结果对象，包含最终文本回答、所有产生过的事件、最新的状态等。
+        """
         events: list[AgentEvent] = []
         event_index = 0
 
@@ -98,7 +126,16 @@ class AgentRunner:
     # ── 同步流式 ──────────────────────────────────────────────────────────────
 
     def stream_run(self, agent_input: AgentInput) -> Iterator[Union[AgentEvent, str]]:
-        """同步 SSE 流式运行，逐步 yield AgentEvent 或 str(delta)。"""
+        """【大白话解释】
+        同步流式运行模式：像挤牙膏一样，实时把大模型吐出的每一个字和工具调用事件 yield 出来。
+        适合在同步 SSE 场景下使用。
+
+        需要拿到的东西：
+        - agent_input: 用户的本轮输入参数对象。
+
+        会给出来的结果：
+        - 一个生成器迭代器，逐步产生大模型回答的文本片段（str）或者关键的状态事件（AgentEvent）。
+        """
         event_index = 0
         self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
         self.state.step += 1
@@ -181,7 +218,23 @@ class AgentRunner:
         run_id: Optional[str] = None,
         workspace_path: Optional[str] = None,
     ) -> AsyncIterator[Union[AgentEvent, str]]:
-        """异步 SSE 流式运行，支持工具审批中断与恢复。"""
+        """【大白话解释】
+        异步流式运行模式（最强大的模式！）：支持异步并发、支持工具调用的审批中断、并且能将思考过程和执行步骤实时吐出。
+        在这个模式下，如果大模型调用的工具需要人工审批，它会及时暂停，保留现场并 yield 审批事件，等待人类介入审批通过后，再由 Resume 恢复运行。
+
+        需要拿到的东西：
+        - agent_input: 用户的本轮输入参数。
+        - on_tool_start: 当工具开始执行时的回调函数（可选）。
+        - on_tool_finish: 当工具执行结束时的回调函数（可选）。
+        - on_approval_required: 当需要审批时的回调函数（可选）。
+        - skip_user_message: 是否跳过自动往历史里塞用户消息（如果前面已经塞过了，这里传 True）。
+        - event_index: 序列号起始索引（默认为 0）。
+        - run_id: 这次运行的 ID（可选）。
+        - workspace_path: 工作区物理路径（可选）。
+
+        会给出来的结果：
+        - 一个异步迭代器，实时产生大模型吐出的字片段（str）或者执行中产生的关键事件（AgentEvent）。
+        """
         if not skip_user_message:
             self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
         self.state.step += 1

@@ -30,7 +30,21 @@ def build_model_request(
     allow_tool_names: Optional[list[str]] = None,
     session_id: str = "",
 ) -> ModelRequest:
-    """把 runtime state 组成一次调用请求。"""
+    """【大白话解释】
+    这是一个“大模型请求打包盒”。
+    它的作用是把大模型需要知道的所有背景设定、历史聊天记录、以及大模型这会儿允许调用的所有工具清单（Schemas），
+    全部整整齐齐地装进一个叫 `ModelRequest` 的规范盒子里，然后交给大模型适配器拿去发网络请求。
+
+    需要拿到的东西：
+    - definition: 包含系统提示词（人设）的智能体定义配置。
+    - state: 包含之前所有多轮历史对话消息的聊天状态。
+    - tool_registry: 工具注册中心（工具箱），用于获取具体工具的描述 Schema。
+    - allow_tool_names: 这一步大模型被授权使用的工具名字列表（如果是空就从定义里取）。
+    - session_id: 会话的唯一 ID（用于追踪调试）。
+
+    会给出来的结果：
+    - 一个规范的 ModelRequest 大模型请求实体包，大模型适配器直接认它。
+    """
 
     return ModelRequest(
         messages=[

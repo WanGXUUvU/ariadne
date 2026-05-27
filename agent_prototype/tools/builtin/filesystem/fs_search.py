@@ -15,11 +15,21 @@
 """
 
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
-
 from pathlib import Path
 
 def search_text(query: str, path: str = ".") -> str:  # 在目录里搜索文本
-    """输入：搜索关键字、可选目录路径。输出：匹配结果文本或无匹配提示。"""
+    """
+    大白话解释：
+    这是“全文检索”的具体执行函数。
+    就像你在整个项目文件夹里按快捷键 `Ctrl+Shift+F`（或者用命令 `grep`），输入你想找的字，它就会掘地三尺，把指定文件夹底下所有文本文件里的每一行都翻个遍，只要发现哪一行提到了你的字，就赶紧把“文件名 + 第几行 + 这一行的内容”通通记下来报给你。
+
+    需要拿到的东西：
+    - query (str): 你想搜索的关键字。
+    - path (str, 默认 "."): 你想在哪个文件夹里开始搜（不填默认当前运行目录）。
+
+    会给出来的结果：
+    - str: 一个大长串文字，每行代表一个匹配结果，例如 `foo.txt:15: 这里包含关键字`。如果没有匹配项，就会温柔地告诉你没找着。
+    """
     target = Path(path)  # 把字符串路径转成 Path 对象
 
     if not target.exists():  # 如果路径不存在
@@ -70,8 +80,14 @@ SEARCH_TEXT_SCHEMA = {  # 给模型看的工具说明
     },
 }
 
-def build_search_text_definition()->ToolDefinition:
-    """输入：无。输出：search_text 对应的 ToolDefinition。"""
+def build_search_text_definition() -> ToolDefinition:
+    """
+    大白话解释：
+    把上面的“全文检索”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+
+    会给出来的结果：
+    - ToolDefinition: 打包好、带安全等级的工具定义对象。
+    """
     return ToolDefinition(
         name="search_text",
         schema=SEARCH_TEXT_SCHEMA,

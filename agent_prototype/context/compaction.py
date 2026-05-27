@@ -29,7 +29,17 @@ def split_messages_for_compaction(
         messages:list[ChatMessage], #输入完整历史消息列表
         keep_recent_count:int=DEFAULT_KEEP_RECENT_COUNT, #输入要保留的最近原始消息数量
 )->tuple[list[ChatMessage],list[ChatMessage],list[ChatMessage]]:
-    """输入：完整消息列表。 输出：前锚点、中段、最近消息。""" #这个函数值负责切分 不负责调用模型
+    """【大白话解释】
+    把一长串的历史聊天记录切成三段：开头（前锚点）、中间（准备被压扁压缩的一段）和结尾（最近发生的、原样保留的几条）。
+    这样我们就知道要把哪部分送去让大模型压缩了。
+
+    需要拿到的东西：
+    - messages: 完整的历史聊天消息列表。
+    - keep_recent_count: 结尾需要原样保留、不被压缩的消息数量。
+
+    会给出来的结果：
+    - 一个有三个元素的元组，分别是：(前锚点消息列表, 中间待压缩消息列表, 最近的原始消息列表)。
+    """
 
     if not messages:
         return [],[],[]
@@ -46,7 +56,16 @@ def split_messages_for_compaction(
     return anchor_messages,middle_messages,recent_messages
 
 def build_compact_prompt(middle_messages:list[ChatMessage])->str:
-    """输入：中段消息。输出：发给模型的 compact prompt。"""
+    """【大白话解释】
+    专门为大模型准备一个“压缩指令”！把中间那段长长的聊天记录整理一下，
+    加上提示词，做成一个任务书，拜托大模型帮我们把这段内容归纳总结一下。
+
+    需要拿到的东西：
+    - middle_messages: 需要被压缩的中间那段聊天记录列表。
+
+    会给出来的结果：
+    - 一大段文本（Prompt），直接拿去喂给大模型就行。
+    """
 
     lines = [
         "你是一个对话历史压缩助手。",
@@ -73,7 +92,16 @@ def build_compact_prompt(middle_messages:list[ChatMessage])->str:
     return "\n".join(lines)
 
 def build_compact_summary_message(summary_text: str) -> ChatMessage:
-    """输入：模型返回的 summary 文本。输出：可回写到 state 的 summary message。"""  # 这个函数负责把文本包装成一条 ChatMessage
+    """【大白话解释】
+    大模型写好摘要文本后，这个函数会把文本包装成一条系统（system）消息，
+    并在开头贴上一个标签，告诉大家：“注意啦，下面是之前聊天中段的压缩版摘要！”
+
+    需要拿到的东西：
+    - summary_text: 大模型总结出来的摘要纯文本。
+
+    会给出来的结果：
+    - 一个 ChatMessage 消息对象，格式完美，可以直接存进聊天历史里。
+    """
 
     return ChatMessage(
         role="system",  # 用 system 角色，表示这是系统注入的 compact 摘要，不是 assistant 原话
@@ -85,7 +113,18 @@ def compact_state_with_summary(
         summary_text:str, #输入模型已经完整好的 compact 摘要文本
         keep_recent_count:int=DEFAULT_KEEP_RECENT_COUNT,
 )->CompactOutput:
-    """输入：原 state、summary 文本。输出：compact 后的新状态。"""  # 这个函数不负责调模型，把原本的messages中间的部分替换成总结好的
+    """【大白话解释】
+    真正动手把历史聊天状态里的“中段”替换成大模型写好的“压缩摘要”！
+    它会检查如果中段消息其实很少就懒得压缩了；如果确实压缩了，就组装出一个全新的状态，并数数这次帮用户省下了多少条消息。
+
+    需要拿到的东西：
+    - state: 当前未压缩的完整智能体状态。
+    - summary_text: 已经生成好的中段摘要文本。
+    - keep_recent_count: 结尾要保留几条原样消息。
+
+    会给出来的结果：
+    - 一个 CompactOutput 对象，里面包含了：压缩后的新状态、到底有没有真的进行压缩（布尔值）、以及一共删掉了多少条原始消息。
+    """
 
     anchor_messages,middle_messages,recent_messages = split_messages_for_compaction(#把历史切成三段
         state.messages, #传入原始消息列表
@@ -107,18 +146,33 @@ def compact_state_with_summary(
 
 
 class HistoryCompactor:
-    """历史压缩总调度器 (L6 上下文层)。
-    
-    职责：
-    通过组合 L1 ModelAdapter 进行有损的历史摘要请求，生成摘要字符串。
+    """【大白话解释】
+    这是一个“历史记录压缩调度员”。
+    它的工作是协调大模型适配器（ModelAdapter），把对话历史中太长太旧的中间部分，
+    让大模型给精简压缩成一句话摘要，以便腾出更多上下文空间，不让大模型“忘事”或者超出字数限制。
     """
 
     def __init__(self, adapter: ModelAdapter):
+        """【大白话解释】
+        初始化压缩调度员，给他配备一个跟大模型沟通的“传声筒”（ModelAdapter）。
+
+        需要拿到的东西：
+        - adapter: 模型适配器，用来向大模型发请求。
+        """
         self.adapter = adapter
         self.last_compact_tokens: Optional[int] = None
 
     def compact(self, messages: list[ChatMessage], keep_recent: int) -> str:
-        """调用 LLM 生成中段摘要文本，返回摘要字符串。"""
+        """【大白话解释】
+        调度员的核心工作：挑出消息里能压缩的中间部分，拼好任务提示词发送给大模型，拿到大模型回复的摘要并返回。
+
+        需要拿到的东西：
+        - messages: 原始的所有消息列表。
+        - keep_recent: 结尾要保留的消息数量。
+
+        会给出来的结果：
+        - 压缩好的摘要纯文本字符串（如果没东西可压，就返回空字符串）。
+        """
         _, middle_messages, _ = split_messages_for_compaction(
             messages,
             keep_recent_count=keep_recent,

@@ -18,7 +18,21 @@
 from agent_prototype.api.dto.schemas import AgentEvent,ChatMessage
 
 def build_final_turn(raw_reply:str,event_index:int)->tuple[str,AgentEvent,ChatMessage]:
-    """把最终回复转换成 runtime 可消费的 reply/event/assistant meessage. """
+    """【大白话解释】
+    这是一个“最终回复打包机”。
+    当大模型完成全部思考和对话，吐出它最终的回答文本时，这个打包机就会把这段原始回答进行精简修剪，
+    并把它们变形成三个不同的零件，方便后面的运行逻辑直接拿去用。
+
+    需要拿到的东西：
+    - raw_reply: 大模型吐出来的原始回答文本。
+    - event_index: 这轮事件在整个对话中的排队序号（索引）。
+
+    会给出来的结果：
+    - 一个包含三个元素的元组，分别是：
+      1. 修剪掉首尾空白后的纯回复文本（reply）。
+      2. 包装了序号的“最终回答”事件对象（AgentEvent），用于发送给前端。
+      3. 包装了角色为 assistant 的原始消息对象（ChatMessage），用于存进历史聊天记录。
+    """
 
     reply = (raw_reply or "").strip()
     event=AgentEvent(

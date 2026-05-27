@@ -35,12 +35,19 @@ from agent_prototype.execution.streaming.stream_run_session import StreamRunSess
 
 
 class RunService:
-    """运行时核心应用服务类 (RunService)
-
-    采用极致的 OOP 设计，通过构造注入 Session 依赖，生命周期契合单元事务。
+    """【大白话解释】
+    这是整个智能体系统的“运行时总指挥官”。
+    它主要负责协调和调度智能体的实际运行。比如：准备物料（RunContextBuilder）、启动智能体（AgentRunner）、
+    管理子智能体的并发调用（多线程派发、状态查询、阻塞等待）、并且在完事之后指挥落库小助手（RunPersistenceService）把数据保存下来。
     """
 
     def __init__(self, db: Session):
+        """【大白话解释】
+        初始化总指挥官，给他分配好数据库连接、会话存储、审批记录存储和落库小助手。
+
+        需要拿到的东西：
+        - db: 数据库连接会话对象。
+        """
         self.db            = db
         self.store         = SqliteSessionStore(db)
         self.approval_store = SqliteApprovalStore(db)
@@ -49,7 +56,17 @@ class RunService:
     # ── 私有辅助 ──────────────────────────────────────────────────────────────
 
     def _make_child_dispatcher(self, parent_run_id: str, session_id: str) -> Callable[[str, str], str]:
-        """构造子智能体派发器闭包，将线程提交、ID 生成及落库操作限制在 L8 内部"""
+        """【大白话解释】
+        内部方法：生产一个“子智能体派发器”。
+        当大模型觉得任务太复杂，需要雇佣一个“子智能体（小弟）”去独立干活时，这个派发器就会在后台默默启动一个新线程来跑小弟的任务。
+
+        需要拿到的东西：
+        - parent_run_id: 派发这个小弟的老大（父级）运行 ID。
+        - session_id: 当前会话的 ID。
+
+        会给出来的结果：
+        - 一个可执行的闭包函数（Child Dispatcher），大模型调工具的时候直接调用它来派发新任务，并拿到小弟的运行 ID。
+        """
         def child_dispatcher(task: str, agent_name: str = "子Agent") -> str:
             child_run_id = uuid.uuid4().hex
             
@@ -67,7 +84,13 @@ class RunService:
         return child_dispatcher
 
     def _make_status_checker(self) -> Callable[[list[str]], dict]:
-        """构造非阻塞状态查询器闭包，封装对全局 Future 状态的获取逻辑"""
+        """【大白话解释】
+        内部方法：生产一个“小弟工作进度查询器”。
+        老大派发了小弟干活之后，可以通过这个查询器，随时去看看这批小弟到底是干完了、还在跑、还是出错了。
+
+        会给出来的结果：
+        - 一个可执行的闭包函数（Status Checker），输入一堆小弟的 ID，吐出这批小弟当前的工作状态和结果。
+        """
         def status_checker(child_run_ids: list[str]) -> dict:
             result = {}
             for run_id in child_run_ids:
@@ -87,7 +110,13 @@ class RunService:
         return status_checker
 
     def _make_child_waiter(self) -> Callable[[str], str]:
-        """构造阻塞等待器闭包，控制超时及结果提取"""
+        """【大白话解释】
+        内部方法：生产一个“催活专员”。
+        当老大必须拿到某个小弟的工作结果才能继续往下走时，这个专员就会死等（阻塞等待最多 120 秒），直到小弟干完并把结果交出来。
+
+        会给出来的结果：
+        - 一个可执行的闭包函数（Child Waiter），输入一个小弟的 ID，如果小弟顺利干完就返回他的答复纯文本；如果超时或者出错就抛出异常。
+        """
         def child_waiter(child_run_id: str) -> str:
             f = _global_futures.get(child_run_id)
             if f is None:
@@ -106,7 +135,21 @@ class RunService:
         session_id: str,
         agent_name: str = "子Agent"
     ):
-        """物理子智能体线程执行与落库的工作器方法"""
+        """【大白话解释】
+        这才是子智能体（小弟）在后台默默流汗干活的“实际车间方法”！
+        因为是在单独的后台线程里跑，所以它会自己开一个干净的数据库连接，启动一个全新的 AgentRunner，
+        跑完之后还会把小弟的运行痕痕迹和产生的所有事件老老实实写进数据库，最后自动把数据库连接关掉。
+
+        需要拿到的东西：
+        - task: 分配给小弟的任务纯文本。
+        - child_run_id: 这个小弟的运行 ID。
+        - parent_run_id: 老大的运行 ID。
+        - session_id: 会话 ID。
+        - agent_name: 小弟的代号/名字（默认叫 "子Agent"）。
+
+        会给出来的结果：
+        - 小弟运行完之后的 AgentOutput 输出结果对象。
+        """
         from agent_prototype.infra.db.engine import SessionLocal
         from agent_prototype.agent.definition import AgentDefinition
         
@@ -154,7 +197,18 @@ class RunService:
             db.close()
 
     def _build_agent_runner(self, ctx, run_id: str, agent_input: AgentInput) -> AgentRunner:
-        """根据 RunContext 构造 AgentRunner，两个入口共用。"""
+        """【大白话解释】
+        内部组装方法：把智能体底座（AgentRunner）给捏出来。
+        它会把大模型的适配器、人设定义、审批规则全给它，最重要的是会把“派发小弟、查询进度、催活”这三个闭包锦囊妙计塞给它，实现解耦。
+
+        需要拿到的东西：
+        - ctx: 装配好的 RunContext 运行物料背包。
+        - run_id: 这次运行的 ID。
+        - agent_input: 输入的参数对象。
+
+        会给出来的结果：
+        - 一个组装完毕、随时可以开始跑的 AgentRunner 实例。
+        """
         return AgentRunner(
             state=ctx.state,
             definition=ctx.definition,
@@ -172,7 +226,16 @@ class RunService:
     # ── 公开方法 ──────────────────────────────────────────────────────────────
 
     def run_agent(self, agent_input: AgentInput) -> AgentOutput:
-        """主入口：非流式同步驱动 Agent 运转"""
+        """【大白话解释】
+        同步普通运行主入口：一口气让智能体从头跑到尾！
+        会先打包好运行时物料，组装出智能体底座，让它一口气跑完，最后再把所有的聊天数据和 Token 消耗都写进数据库，返回最终结果。
+
+        需要拿到的东西：
+        - agent_input: 用户请求的输入参数。
+
+        会给出来的结果：
+        - 包含最终聊天答复和状态的 AgentOutput 输出结果。
+        """
         run_id = uuid.uuid4().hex
         ctx = RunContextBuilder(self.db).build(agent_input)
         agent = self._build_agent_runner(ctx, run_id, agent_input)
@@ -189,7 +252,16 @@ class RunService:
         )
 
     async def async_stream_agent(self, agent_input: AgentInput) -> AsyncIterator[str]:
-        """异步 SSE 流式驱动 Agent 运转（支持高并发工具审批中断与 ToolCall 中间态落库）"""
+        """【大白话解释】
+        异步流式运行主入口：像挤牙膏一样，把智能体的思考过程和回答实时吐给前端（SSE 格式）！
+        支持高并发、中间需要审批时会中断等待、并且能在调工具的中间状态也进行数据落库。
+
+        需要拿到的东西：
+        - agent_input: 用户请求的输入参数。
+
+        会给出来的结果：
+        - 一个异步迭代器，实时吐出 StreamFrame 的字符串帧。
+        """
         run_id   = uuid.uuid4().hex
         ctx      = RunContextBuilder(self.db).build(agent_input)
         observer = ToolRunObserver(self.db, self.store, self.approval_store,
@@ -207,9 +279,33 @@ class RunService:
         agent_name: Optional[str],
         skill_name: Optional[str],
     ) -> dict:
+        """【大白话解释】
+        当运行被突然中止时，紧急调用落库小助手的 save_cancelled 来善后，保存残缺的半成品数据并把状态更新为取消。
+
+        需要拿到的东西：
+        - session_id: 会话 ID。
+        - run_id: 运行 ID。
+        - user_input: 用户的本轮输入。
+        - partial_reply: 中断时已经吐出来的半成品回复。
+        - agent_name: 智能体名字。
+        - skill_name: 使用的技能名字。
+
+        会给出来的结果：
+        - 一个简单的成功字典，比如 `{"ok": True}`。
+        """
         return self.persist.save_cancelled(
             session_id, run_id, user_input, partial_reply, agent_name, skill_name,
         )
 
     def get_run_detail(self, session_id: str, run_id: str):
+        """【大白话解释】
+        查账！去数据库查某次具体运行的详情（如智能体的回答和调用过的工具）。
+
+        需要拿到的东西：
+        - session_id: 会话 ID。
+        - run_id: 运行 ID。
+
+        会给出来的结果：
+        - 包含运行详情和工具调用的元组。
+        """
         return self.persist.get_run_detail(session_id, run_id)

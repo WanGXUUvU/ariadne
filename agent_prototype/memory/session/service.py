@@ -36,19 +36,35 @@ from agent_prototype.memory.session.store import SqliteSessionStore
 class SessionService:
     """会话生命周期管理服务类 (OOP)
     
-    职责：
-    1. 负责会话的创建、销毁、重置、重命名；
-    2. 控制会话的模型绑定及安全档位权限参数更改，并管理事务控制。
+    大白话解释：
+    这个类是一个“会话大管家”。它主要用来打理跟“聊天会话”（Session）有关的所有核心业务，比如：创建一个新会话、把会话重置清空、给会话改名字、彻底删除会话，或者更新会话里绑定的模型和安全策略等。它不直接和数据库打交道，而是指挥底下的 store 模块去干活，并且负责管好“事务”（就是保证一连串数据库操作要么全成功，要么有一步失败了就全部退回原样，防止数据搞乱）。
     """
     
     def __init__(self, db: Session):
+        """
+        大白话解释：
+        大管家初始化。把数据库连接和底下的数据仓库（Store）都准备好，方便后面随时读写数据。
+
+        需要拿到的东西：
+        - db (Session): 数据库会话连接，也就是操作数据库的“钥匙”。
+        """
         self.db    = db
         self.store = SqliteSessionStore(db)
 
     # ── 会话生命周期 ────────────────────────────────────────────────────────────
 
     def create_session(self, payload: CreateSessionInput) -> SessionSummary:
-        """创建一个全新的空白会话"""
+        """
+        大白话解释：
+        创建一个全新、空白的聊天会话。
+        这个函数会自动生成一个独一无二的会话 ID，查一下数据库有没有默认的 AI 模型和模型供应商，有的话就自动和这个新会话绑定。然后把这些配置信息存进数据库，最后把新创建的会话信息打包好返还给调用方。
+
+        需要拿到的东西：
+        - payload (CreateSessionInput): 创建会话所需的入参。这里面包括会话叫什么名字（session_name）、关联的工作空间路径（workspace_path）和名称（workspace_name），以及会话类型等。
+
+        会给出来的结果：
+        - SessionSummary: 一个精简的会话信息包，里面包含了这个新会话的 ID、名字、创建时间、更新时间、包含的消息数量、工作空间等各种常用属性。
+        """
         session_id = uuid.uuid4().hex
         state = AgentState()
 
@@ -101,7 +117,16 @@ class SessionService:
         )
 
     def reset_session(self, payload: ResetInput) -> dict[str, bool]:
-        """重置指定会话，彻底清空其快照消息，并保持其他配置不动"""
+        """
+        大白话解释：
+        重置指定的会话，把里面的聊天历史、运行轨迹全部擦除干净，变回像新买的手机一样的出厂设置，但会保留会话本身的名字、绑定的模型和安全配置不被删掉。
+
+        需要拿到的东西：
+        - payload (ResetInput): 重置入参。最主要的就是会话 ID (session_id)。
+
+        会给出来的结果：
+        - dict[str, bool]: 重置成功后返回一个表示搞定的字典，例如 `{"ok": True}`。
+        """
         record = self.store.read_session_record(payload.session_id)
         if not record:
             raise ValueError("Session not found")
@@ -125,7 +150,16 @@ class SessionService:
         return {"ok": True}
 
     def delete_session(self, session_id: str) -> dict[str, bool]:
-        """逻辑或物理删除指定会话"""
+        """
+        大白话解释：
+        把一个指定的会话彻底从数据库里删掉（物理删除），并且把它相关的运行历史、步骤轨迹等等也一并清理干净，防止残留垃圾数据。
+
+        需要拿到的东西：
+        - session_id (str): 想要删除的那个会话的唯一身份证号（ID）。
+
+        会给出来的结果：
+        - dict[str, bool]: 删完之后返回一个表示搞定的字典，例如 `{"ok": True}`。
+        """
         record = self.store.read_session_record(session_id)
         if record is None:
             raise ValueError("Session not found")
@@ -139,7 +173,17 @@ class SessionService:
         return {"ok": True}
 
     def rename_session(self, session_id: str, new_name: str) -> dict[str, bool]:
-        """物理更改会话名称"""
+        """
+        大白话解释：
+        给一个已经存在的会话重新起个名字。比如把“未命名会话”改成“我的智能助手”。
+
+        需要拿到的东西：
+        - session_id (str): 需要改名的会话 ID。
+        - new_name (str): 新的名字。新名字不能为空或一堆空格。
+
+        会给出来的结果：
+        - dict[str, bool]: 改名成功后返回一个表示搞定的字典，例如 `{"ok": True}`。
+        """
         if not new_name or not new_name.strip():
             raise ValueError("Session name cannot be empty")
         
@@ -156,7 +200,17 @@ class SessionService:
         return {"ok": True}
 
     def update_session(self, session_id: str, payload: RenameSessionInput) -> dict[str, bool]:
-        """收归路由越界操作：支持重命名、安全权限档位、模型 ID、服务商 ID、深度思考参数等多维更新"""
+        """
+        大白话解释：
+        一站式多功能会话更新。如果想同时改会话名字、切换安全权限档位、换模型、换模型服务商，或者开启/关闭深度思考参数，都可以通过这个函数一次性搞定。
+
+        需要拿到的东西：
+        - session_id (str): 要更新的会话 ID。
+        - payload (RenameSessionInput): 包含各种可选更新属性的数据包，比如新名字、安全权限级别、模型 ID 等，传了哪个属性就更新哪个，不传的保持不变。
+
+        会给出来的结果：
+        - dict[str, bool]: 更新成功后返回一个表示搞定的字典，例如 `{"ok": True}`。
+        """
         record = self.store.read_session_record(session_id)
         if record is None:
             raise ValueError("Session not found")

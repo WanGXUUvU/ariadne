@@ -25,7 +25,12 @@ from agent_prototype.model.types.domain import RiskLevel
 
 @dataclass(frozen=True)
 class ToolDefinition:
-    """单个工具的描述。frozen=True 确保定义不可变，避免运行中被改坏。"""
+    """单个工具的描述。frozen=True 确保定义不可变，避免运行中被改坏。
+    
+    大白话解释：
+    这个类是一个“工具标准描述说明书”。
+    只要是在我们系统里能被 AI 调用的工具，都要用这个说明书打包一下。它规定了一个合格的工具必须要写清楚：自己叫什么名字（name）、需要什么样的参数格式（schema）、当被调用时去找哪个真正的 Python 函数执行（handler），以及这个工具是否有安全风险（risk_level）。`frozen=True` 意味着一旦写好了这份说明书，任何人都不能在运行时偷偷篡改里面的内容。
+    """
 
     name: str
     schema: dict

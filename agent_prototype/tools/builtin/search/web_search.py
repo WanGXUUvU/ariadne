@@ -18,8 +18,19 @@ import os,httpx,json
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
 from agent_prototype.model.types.domain import ToolResult
 
-def web_search(query:str,num_results:int=5)->ToolResult:
-    """输入：搜索词、结果数量。输出：搜索结果列表的 ToolResult。"""
+def web_search(query: str, num_results: int = 5) -> ToolResult:
+    """
+    大白话解释：
+    这是“网页搜索引擎”的具体执行函数。
+    当你想查一下最新的新闻、最新的代码库用法，或者 AI 的知识库不够新时，这个工具会飞快地跑去 Tavily 搜索引擎发起网络搜索，把查到的核心网页文本和参考链接原封不动拉回来给你看。
+
+    需要拿到的东西：
+    - query (str): 你想在网上搜索什么词。
+    - num_results (int, 默认 5): 你最多想要几个搜索结果（一般最多能拿 10 个）。
+
+    会给出来的结果：
+    - ToolResult: 一个搜索结果包裹。如果成功，`content` 里就是一串 JSON 文本，包含查到的所有网页标题、正文片段和 URL；如果失败了（比如你忘了在环境变量里配 API Key 或者网络断了），它会返回 False 并给出原因。
+    """
     
     api_key=os.environ.get("WEB_SEARCH_API_KEY")
 
@@ -71,7 +82,13 @@ WEB_SEARCH_TOOL_SCHEMA = {
 }
 
 def build_web_search_tool_definition() -> ToolDefinition:
-    """输入：无。输出：web_search 对应的 ToolDefinition。"""
+    """
+    大白话解释：
+    把上面的“网页搜索引擎”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+
+    会给出来的结果：
+    - ToolDefinition: 打包好、带安全等级的工具定义对象。
+    """
     return ToolDefinition(
         name="web_search",
         schema=WEB_SEARCH_TOOL_SCHEMA,

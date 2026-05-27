@@ -29,12 +29,34 @@ router = APIRouter()
 
 @router.post("/sessions", response_model=SessionSummary)
 def create_session_api(payload: CreateSessionInput, db: Session = Depends(get_db)) -> SessionSummary:
+    """这个函数是用来创建一个新的会话（Session）的。
+    
+    每次你想跟 Agent 开启一段全新的聊天，或者换一个工作区重新做任务时，就用这个接口建一个新会话。
+    
+    需要拿到的东西：
+    - payload: CreateSessionInput 对象，里面包含新会话的名字、使用哪种权限、关联哪个工作区等配置。
+    - db: 数据库连接会话，用于将新会话保存到数据库中。
+    
+    会给出来的结果：
+    - SessionSummary 对象，也就是这个新会话的简要基本信息（比如 ID、名字、创建时间等）。
+    """
     service = SessionService(db)
     return service.create_session(payload)
 
 
 @router.delete("/sessions/{session_id}")
 def delete_session_api(session_id: str, db: Session = Depends(get_db)) -> dict[str, bool]:
+    """这个函数是用来彻底删除某一个不需要的会话的。
+    
+    调用这个接口后，该会话下的所有聊天历史记录和相关数据都会被清理干净。
+    
+    需要拿到的东西：
+    - session_id: 字符串类型，代表要删除的那个会话的唯一身份证。
+    - db: 数据库连接会话，用来去数据库执行删除。
+    
+    会给出来的结果：
+    - 一个字典，形如 {"status": True}，代表删除操作是否成功完成。
+    """
     try:
         service = SessionService(db)
         return service.delete_session(session_id)
@@ -44,6 +66,16 @@ def delete_session_api(session_id: str, db: Session = Depends(get_db)) -> dict[s
 
 @router.get("/sessions", response_model=list[SessionSummary])
 def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:
+    """这个函数是用来获取系统里所有会话的摘要列表的。
+    
+    常用于前端侧边栏（Sidebar）初始化时，展示用户以前聊过的所有会话列表。
+    
+    需要拿到的东西：
+    - db: 数据库连接会话，用来从数据库里捞出所有的会话数据。
+    
+    会给出来的结果：
+    - 一个包含多个 SessionSummary 对象的列表，列表里每个元素都装有对应会话的名字、最后一条消息预览、消息数量等概要信息。
+    """
     store = SqliteSessionStore(db)
     records = store.list_sessions()
     return [
@@ -68,6 +100,15 @@ def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:
 
 @router.get("/sessions/{session_id}", response_model=SessionDetail)
 def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionDetail:
+    """这个函数是用来读取单个会话的极详细内幕信息的（比如它里面的具体聊天消息、使用的模型、是否开启深度思考等）。
+    
+    需要拿到的东西：
+    - session_id: 字符串类型，也就是你要查看的会话的唯一身份证。
+    - db: 数据库连接会话，用来读写会话的记录和具体状态。
+    
+    会给出来的结果：
+    - SessionDetail 对象，里面包含了会话的所有细节和完整的历史消息状态。
+    """
     store = SqliteSessionStore(db)
     record = store.read_session_record(session_id)
     if record is None:
@@ -100,7 +141,16 @@ def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionD
 
 @router.patch("/sessions/{session_id}")
 def rename_session_api(session_id: str, payload: RenameSessionInput, db: Session = Depends(get_db)) -> dict[str, bool]:
-    """🌟 拒绝控制器层越权写 DB，完全收归业务服务类实例化调用"""
+    """这个函数是用来修改会话属性的，比如给会话改个更贴切的新名字，或者更换关联的模型和工作区参数等。
+    
+    需要拿到的东西：
+    - session_id: 字符串类型，你要修改的会话的唯一身份证。
+    - payload: RenameSessionInput 对象，里面包含了新的会话名字、选用的模型等要更新的参数。
+    - db: 数据库连接会话，用来持久化你的修改。
+    
+    会给出来的结果：
+    - 一个字典，形如 {"status": True}，代表会话信息修改（如改名）是否成功。
+    """
     try:
         service = SessionService(db)
         return service.update_session(session_id, payload)
