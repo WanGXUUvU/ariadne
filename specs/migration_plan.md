@@ -17,7 +17,7 @@ agent_prototype/
 │   │   └── protocol.py                ← infrastructure/llm/model_adapter_protocol.py
 │   ├── types/
 │   │   ├── __init__.py
-│   │   ├── domain.py              ← core/schemas.py  [领域原语: ToolCall/ChatMessage/RiskLevel等]
+│   │   ├── domain.py              ← core/schemas.py  [LLM协议原语: ToolCall/ChatMessage/RiskLevel]
 │   │   └── model_types.py             ← infrastructure/llm/model_types.py
 │   └── __init__.py
 │
@@ -59,6 +59,9 @@ agent_prototype/
 │   │   └── util/
 │   │       ├── __init__.py
 │   │       └── echo.py                ← infrastructure/tools/builtin/echo.py
+│   ├── os/
+│   │   ├── __init__.py                [new]
+│   │   └── apple_script.py            ← infrastructure/os_proxy/apple_script.py  [macOS系统调用]
 │   ├── mcp/
 │   │   └── __init__.py                [new — MCP 协议接入，预留]
 │   └── __init__.py
@@ -119,6 +122,7 @@ agent_prototype/
 │   │   └── __init__.py                [new — 统一策略执行引擎，预留]
 │   ├── audit/
 │   │   └── __init__.py                [new — 审计日志，预留]
+│   ├── policy.py                      [new — ApprovalPolicy/PermissionProfile/PROFILES/needs_approval]
 │   ├── guard.py                       [new — 敏感内容检测，预留]
 │   └── __init__.py
 │
@@ -479,7 +483,6 @@ git mv infrastructure/llm/thinking_styles.py prompt/strategies/thinking.py
 ```bash
 git mv infrastructure/llm/chat_completions_adapter.py model/adapters/chat_completions.py
 git mv infrastructure/llm/model_adapter_protocol.py   model/adapters/protocol.py
-git mv infrastructure/llm/openai_adapter.py           model/adapters/openai.py
 git mv infrastructure/llm/model_types.py              model/types/model_types.py
 ```
 

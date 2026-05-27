@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.model.types.domain import PROFILES
+from agent_prototype.security.policy import PROFILES
 from agent_prototype.api.dto.schemas import (
     AgentState, ApprovalPolicy, CreateSessionInput,
     PermissionProfile, RenameSessionInput, ResetInput,

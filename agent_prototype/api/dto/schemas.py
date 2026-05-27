@@ -11,15 +11,17 @@ from pydantic import BaseModel, Field
 
 from agent_prototype.model.types.domain import (
     RiskLevel,
-    SandboxMode,
-    ApprovalPolicy,
-    PermissionProfile,
-    PROFILES,
     ToolCallFunction,
     ToolCall,
     ToolError,
     ToolResult,
     ChatMessage,
+)
+from agent_prototype.security.policy import (
+    SandboxMode,
+    ApprovalPolicy,
+    PermissionProfile,
+    PROFILES,
     needs_approval,
 )
 

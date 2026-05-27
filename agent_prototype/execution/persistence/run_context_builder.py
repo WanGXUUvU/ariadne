@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from agent_prototype.model.types.domain import PROFILES
+from agent_prototype.security.policy import PROFILES
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig, SessionRecord
 from agent_prototype.memory.session.store import SqliteSessionStore
 from agent_prototype.model.adapters.chat_completions import ChatCompletionsAdapter
