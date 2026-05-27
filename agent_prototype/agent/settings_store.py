@@ -21,11 +21,38 @@ from sqlalchemy.orm import Session
 
 
 class SqliteSettingsStore:
+    """这个类是大模型厂商和模型配置的数据库底层保险箱（SQLite 仓储实现）。
+    
+    它唯一的职责就是老老实实执行各种 SQL 语句或 SQLAlchemy ORM 操作，把厂商的参数、API 地址、API Key 以及各个同步出来的具体模型数据，稳稳当当地存入数据库表或者查询出来。
+    
+    它的上下游：
+    - 上游：SettingsService 服务大管家。
+    - 下游：数据库物理表 ORM 模型 ProviderConfig 和 ModelSetting。
+    """
     def __init__(self, db: Session):
+        """保险箱的初始化函数，把数据库连接会话存起来，方便后面随时进行存取。
+        
+        需要拿到的东西：
+        - db: 数据库连接会话，用于执行 SQL 增删改查。
+        
+        会给出来的结果：
+        - 仓储类实例本身。
+        """
         self.db = db
 
     def create_provider(self, name: str, base_url: str, api_key: str) -> ProviderConfig:
-        """有相同 base_url 则更新，否则新建。"""
+        """在数据库中登记创建一个大模型厂商记录。
+        
+        如果数据库里已经有相同 API 接口地址（base_url）的厂商了，它会很聪明地直接在这个已有厂商上更新它的名字和 API 密钥；如果没有，就新建一条记录存进去。
+        
+        需要拿到的东西：
+        - name: 字符串，厂商的名字。
+        - base_url: 字符串，该厂商的接口基地址。
+        - api_key: 字符串，你申请的 API 密钥。
+        
+        会给出来的结果：
+        - 写入或者更新后的数据库厂商实体记录 ProviderConfig。
+        """
         record = self.db.query(ProviderConfig).filter(ProviderConfig.base_url == base_url).first()
         if record is not None:
             record.name = name
@@ -36,6 +63,14 @@ class SqliteSettingsStore:
         return new_record
 
     def list_providers(self) -> list[ProviderConfig]:
+        """从数据库中把所有登记在册的大模型厂商记录全部捞出来，并按照创建时间倒序（最新创建的在最前面）排好队返回。
+        
+        需要拿到的东西：
+        - 无需额外参数。
+        
+        会给出来的结果：
+        - 包含数据库中所有厂商实体记录的列表（List[ProviderConfig]）。
+        """
         return self.db.query(ProviderConfig).order_by(ProviderConfig.created_at.desc()).all()
 
     def patch_provider(
@@ -46,7 +81,20 @@ class SqliteSettingsStore:
         api_key: Optional[str] = None,
         is_default :Optional[bool]=None
     ) -> Optional[ProviderConfig]:
-        """按 id 更新 provider 字段，至少传一个，返回更新后的记录或 None（未找到）。"""
+        """局部更新数据库中某个厂商的配置字段（比如改名、改密钥、改地址，或者将其设为系统默认厂商）。
+        
+        如果将其设为默认厂商，它会贴心地把数据库中其他所有厂商的 is_default 标记全部清零，保证全局有且只有一个默认厂商。
+        
+        需要拿到的东西：
+        - provider_id: 整数，要更新的厂商的唯一数据库 ID。
+        - name: 可选字符串，更新后的厂商名字。
+        - base_url: 可选字符串，更新后的基地址。
+        - api_key: 可选字符串，更新后的 API 密钥。
+        - is_default: 可选布尔值，是否设为系统默认厂商。
+        
+        会给出来的结果：
+        - 更新成功后的厂商最新实体记录对象，要是找不到这个厂商则返回 None。
+        """
         record = self.db.query(ProviderConfig).filter(ProviderConfig.id == provider_id).first()
         if record is None:
             return None
@@ -62,7 +110,16 @@ class SqliteSettingsStore:
         return record
 
     def delete_provider(self, provider_id: int) -> None:
-        """删除 provider，model_settings 通过 CASCADE 自动删除。"""
+        """从数据库中物理删除指定的厂商记录。
+        
+        由于数据库设置了外键级联删除（CASCADE），该厂商旗下的所有模型配置记录也会被自动一并物理删除。
+        
+        需要拿到的东西：
+        - provider_id: 整数，你想干掉的那个厂商 ID。
+        
+        会给出来的结果：
+        - 无返回值。
+        """
         record = self.db.query(ProviderConfig).filter(ProviderConfig.id == provider_id).first()
         if record is not None:
             self.db.delete(record)
@@ -78,7 +135,23 @@ class SqliteSettingsStore:
         context_length: Optional[int],
         supports_tools: bool,
     ) -> ModelSetting:
-        """有则更新字段，无则插入新行（按 provider_id + model_id 联合查）。"""
+        """在数据库里保存或更新同步下来的具体模型配置信息。
+        
+        如果这个厂商下已经存在了这个模型（根据联合唯一索引 provider_id + model_id 来判断），它就会把最新的显示名字、是否支持思考、思考风格、上下文长度等属性统统覆盖更新进去；如果是一个之前从没见过的新模型，就会往数据库表里插入一条新行。
+        
+        需要拿到的东西：
+        - provider_id: 整数，该模型归属的厂商 ID。
+        - model_id: 字符串，模型的官方 ID（例如 'gpt-4o'）。
+        - display_name: 字符串，用于展示的名字。
+        - supports_thinking: 布尔值，是否支持深度思考。
+        - thinking_style: 字符串，思考风格流派。
+        - effort_levels: 字符串，支持的深度思考强度的 JSON 串。
+        - context_length: 可选整数，上下文的最大 Token 长度。
+        - supports_tools: 布尔值，是否支持调用外部工具。
+        
+        会给出来的结果：
+        - 更新或插入成功后的模型实体记录 ModelSetting。
+        """
         record = (
             self.db.query(ModelSetting)
             .filter(ModelSetting.provider_id == provider_id, ModelSetting.model_id == model_id)
@@ -110,7 +183,17 @@ class SqliteSettingsStore:
         provider_id: Optional[int] = None,
         enabled_only: bool = False,
     ) -> list[ModelSetting]:
-        """查模型列表，可按 provider 或只看 enabled=1 的。"""
+        """从数据库中查询已保存的具体模型列表。
+        
+        支持很多筛选条件，比如只看某一个特定厂商的模型，或者只看当前处于“启用（enabled=1）”状态的模型。
+        
+        需要拿到的东西：
+        - provider_id: 可选的整数，用来过滤厂商。
+        - enabled_only: 布尔值，如果为 True 则只捞出已被启用的模型。
+        
+        会给出来的结果：
+        - 包含数据库中符合条件的模型实体记录列表（List[ModelSetting]）。
+        """
         query = self.db.query(ModelSetting)
         if provider_id is not None:
             query = query.filter(ModelSetting.provider_id == provider_id)
@@ -124,7 +207,16 @@ class SqliteSettingsStore:
         enabled: Optional[int] = None,
         display_name: Optional[str] = None,
     ) -> Optional[ModelSetting]:
-        """更新单个模型的 enabled 或 display_name。"""
+        """局部修改数据库中单个模型的启用状态（enabled）或者别名（display_name）。
+        
+        需要拿到的东西：
+        - model_db_id: 整数，该模型在数据库表里的唯一主键 ID。
+        - enabled: 可选的整数（0 或 1），是否启用。
+        - display_name: 可选字符串，展示用的新别名。
+        
+        会给出来的结果：
+        - 更新成功后的模型实体记录对象，找不到对应的记录则返回 None。
+        """
         record = self.db.query(ModelSetting).filter(ModelSetting.id == model_db_id).first()
         if record is None:
             return None

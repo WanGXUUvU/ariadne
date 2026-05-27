@@ -19,7 +19,18 @@ from fastapi.responses import JSONResponse  # 返回统一 HTTP 响应
 from agent_prototype.api.dto.schemas import ApiError, ErrorResponse  # 导入统一错误 schema
 
 def error_response(status_code:int,code:str,message:str)->JSONResponse:
-    """输入：HTTP状态码、错误代码、错误文案。输出：统一错误响应格式"""
+    """这个函数是用来生成统一格式的错误响应（JSONResponse）的。
+    
+    当系统出错或者输入参数不对时，用它可以保证返回给前端的错误格式是一致的，方便前端解析。
+    
+    需要拿到的东西：
+    - status_code: 整数，比如 400、404、500 等 HTTP 状态码。
+    - code: 字符串，用来给这个错误起一个简短的标识（比如 'bad_request', 'not_found'）。
+    - message: 字符串，具体的错误原因大白话解释，用来展示给用户看。
+    
+    会给出来的结果：
+    - 一个 JSONResponse 对象，里面包裹着符合系统标准格式的错误信息。
+    """
     
     return JSONResponse(
         status_code=status_code,

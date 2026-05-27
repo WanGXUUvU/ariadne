@@ -28,22 +28,46 @@ from agent_prototype.security.approval.store import SqliteApprovalStore
 class ApprovalService:
     """工具调用审批管理服务类
     
-    职责：
-    1. 管理挂起审批记录的状态改变；
-    2. 控制事务的提交与一致性。
+    大白话解释：
+    这个类是“审批业务大管家”。
+    它主要负责在业务层打理一切审批工作。比如：帮别人去查一张审批工单的详情；当人类点击了“同意”按钮时，它来批准这笔工单；点击“拒绝”时，它来驳回工单；或者点击“全自动执行（approve_all）”时，它不仅同意当前这笔，还会顺便把当前会话的权限级别直接连升三级变成“full-auto 全自动运行状态”，并且负责保存并提交数据库事务。
     """
     
     def __init__(self, db: Session):
-        """注入 db 会话，聚合仓储"""
+        """
+        大白话解释：
+        审批服务大管家初始化，带上数据库的“钥匙”，并且叫上底下的工单仓库管理员。
+
+        需要拿到的东西：
+        - db (Session): 数据库会话连接。
+        """
         self.db = db
         self.store = SqliteApprovalStore(db)
 
     def get_approval(self, approval_id: str) -> Optional[PendingApproval]:
-        """输入：approval_id。输出：审批记录实体"""
+        """
+        大白话解释：
+        根据审批单号查出工单的全部内容。
+
+        需要拿到的东西：
+        - approval_id (str): 审批单的 ID 编号。
+
+        会给出来的结果：
+        - Optional[PendingApproval]: 查出来的数据库审批记录详情，找不到就返回 None。
+        """
         return self.store.get(approval_id)
 
     def approve(self, approval_id: str) -> Optional[PendingApproval]:
-        """输入：approval_id。输出：更新为 approved 状态的记录"""
+        """
+        大白话解释：
+        批准这笔审批工单。把工单状态改成“approved（已批准）”并马上保存提交到数据库。
+
+        需要拿到的东西：
+        - approval_id (str): 审批单的 ID 编号。
+
+        会给出来的结果：
+        - Optional[PendingApproval]: 批准成功后的审批记录详情，如果压根没查到这笔单子就返回 None。
+        """
         record = self.store.update_status(approval_id, "approved")
         if record is None:
             return None
@@ -51,7 +75,16 @@ class ApprovalService:
         return record
 
     def reject(self, approval_id: str) -> Optional[PendingApproval]:
-        """输入：approval_id。输出：更新为 rejected 状态的记录"""
+        """
+        大白话解释：
+        驳回这笔审批工单。把工单状态改成“rejected（已拒绝）”并马上保存提交到数据库。
+
+        需要拿到的东西：
+        - approval_id (str): 审批单的 ID 编号。
+
+        会给出来的结果：
+        - Optional[PendingApproval]: 驳回成功后的审批记录详情，如果压根没查到这笔单子就返回 None。
+        """
         record = self.store.update_status(approval_id, "rejected")
         if record is None:
             return None
@@ -59,10 +92,16 @@ class ApprovalService:
         return record
 
     def approve_all(self, approval_id: str) -> Optional[PendingApproval]:
-        """审批通过，并将所在 session 的权限档位提升为 full-auto。
+        """
+        大白话解释：
+        超级批准工单。
+        不仅把当前这笔敏感工具调用的工单批准通过，还会大笔一挥，直接把这个会话的安全权限配置修改成“full-auto（全自动无需人工审批模式）”，表示后面遇到再多危险工具也不用拦截了。然后立即存入数据库并提交事务。
 
-        :param approval_id: 待审批的记录 ID
-        :return: 更新为 approved 状态的记录，未找到时返回 None
+        需要拿到的东西：
+        - approval_id (str): 审批单的 ID 编号。
+
+        会给出来的结果：
+        - Optional[PendingApproval]: 批准成功后的审批记录详情，如果找不到就返回 None。
         """
         from agent_prototype.infra.db.orm_models import SessionRecord
 

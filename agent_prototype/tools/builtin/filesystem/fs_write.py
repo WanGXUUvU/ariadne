@@ -15,12 +15,22 @@
 """
 
 from pathlib import Path  # 处理文件路径
-
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel  # 导入工具定义
 
 
 def write_file(path: str, content: str) -> str:  # 把内容写入文件
-    """输入：目标文件路径、要写入的文本内容。输出：写入结果摘要字符串。"""
+    """
+    大白话解释：
+    这是“把文字写入文件”的具体执行函数。
+    就像你在电脑上新建或者打开一个文本文件，把一堆字粘贴进去然后点击“保存”。如果存放这个文件的文件夹根本不存在，它还会很贴心地自动把缺失的文件夹全都建好。
+
+    需要拿到的东西：
+    - path (str): 你想要写入的目标文件物理绝对路径。
+    - content (str): 想要写进文件里的具体文本内容。
+
+    会给出来的结果：
+    - str: 一个写入结果的通知，比如告诉你成功往哪个文件写入了多少个字符。如果指定的路径其实是一个文件夹，它会明智地拒绝并报错。
+    """
     target = Path(path)  # 把字符串路径转成 Path 对象
 
     if target.exists() and target.is_dir():  # 如果路径已经存在，而且是目录
@@ -58,7 +68,13 @@ WRITE_FILE_SCHEMA = {  # 给模型看的工具说明
 
 
 def build_write_file_tool_definition() -> ToolDefinition:  # 构造 registry 需要的工具对象
-    """输入：无。输出：write_file 对应的 ToolDefinition。"""
+    """
+    大白话解释：
+    把上面的“把文字写入文件”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+
+    会给出来的结果：
+    - ToolDefinition: 打包好、带安全等级的工具定义对象。由于这个工具涉及修改物理磁盘内容，它的风险等级被定为 WRITE（写操作风险）。
+    """
     return ToolDefinition(
         name="write_file",  # 工具名
         schema=WRITE_FILE_SCHEMA,  # schema

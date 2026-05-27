@@ -45,7 +45,11 @@ TOOL_TIMEOUT = 120  # 单次工具调用最长等待秒数
 
 @dataclass
 class ToolTurnResult:
-    """一次 tool call 批处理后的结果。"""
+    """【大白话解释】
+    这是一个“一轮工具调用处理完后的结算账单（结果实体）”。
+    当智能体把一轮里的所有工具全部调用完（或者中途因为需要审批而暂停）后，它会用这个账单把产生的事件、追加的消息、
+    下一个事件的序号、以及是不是“因为要审批所以暂停了”等信息给汇总打包。
+    """
 
     events: list[AgentEvent]
     tool_messages: list[ChatMessage]
@@ -60,7 +64,19 @@ def handle_tool_calls(
     allow_tool_names: Optional[list[str]],
     event_index: int,
 ) -> ToolTurnResult:
-    """同步处理一轮模型返回的 tool calls。"""
+    """【大白话解释】
+    同步工具执行器：老老实实、挨个同步去调用大模型想用的那批工具。
+    在调用前会进行白名单安全拦截（如果工具不被允许，直接报错）。全部调完后把产生的事件和工具答复包装成结算账单。
+
+    需要拿到的东西：
+    - tool_registry: 工具箱仓库（工具注册中心）。
+    - tool_calls: 大模型发出的工具调用请求列表。
+    - allow_tool_names: 这次允许执行的工具白名单列表（可选）。
+    - event_index: 序列号起始索引。
+
+    会给出来的结果：
+    - 一个结算账单 ToolTurnResult 对象。
+    """
     events: list[AgentEvent] = []
     tool_messages: list[ChatMessage] = []
     current_index = event_index
@@ -140,9 +156,28 @@ async def async_handle_tool_calls(
     saved_messages: Optional[list[ChatMessage]] = None,
     session_type:str="coding",
 ) -> AsyncIterator[Union[AgentEvent, ToolTurnResult]]:
-    """异步处理一轮 tool calls，支持审批中断。
+    """【大白话解释】
+    异步流式工具执行器（超强安全大洋葱！）：支持异步并发、支持复杂的洋葱拦截器中间件链（例如沙箱运行 SandboxMiddleware 和人工审批 ApprovalMiddleware）。
+    在异步执行过程中，如果遇到敏感操作（触发了审批规则），它会抛出异常中断执行，并以 `approval_required` 事件形式实时 yield 出来通知前端，
+    然后暂停，等人类来审批。如果没有遇到阻碍，就会默默在线程池里安全完成调用。
 
-    逐条 yield AgentEvent 或最终 ToolTurnResult。
+    需要拿到的东西：
+    - tool_registry: 工具箱仓库。
+    - tool_calls: 待调用的工具列表。
+    - allow_tool_names: 工具白名单。
+    - event_index: 序列号起始索引。
+    - session_id: 当前会话的 ID。
+    - run_id: 运行的唯一 ID。
+    - workspace_path: 工作区物理路径（用于沙箱环境隔离，可选）。
+    - on_tool_start: 工具启动时的回调跟踪（可选）。
+    - on_tool_finish: 工具结束时的回调跟踪（可选）。
+    - approval_policy: 审批策略。
+    - on_approval_required: 触发审批时的回调（可选）。
+    - saved_messages: 历史消息快照（用于审批现场还原，可选）。
+    - session_type: 会话类型（默认 "coding"）。
+
+    会给出来的结果：
+    - 一个异步生成器，会实时 yield 智能体事件（AgentEvent）或者最终结算账单（ToolTurnResult）。
     """
     tool_messages: list[ChatMessage] = []
     current_index = event_index

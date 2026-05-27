@@ -28,7 +28,18 @@ router = APIRouter()  # 创建路由器
 
 @router.get("/sessions/{session_id}/trace", response_model=TraceResponse)  # 定义 trace 接口
 def read_session_trace_api(session_id: str, run_id: Optional[str] = None, db: Session = Depends(get_db)) -> TraceResponse:  # 接收参数
-    """输入：session_id、可选 run_id、数据库会话。输出：TraceResponse。"""  # 接口说明
+    """这个函数是用来读取会话在后台运行时的详细执行轨迹（Trace/运行步骤）的。
+    
+    它可以帮你还原 Agent 思考的每一步：到底是在脑子里想（Thinking），还是在调用工具（Tool Calling），又或者是出错了（Error），方便你调试和追踪。
+    
+    需要拿到的东西：
+    - session_id: 字符串类型，当前会话的唯一身份证。
+    - run_id: 可选的字符串，如果传了就只查某一次运行的具体轨迹；如果不传，就会列出这个会话下所有的运行轨迹。
+    - db: 数据库连接会话，用于去数据库中捞出所有的 Trace 和步骤数据。
+    
+    会给出来的结果：
+    - TraceResponse 对象，里面不仅包含了运行概况（比如输入、最终回复、耗时等），还包含了最核心的事件步骤列表 events，还原 Agent 思考的完整链路。
+    """
     store = SqliteSessionStore(db)  # 创建 store
     run_records = store.list_run_records(session_id, run_id=run_id)  # 读取 run 记录
     if not run_records:  # 没有 trace
