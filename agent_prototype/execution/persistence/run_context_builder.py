@@ -79,17 +79,22 @@ class RunContextBuilder:
         """
         session_id = agent_input.session_id
 
-        # ── 读取 session 记录 ─────────────────────────────────────────────────
+        # ──【第一层：元数据加载层 L0/L8】读取数据库会话元数据 ───────────────────────
+        # 从 SQLite 中读取会话的主表记录，以获取其绑定的模型、厂商、工作区路径及权限配置文件。
         record = self.db.query(SessionRecord).filter(
             SessionRecord.session_id == session_id
         ).first()
 
+        # ──【第二层：大模型通道层 L1】构建 LLM 客户端适配器 ─────────────────────────
+        # 依靠数据库里的 Provider 及 Model 配置，拉起具备思考流与参数生成功能的适配器实例。
         adapter = self._build_adapter(session_id, record=record)
 
-        # ── 读取 session 状态，触发自动压缩 ──────────────────────────────────
+        # ──【第三层：历史与摘要容量层 L5/L6】加载历史消息并触发自动压缩评估 ────────────
+        # 1. 从 DB 中读出本会话当前的完整对话历史。
         state = self.store.get(session_id) or AgentState()
         context_tokens = record.context_tokens if record and record.context_tokens else 0
 
+        # 2. 查询底层大模型的最大 Token 上下文限制，用以计算占比比率。
         model_setting = (
             self.db.query(ModelSetting).filter(
                 ModelSetting.model_id == record.model_id,
@@ -102,6 +107,8 @@ class RunContextBuilder:
         context_length = model_setting.context_length if model_setting and model_setting.context_length else context_tokens
         session_type = record.session_type if record else "assistant"
         workspace_path = record.workspace_path if record else None
+        
+        # 3. 如果有历史消息，自动评估并执行“前情提要式”的内存压缩，腾出上下文额度。
         if state.messages:
             auto_compact_result = CompactService(self.db).auto_compact_in_memory(
                 state=state,
@@ -111,14 +118,17 @@ class RunContextBuilder:
             )
             state = auto_compact_result.state
 
-        # ── 加载 Agent 定义 ───────────────────────────────────────────
+        # ──【第四层：智能体模板层 L8】决定并加载智能体基础定义配置 ──────────────────
+        # 根据会话类型进行智能映射：若为 Coding 编码会话则强制使用软件工程师角色；
+        # 若为 Assistant 聊天会话，则回退至用户自定义配置或默认智能体。
         if session_type == "coding":
             effective_agent_name = "software_engineer"
         else:
             effective_agent_name = agent_input.agent_name or "default"
         definition = AgentDefinitionService(self.db).load_definition(effective_agent_name)
 
-        # ── 使用 L6 统一上下文装配器 (ContextAssembler) 进行装配 ───────────
+        # ──【第五层：上下文装配层 L6】缝合本地物理规约、灵魂人设与技能清单 ────────────
+        # 1. 统一委托 ContextAssembler，去工作区文件夹下异步读取 AGENTS.md, SOUL.md, USER.md。
         assembler = ContextAssembler(self.db)
         assembled_ctx = assembler.assemble(
             agent_input=agent_input,
@@ -127,14 +137,17 @@ class RunContextBuilder:
             definition=definition,
         )
 
+        # 2. 将装配、缝合完毕的全新 system_prompt 覆盖写入本次运行的副本中。
         runtime_definition = definition.model_copy(
             update={"system_prompt": assembled_ctx.system_prompt}
         )
 
-        # ── 读取审批策略 ──────────────────────────────────────────────────────
+        # ──【第六层：安全网关策略层 L8】加载人工审批与信任决策门禁 ──────────────────
+        # 读取会话当前的权限配置文件（conservative/standard/full-auto），并映射为运行时拦截策略。
         profile_name = record.permission_profile if record and record.permission_profile else "conservative"
         approval_policy = PROFILES.get(profile_name, PROFILES["conservative"]).approval_policy
 
+        # ──【第七层：输出构建】组装完整的运行时上下文背包 ──────────────────────────
         return RunContext(
             state=state,
             definition=runtime_definition,
