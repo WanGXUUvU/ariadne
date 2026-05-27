@@ -403,13 +403,9 @@ mkdir -p tests/{unit/{model,tools,security,execution,memory,planning,observation
 
 ---
 
-### Step 1 — 修复拼写错误（立即，零风险）
+### Step 1 — 修复拼写错误 ✅ 已完成，跳过
 
-```bash
-git mv application/services/setting_services.py \
-        application/services/settings_service.py
-# 删除 pycache 中的 approval_toutes.py（非源文件，直接 rm）
-```
+> `settings_service.py` 拼写已正确，`approval_toutes.py` pycache 文件已不存在，本步无需操作。
 
 ---
 
