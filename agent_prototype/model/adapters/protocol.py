@@ -1,3 +1,13 @@
+"""
+[九层模型 - L1 模型适配协议层 (Model Adapter Protocol Layer)]
+
+文件职责：
+- 定义大模型适配器的标准结构协议（ModelAdapter）。
+- 约束同步生成（generate）、同步流式（stream_generate）及异步流式（async_stream_generate）调用签名。
+
+上游依赖：L1 适配器层 (chat_completions.py)、L6 历史压缩层 (compaction.py)。
+下游依赖：L1 协议类型 (model_types.py)。
+"""
 from typing import Protocol,Iterator,AsyncIterator
 from agent_prototype.model.types.model_types import ModelRequest, ModelResponse, ModelStreamEvent
 

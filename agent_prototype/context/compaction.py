@@ -1,5 +1,19 @@
+"""
+[九层模型 - L6 上下文压缩层 (Context Compaction Layer)]
+
+文件职责：
+- 定义历史对话压缩格式（前锚点、中段要压缩内容、最近保留原始消息）。
+- 落地 `HistoryCompactor` 大模型历史压缩总调度器，专门通过 LLM API 获取中段消息摘要。
+- 封装生成标准 `[COMPACT_SUMMARY]` 消息气泡并执行 state 响应式替换的算法。
+
+上游依赖：L5 记忆层 (CompactService)。
+下游依赖：L1 模型层 (ModelAdapter)。
+"""
+from typing import Optional
 from agent_prototype.model.types.domain import ChatMessage
 from agent_prototype.api.dto.schemas import AgentState, CompactOutput
+from agent_prototype.model.adapters.protocol import ModelAdapter
+from agent_prototype.model.types.model_types import ModelRequest, ModelConfig
 
 DEFAULT_COMPACT_THRESHOLD=12 #默认超过12条消息时触发 compact
 DEFAULT_KEEP_RECENT_COUNT=4 #默认 compact 后保留最近 4 条原始消息
@@ -58,21 +72,12 @@ def build_compact_prompt(middle_messages:list[ChatMessage])->str:
 
     return "\n".join(lines)
 
-# [COMPACT_SUMMARY]
-# The following is a compressed summary of the middle part of the conversation. It is not a verbatim transcript. Preserve task goals, constraints, important tool results, and unfinished work.
-
-# Conversation segment to compress:
-# - user: 我想做一个支持工具调用的 agent
-# - assistant requested tools: search_docs
-# - tool: Responses API supports tool calling and conversation state
-
-# Return only the compact summary text.
 def build_compact_summary_message(summary_text: str) -> ChatMessage:
     """输入：模型返回的 summary 文本。输出：可回写到 state 的 summary message。"""  # 这个函数负责把文本包装成一条 ChatMessage
 
     return ChatMessage(
         role="system",  # 用 system 角色，表示这是系统注入的 compact 摘要，不是 assistant 原话
-        content=f"{COMPACT_SUMMARY_PREFIX}\n\n{summary_text.strip()}",  # 把固定前缀和模型返回正文拼成最终摘要消息内容
+        content=f"{COMPACT_SUMMARY_PREFIX}\n\n{summary_text.strip()}",  # 把固定前缀 and 模型返回正文拼成最终摘要消息内容
     )
 
 def compact_state_with_summary( 
@@ -99,3 +104,43 @@ def compact_state_with_summary(
         did_compact=True,  # 标记这次确实发生了 compact
         removed_count=len(state.messages) - len(compacted_messages),  # 计算这次一共折叠掉了多少条原始消息
     )
+
+
+class HistoryCompactor:
+    """历史压缩总调度器 (L6 上下文层)。
+    
+    职责：
+    通过组合 L1 ModelAdapter 进行有损的历史摘要请求，生成摘要字符串。
+    """
+
+    def __init__(self, adapter: ModelAdapter):
+        self.adapter = adapter
+        self.last_compact_tokens: Optional[int] = None
+
+    def compact(self, messages: list[ChatMessage], keep_recent: int) -> str:
+        """调用 LLM 生成中段摘要文本，返回摘要字符串。"""
+        _, middle_messages, _ = split_messages_for_compaction(
+            messages,
+            keep_recent_count=keep_recent,
+        )
+        if not middle_messages:
+            self.last_compact_tokens = None
+            return ""
+
+        compact_prompt = build_compact_prompt(middle_messages)
+        request = ModelRequest(
+            messages=[
+                ChatMessage(role="system", content=compact_prompt),
+            ],
+            tools=[],
+            config=ModelConfig(stream=False),
+            metadata={"mode": "compact"},
+        )
+        summary_response = self.adapter.generate(request)
+        
+        if summary_response.usage and summary_response.usage.input_tokens:
+            self.last_compact_tokens = summary_response.usage.input_tokens
+        else:
+            self.last_compact_tokens = None
+
+        return (summary_response.content or "").strip()

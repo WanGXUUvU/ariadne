@@ -1,3 +1,19 @@
+"""基础设施层 (Infrastructure Layer) - 测试回显工具
+
+职责：
+1. 内置的回显（Echo）物理工具，直接返回用户传入的内容，用于系统连通性与参数流传走通。
+2. 提供测试工具标准的 Pydantic 入参模型。
+
+不负责：
+1. 安全拦截或物理越界检测。
+
+数据流向：
+- 输入：入参字符串。
+- 输出：相同内容的回显数据。
+- 上游来源：Application 运行时调用驱动。
+- 下游流向：大模型或前端消息面板。
+"""
+
 from agent_prototype.tools.protocol import ToolDefinition
 from agent_prototype.model.types.domain import ToolResult
 from agent_prototype.tools.protocol import RiskLevel

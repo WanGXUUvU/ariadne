@@ -1,3 +1,19 @@
+"""基础设施层 (Infrastructure Layer) - Tavily 网络搜索工具
+
+职责：
+1. 调用 Tavily HTTP API 发起外部互联网的资料检索。
+2. 获取搜索到的核心网页内容及参考链接。
+
+不负责：
+1. 搜索结果与系统提示词的整合编排。
+
+数据流向：
+- 输入：搜索关键词字符串。
+- 输出：匹配到的互联网内容片段与参考 URL 列表。
+- 上游来源：应用层工具执行模块。
+- 下游流向：外部互联网 Tavily 物理 API。
+"""
+
 import os,httpx,json
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
 from agent_prototype.model.types.domain import ToolResult

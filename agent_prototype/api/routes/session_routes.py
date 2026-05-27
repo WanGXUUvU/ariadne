@@ -1,3 +1,20 @@
+"""接口与适配层 (Interface Layer) - 会话路由控制器
+
+职责：
+1. 提供会话（Session）与执行轨迹（Trace）的 CRUD 路由适配。
+2. 支持创建会话、会话重命名、删除会话、以及查询会话历史记录。
+
+不负责：
+1. 会话与物理文件夹绑定的具体业务动作（由 WorkspaceService 负责）。
+2. 底层数据库会话和 Trace 的物理读写。
+
+数据流向：
+- 输入：HTTP 路由入参及 Session 动作 DTO。
+- 输出：会话对象或历史消息列表。
+- 上游来源：前端 sidebar 列表与对话主视窗。
+- 下游流向：调用 agent_prototype/memory/session/service.py。
+"""
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 

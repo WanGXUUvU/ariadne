@@ -1,3 +1,21 @@
+"""基础设施层 (Infrastructure Layer) - SQLAlchemy 数据库引擎
+
+职责：
+1. 初始化物理 SQLite 数据库文件连接。
+2. 创建全局线程安全的 SQLAlchemy Engine 与会话工厂 SessionLocal。
+3. 提供统一的 get_db 上游生命周期函数。
+
+不负责：
+1. 具体的 ORM 数据表模型声明。
+2. 业务数据的任何逻辑加工。
+
+数据流向：
+- 输入：本地数据库物理连接路径（URL）。
+- 输出：SessionLocal 会话工厂。
+- 上游来源：FastAPI 依赖注入（Dependencies）。
+- 下游流向：供所有 Persistence 层 Service 直接调用执行物理 SQL。
+"""
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 

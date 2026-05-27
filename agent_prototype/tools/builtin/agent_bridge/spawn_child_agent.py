@@ -1,57 +1,66 @@
-import uuid
-from concurrent.futures import ThreadPoolExecutor
-from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
-from agent_prototype.model.types.domain import ToolResult
-from agent_prototype.api.dto.schemas import AgentInput, AgentState
-from agent_prototype.agent.definition import AgentDefinition
-from agent_prototype.execution.persistence.run_context_builder import RunContextBuilder
-from agent_prototype.infra.db.engine import SessionLocal
+"""
+[九层模型 - L3 工具层 (Tools Layer)]
 
-def build_spawn_child_agent_tool(parent_run_id:str, session_id:str, executor:ThreadPoolExecutor, futures:dict)->ToolDefinition:
-    """工厂函数：把db注入闭包，返回可注册的Tool Definition"""
+文件职责：
+- 异步派发子智能体任务的桥接工具（spawn_child_agent）。
+- 接收 `child_dispatcher` 纯闭包回调，彻底与 L8 认知引擎和 L5 物理落库解耦，排除一切物理 import。
+- 仅负责接收模型意图，调用回调获取 child_run_id，并包装为 ToolResult 返回给上层。
+
+上游依赖：L8 执行层通过 build_run_registry 进行闭包回调注入。
+下游依赖：纯无状态 Callable 接口。
+"""
+from typing import Callable
+from agent_prototype.tools.protocol import ToolDefinition, RiskLevel
+from agent_prototype.model.types.domain import ToolResult
+
+def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) -> ToolDefinition:
+    """工厂函数：注入子智能体派发器回调，返回可注册的 ToolDefinition"""
 
     def spawn_child_agent(task: str, agent_name: str = "子Agent") -> ToolResult:
-
-        child_run_id=uuid.uuid4().hex
-
-        future=executor.submit(_run_child, task, child_run_id, parent_run_id, session_id, agent_name)
-        futures[child_run_id]=future
-        return ToolResult(
-            ok=True,
-            content=child_run_id,
-            metadata={"tool_name":"spawn_child_agent","child_run_id":child_run_id,"agent_name":agent_name},
-        )
+        try:
+            child_run_id = child_dispatcher(task, agent_name)
+            return ToolResult(
+                ok=True,
+                content=child_run_id,
+                metadata={"tool_name": "spawn_child_agent", "child_run_id": child_run_id, "agent_name": agent_name},
+            )
+        except Exception as e:
+            return ToolResult(
+                ok=False,
+                content=f"Failed to spawn child agent: {e}",
+                metadata={"tool_name": "spawn_child_agent", "agent_name": agent_name},
+            )
     
     SCHEMA = {
-    "type": "function",
-    "function": {
-        "name": "spawn_child_agent",
-        "description": (
-            "把一个独立子任务委派给子 Agent 异步执行。"
-            "立即返回 child_run_id 字符串，不等待任务完成。"
-            "【单任务模式】派出后立即调用 wait_child_agent(child_run_id) 阻塞等待结果，再回复用户。不要先对用户说'正在等待'就停下。"
-            "【并行模式】需要同时派发多个子任务时，先连续调用多次 spawn_child_agent，"
-            "然后用 check_child_status 逐一查询各子任务状态：若已 done 则直接从 reply 字段取值；"
-            "若仍 running 则对该 child_run_id 单独调用 wait_child_agent 阻塞等待其完成再取结果。"
-            "全部子任务结果收齐后，汇总回复用户。"
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "task": {
-                    "type": "string",
-                    "description": "子 Agent 需要完成的具体任务描述",
+        "type": "function",
+        "function": {
+            "name": "spawn_child_agent",
+            "description": (
+                "把一个独立子任务委派给子 Agent 异步执行。"
+                "立即返回 child_run_id 字符串，不等待任务完成。"
+                "【单任务模式】派出后立即调用 wait_child_agent(child_run_id) 阻塞等待结果，再回复用户。不要先对用户说'正在等待'就停下。"
+                "【并行模式】需要同时派发多个子任务时，先连续调用多次 spawn_child_agent，"
+                "然后用 check_child_status 逐一查询各子任务状态：若已 done 则直接从 reply 字段取值；"
+                "若仍 running 则对该 child_run_id 单独调用 wait_child_agent 阻塞等待其完成再取结果。"
+                "全部子任务结果收齐后，汇总回复用户。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "子 Agent 需要完成的具体任务描述",
+                    },
+                    "agent_name": {
+                        "type": "string",
+                        "description": "子 Agent 的角色名称，用于前端展示，如'数据分析师'、'代码审查员'。不填默认为'子Agent'。",
+                    },
                 },
-                "agent_name": {
-                    "type": "string",
-                    "description": "子 Agent 的角色名称，用于前端展示，如'数据分析师'、'代码审查员'。不填默认为'子Agent'。",
-                },
+                "required": ["task"],
+                "additionalProperties": False,
             },
-            "required": ["task"],
-            "additionalProperties": False,
         },
-    },
-}
+    }
 
     return ToolDefinition(
         name="spawn_child_agent",
@@ -59,42 +68,3 @@ def build_spawn_child_agent_tool(parent_run_id:str, session_id:str, executor:Thr
         handler=spawn_child_agent,
         risk_level=RiskLevel.SAFE,
     )
-    
-def _run_child(task: str, child_run_id: str, parent_run_id: str, session_id: str, agent_name: str = "子Agent"):
-    from agent_prototype.execution.runtime.agent_runtime import AgentRunner  # 懒加载，避免循环导入
-    from agent_prototype.memory.session.store import SqliteSessionStore  # 导入 store
-    db = SessionLocal()
-    try:
-        adapter = RunContextBuilder(db).build_adapter(session_id)
-        child_state=AgentState()
-        definition = AgentDefinition(id=child_run_id, name=agent_name)
-        agent=AgentRunner(
-            state=child_state,
-            definition=definition,
-            model_adapter=adapter,
-        )
-        output=agent.run(AgentInput(
-            session_id=session_id,  # 复用父 session_id，满足外键约束
-            user_input=task,
-        ))
-
-        # 📍 落库：子 Agent 的 run 记录 + 事件列表，挂在同一个 session 下
-        store = SqliteSessionStore(db)
-        store.create_child_run(
-            parent_run_id=parent_run_id,
-            session_id=session_id,
-            run_id=child_run_id,
-            agent_name=agent_name,
-            user_input=task,
-            reply=output.reply,
-            events=output.events,
-        )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        print(f"Failed to persist child run {child_run_id}: {e}")
-        raise
-    finally:
-        db.close()
-
-    return output   # ← f.result() 拿到 AgentOutput

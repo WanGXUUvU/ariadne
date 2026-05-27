@@ -1,8 +1,19 @@
+"""
+[九层模型 - L3 工具注册中心 (Tool Registry Layer)]
+
+文件职责：
+- 管理所有可用工具（ToolDefinition）的加载、克隆与映射。
+- 封装工具参数 JSON 解析、安全校验、类型错误防范、以及统一的运行时工具执行。
+- 接收 `child_dispatcher`、`status_checker`、`child_waiter` 回调并组装出包含桥接工具的 ToolRegistry。
+
+上游依赖：L8 执行层 (RunService)。
+下游依赖：L3 各项内置工具文件定义。
+"""
 import json  # 解析工具参数 JSON
-from typing import  Optional  # 类型标注
+from typing import Optional, Callable  # 类型标注
 
 from agent_prototype.model.types.domain import ToolError, ToolResult
-from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
+from agent_prototype.tools.protocol import ToolDefinition, RiskLevel
 from .builtin.util.echo import build_echo_tool_definition
 from .builtin.filesystem.fs_read import build_read_file_tool_definition
 from .builtin.filesystem.fs_list import build_list_dir_definition
@@ -18,17 +29,17 @@ class ToolRegistry:  # 工具注册中心
         """输入：无。输出：初始化后的 ToolRegistry 实例。"""
         self._tools: dict[str, ToolDefinition] = {}  # 用名字保存所有工具
 
-    def clone(self)->"ToolRegistry":
-        
+    def clone(self) -> "ToolRegistry":
         new = ToolRegistry()
-        new._tools=dict(self._tools)
+        new._tools = dict(self._tools)
         return new
     
-    #注册时会把完整的ToolDefiniton注册进去
+    # 注册时会把完整的 ToolDefinition 注册进去
     def register(self, tool: ToolDefinition) -> None:
         """输入：一个 ToolDefinition。输出：无，副作用是把工具注册进内存字典。"""
         self._tools[tool.name] = tool  # 注册工具
-    #把注册的tool的schema 抽出来 组成一个列表
+
+    # 把注册的 tool 的 schema 抽出来 组成一个列表
     def get_tool_schemas(self, tool_names: Optional[list[str]] = None) -> list[dict]:
         """输入：可选的工具名列表。输出：给模型使用的工具 schema 列表。"""
         if tool_names is None:
@@ -38,11 +49,12 @@ class ToolRegistry:  # 工具注册中心
 
         return [tool.schema for tool in tools]  # 只返回 schema 列表
 
-    def get_risk_level(self,name:str)->RiskLevel:
-        tool=self._tools.get(name)
+    def get_risk_level(self, name: str) -> RiskLevel:
+        tool = self._tools.get(name)
         if tool is None:
             return RiskLevel.SAFE
         return tool.risk_level
+
     def execute_tool_call(self, name: str, arguments: str) -> ToolResult:
         """输入：工具名、JSON 字符串参数。输出：统一的 ToolResult。"""
         tool = self._tools.get(name)  # 按名字找工具
@@ -54,16 +66,16 @@ class ToolRegistry:  # 工具注册中心
                     tool_name=name,  # 工具名
                     message=f"Unknown tool: {name}",  # 错误信息
                 ),
-                metadata={"tool_name":name},
+                metadata={"tool_name": name},
             )
 
         try:
             args = json.loads(arguments or "{}")  # 字符串变成字典
-        except json.JSONDecodeError as exc:#参数不是合法json
+        except json.JSONDecodeError as exc:  # 参数不是合法 json
             return ToolResult(
                 ok=False,
                 error=ToolError(code="invalid_arguments", tool_name=name, message="Invalid JSON arguments"),
-                metadata={"tool_name":name,"raw_arguments":arguments,"debug":str(exc)},
+                metadata={"tool_name": name, "raw_arguments": arguments, "debug": str(exc)},
             )
         try:  # 尝试执行工具
             result = tool.handler(**args)  # 调用 handler
@@ -80,14 +92,15 @@ class ToolRegistry:  # 工具注册中心
                 metadata={"tool_name": name},
             )
         
-        if isinstance(result,ToolResult):# 如果 handler 已经返回 ToolResult
+        if isinstance(result, ToolResult):  # 如果 handler 已经返回 ToolResult
             return result
         
         return ToolResult(
             ok=True,
             content=str(result),
-            metadata={"tool_name":name},
+            metadata={"tool_name": name},
         )
+
 
 def build_default_tool_registry() -> ToolRegistry:
     """输入：无。输出：预注册默认工具后的 ToolRegistry。"""
@@ -101,12 +114,21 @@ def build_default_tool_registry() -> ToolRegistry:
     registry.register(build_web_search_tool_definition())
     return registry
 
-def build_run_registry(parent_run_id:str, executor, futures:dict, session_id:Optional[str]=None) -> ToolRegistry:
+
+def build_run_registry(
+    child_dispatcher: Callable[[str, str], str],
+    status_checker: Callable[[list[str]], dict],
+    child_waiter: Callable[[str], str],
+) -> ToolRegistry:
     from .builtin.agent_bridge.spawn_child_agent import build_spawn_child_agent_tool
+    from .builtin.agent_bridge.check_child_status import build_check_child_status_tool
+    from .builtin.agent_bridge.wait_child_agent import build_wait_child_agent_tool
+
     registry = DEFAULT_TOOL_REGISTRY.clone()
-    registry.register(build_spawn_child_agent_tool(parent_run_id, session_id or "test-session-id", executor, futures))
-    registry.register(build_check_child_status_tool(futures))
-    registry.register(build_wait_child_agent_tool(futures))
+    registry.register(build_spawn_child_agent_tool(child_dispatcher))
+    registry.register(build_check_child_status_tool(status_checker))
+    registry.register(build_wait_child_agent_tool(child_waiter))
     return registry
+
 
 DEFAULT_TOOL_REGISTRY = build_default_tool_registry()  # 默认注册中心

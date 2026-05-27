@@ -1,17 +1,28 @@
+"""
+[九层模型 - L5 记忆层 (Memory Layer)]
+
+文件职责：
+- 管理有损对话历史压缩生命周期（CompactService）。
+- 负责快照状态（Snapshot）持久化更新、数据库事务管理、以及 Session 主Runs状态（活跃/非活跃）维护。
+- 拒绝任何 LLM 直接调用与 L8 执行层依赖，转而通过依赖注入的 L6 HistoryCompactor 执行大模型压缩。
+
+上游依赖：L8 执行层 (RunContextBuilder)、L10 接口层 (GET/POST 路由)。
+下游依赖：L6 上下文压缩层 (HistoryCompactor / compaction.py)、L5 仓储层 (SqliteSessionStore)、L0 基础设施 (db)。
+"""
 import os
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from agent_prototype.infra.db.orm_models import SessionRecord, ModelSetting
+from agent_prototype.infra.db.orm_models import SessionRecord, ModelSetting, ProviderConfig
 from agent_prototype.api.dto.schemas import AgentState, CompactInput, CompactOutput, ChatMessage
 from agent_prototype.memory.session.store import SqliteSessionStore
 from agent_prototype.context.compaction import (
     build_compact_prompt,
     compact_state_with_summary,
-    split_messages_for_compaction
+    split_messages_for_compaction,
+    HistoryCompactor
 )
 from agent_prototype.model.adapters.chat_completions import ChatCompletionsAdapter
-from agent_prototype.model.types.model_types import ModelConfig, ModelRequest
 
 COMPACT_MODEL = os.getenv("COMPACT_MODEL", "deepseek-v4-flash")
 
@@ -29,10 +40,39 @@ class CompactService:
         self.db = db
         self.store = SqliteSessionStore(db)
 
-    def _get_session_adapter(self, session_id: str) -> ChatCompletionsAdapter:
-        """延迟导入 RunContextBuilder 以避免循环依赖，构建该 session 的 LLM Adapter。"""
-        from agent_prototype.execution.persistence.run_context_builder import RunContextBuilder
-        return RunContextBuilder(self.db).build_adapter(session_id)
+    def _build_session_adapter(self, session_id: str) -> ChatCompletionsAdapter:
+        """从数据库读取配置并独立构建 LLM Adapter，避免向上依赖 L8 执行层。"""
+        from agent_prototype.prompt.strategies.thinking import build_thinking_payload
+
+        record = self.db.query(SessionRecord).filter(
+            SessionRecord.session_id == session_id
+        ).first()
+
+        if record is None or record.model_provider_id is None or record.model_id is None:
+            raise ValueError("当前会话未配置模型，请在设置中选择 Provider 和模型后再开始对话")
+
+        provider = self.db.query(ProviderConfig).filter(
+            ProviderConfig.id == record.model_provider_id
+        ).first()
+        if provider is None:
+            raise ValueError("会话关联的 Provider 已被删除，请重新选择模型")
+
+        model_setting = self.db.query(ModelSetting).filter(
+            ModelSetting.model_id == record.model_id,
+            ModelSetting.provider_id == record.model_provider_id,
+        ).first()
+
+        thinking_payload = build_thinking_payload(
+            style=model_setting.thinking_style if model_setting else "none",
+            enabled=bool(record.thinking_enabled),
+            effort=record.thinking_effort or "medium",
+        )
+        return ChatCompletionsAdapter(
+            api_key=provider.api_key,
+            base_url=provider.base_url,
+            model=record.model_id,
+            extra_payload=thinking_payload,
+        )
 
     def auto_compact_in_memory(
         self,
@@ -41,7 +81,7 @@ class CompactService:
         context_length: int,
         keep_recent_count: int,
         force: bool = False,
-        adapter: Optional[ChatCompletionsAdapter] = None,
+        compactor: Optional[HistoryCompactor] = None,
     ) -> CompactOutput:
         """评估并计算无状态压缩结果（纯内存评估，不涉及物理落库或事务控制）"""
         if not force:
@@ -58,27 +98,17 @@ class CompactService:
         if not middle_messages:
             return CompactOutput(state=state, did_compact=False, removed_count=0)
 
-        compact_prompt = build_compact_prompt(middle_messages)
+        # 核心重构：使用外部传入的 compactor 或是构建默认环境变量 compactor
+        if compactor is None:
+            adapter = ChatCompletionsAdapter(model=COMPACT_MODEL)
+            compactor = HistoryCompactor(adapter)
 
-        # 使用外部传入的适配器，或退回默认环境变量适配器
-        adapter = adapter or ChatCompletionsAdapter(model=COMPACT_MODEL)
-        request = ModelRequest(
-            messages=[
-                ChatMessage(role="system", content=compact_prompt),
-            ],
-            tools=[],
-            config=ModelConfig(stream=False),
-            metadata={"mode": "compact"},
-        )
-        summary_response = adapter.generate(request)
-        summary_text = (summary_response.content or "").strip()
+        summary_text = compactor.compact(state.messages, keep_recent=keep_recent_count)
 
         if not summary_text:
             raise ValueError("Compact summary is empty")
 
-        compact_tokens: Optional[int] = None
-        if summary_response.usage and summary_response.usage.input_tokens:
-            compact_tokens = summary_response.usage.input_tokens
+        compact_tokens: Optional[int] = compactor.last_compact_tokens
 
         compact_result = compact_state_with_summary(
             state=state,
@@ -117,14 +147,18 @@ class CompactService:
             and len(state.messages) >= payload.trigger_threshold
         )
 
-        # 调用自身的内存压缩逻辑（传入 session 对应的适配器）
+        # 获取当前会话的模型适配器并构造 L6 压缩器
+        adapter = self._build_session_adapter(payload.session_id)
+        compactor = HistoryCompactor(adapter)
+
+        # 调用自身的内存压缩逻辑
         compact_result = self.auto_compact_in_memory(
             state=state,
             context_tokens=context_tokens,
             context_length=context_length,
             keep_recent_count=payload.keep_recent_count,
             force=payload.force or force_by_count,
-            adapter=self._get_session_adapter(payload.session_id),
+            compactor=compactor,
         )
 
         if not compact_result.did_compact:
@@ -165,4 +199,3 @@ class CompactService:
             raise
 
         return compact_result
-

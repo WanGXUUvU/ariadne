@@ -1,3 +1,20 @@
+"""接口与适配层 (Interface Layer) - 审批路由控制器
+
+职责：
+1. 提供人工审批决策的 HTTP 处理路由。
+2. 支持查询审批工单状态、提交审批决定（同意/拒绝/修改参数）。
+
+不负责：
+1. 审批工单的底层物理存储与持久化操作。
+2. 运行时中间件的暂停与唤醒信号管理。
+
+数据流向：
+- 输入：HTTP POST /api/v1/approvals DTO。
+- 输出：审批提交状态 JSON 响应。
+- 上游来源：前端审批卡片交互。
+- 下游流向：调用 agent_prototype/security/approval/service.py 执行审批逻辑。
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session

@@ -1,3 +1,20 @@
+"""应用服务层 (Application Layer) - 动态技能编排
+
+职责：
+1. 编排系统动态技能加载、卸载、启用、禁用的全部业务逻辑。
+2. 动态扫描和管理技能在运行时上下文中的参数映射。
+
+不负责：
+1. 技能 Python 插件模块的底层物理动态导入细节（由 Loader 负责）。
+2. 技能的物理文件增删。
+
+数据流向：
+- 输入：技能唯一标识及启用参数。
+- 输出：启用的技能元数据及组装工具。
+- 上游来源：agent_prototype/api/routes/skill_routes.py。
+- 下游流向：调用 agent_prototype/skills/loader.py。
+"""
+
 from sqlalchemy.orm import Session
 
 from agent_prototype.api.dto.schemas import SkillSummary

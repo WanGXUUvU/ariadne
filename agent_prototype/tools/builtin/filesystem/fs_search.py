@@ -1,3 +1,19 @@
+"""基础设施层 (Infrastructure Layer) - 文件系统文本检索工具
+
+职责：
+1. 提供本地磁盘物理文件系统的搜索与正则匹配功能。
+2. 对指定目录下的内容进行文本检索，返回匹配的位置及片段。
+
+不负责：
+1. 沙箱安全边界防范与路径真实性检测。
+
+数据流向：
+- 输入：绝对目录路径、搜索关键字和匹配参数。
+- 输出：匹配结果文件与片段列表。
+- 上游来源：经安全中间件校验后的 Tool 调用。
+- 下游流向：操作系统文件系统。
+"""
+
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
 
 from pathlib import Path

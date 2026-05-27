@@ -1,3 +1,20 @@
+"""接口与适配层 (Interface Layer) - 轨迹路由控制器
+
+职责：
+1. 提供执行细节（Trace/Events）的 HTTP 查询路由控制器。
+2. 允许按 Run ID 查询所有细粒度事件以供前端渲染。
+
+不负责：
+1. 运行中 Trace 事件的实时拦截与收集。
+2. 日志的物理落盘与监控。
+
+数据流向：
+- 输入：HTTP GET 请求及会话/Run 查询入参。
+- 输出：Trace 细粒度事件列表 JSON 响应。
+- 上游来源：前端 Trace 侧边栏及手风琴卡片。
+- 下游流向：调用 agent_prototype/memory/session/service.py。
+"""
+
 import json  # 解析 JSON 字符串
 from typing import Optional  # 可选参数
 from fastapi import APIRouter, Depends, status  # 导入路由、依赖和状态码

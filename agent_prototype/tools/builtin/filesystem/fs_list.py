@@ -1,3 +1,18 @@
+"""基础设施层 (Infrastructure Layer) - 文件系统物理目录列表工具
+
+职责：
+1. 执行具体的本地磁盘文件夹目录列表遍历，列出子目录和文件属性。
+
+不负责：
+1. 路径越界的沙箱拦截或物理安全防范。
+
+数据流向：
+- 输入：绝对文件夹路径。
+- 输出：物理文件和子目录列表。
+- 上游来源：经安全中间件校验后的 Tool 调用。
+- 下游流向：操作系统本地文件系统。
+"""
+
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
 
 from pathlib import Path

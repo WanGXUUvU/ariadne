@@ -1,3 +1,20 @@
+"""应用服务层 (Application Layer) - 人工审批管理服务
+
+职责：
+1. 编排工具调用审批（Approval）的状态更新（通过 / 拒绝 / 提升权限为 full-auto）。
+2. 控制事务提交，保证审批状态在数据库持久化中的一致性。
+
+不负责：
+1. 具体的中间件拦截逻辑（由 ApprovalGateInterceptor 在 runtime 中间件层负责）。
+2. 网络接口控制器路由的暴露。
+
+数据流向：
+- 输入：审批工单 ID（approval_id）及决策状态。
+- 输出：状态更新后的 PendingApproval 实体。
+- 上游来源：agent_prototype/api/routes/approval_routes.py。
+- 下游流向：调用 agent_prototype/security/approval/store.py 写入数据库。
+"""
+
 # ── 第三方库 ──────────────────────────────────────────────────────────────────
 from typing import Optional
 

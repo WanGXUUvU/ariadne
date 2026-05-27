@@ -1,3 +1,13 @@
+"""
+[九层模型 - L1 模型层 (Model Layer)]
+
+文件职责：
+- 定义大模型通信的通用请求/响应结构体（ModelConfig, ModelRequest, ModelResponse, ModelUsage, ModelStreamEvent）。
+- 作为九层模型中最底层的 API 数据交换协议基础。
+
+上游依赖：L1 适配器层 (chat_completions.py)。
+下游依赖：L1 领域类型定义 (domain.py)。
+"""
 from typing import Any,Literal,Optional
 
 from pydantic import BaseModel,Field

@@ -1,3 +1,20 @@
+"""应用服务层 (Application Layer) - 工具调用引擎
+
+职责：
+1. 驱动大模型解析出的工具（ToolCall）顺序或并发执行。
+2. 串联工具执行拦截器管道（ToolInterceptorPipeline），依次执行安全、审批等洋葱圈中间件。
+
+不负责：
+1. 物理工具底层逻辑的具体实现。
+2. 审批数据的持久化数据库读写。
+
+数据流向：
+- 输入：ToolCall 列表入参及执行上下文。
+- 输出：包含所有工具返回消息与事件的 ToolTurnResult。
+- 上游来源：agent_prototype/execution/runtime/agent_runtime.py。
+- 下游流向：传递到拦截器中间件管道，并最终分发至 agent_prototype/tools/* 底层方法。
+"""
+
 # ── 标准库 ────────────────────────────────────────────────────────────────────
 import asyncio
 from concurrent.futures import ThreadPoolExecutor

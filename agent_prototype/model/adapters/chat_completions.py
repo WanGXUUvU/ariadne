@@ -1,3 +1,14 @@
+"""
+[九层模型 - L1 模型层 (Model Layer)]
+
+文件职责：
+- 封装大模型的 API 通信接口（如 SenseNova、OpenAI），将通用模型请求（ModelRequest）转换为服务商特定的 HTTP 请求。
+- 对模型返回的流式 SSE 数据帧进行高内聚的有状态解析（例如：思维链标签 <think>...</think> 的智能提取）。
+- 转换并输出统一的模型响应结构（ModelResponse / ModelStreamEvent）。
+
+上游依赖：L8 执行层 (AgentRunner)、L6 历史压缩层 (HistoryCompactor)。
+下游依赖：物理大模型外部 API 服务。
+"""
 import os
 import json
 import time,httpx
@@ -5,20 +16,18 @@ from typing import Any, Optional,Iterator,AsyncIterator
 
 import requests
 
-from agent_prototype.api.dto.schemas import ChatMessage
+from agent_prototype.model.types.domain import ChatMessage
 from .protocol import ModelAdapter
 from agent_prototype.model.types.model_types import ModelRequest, ModelResponse, ModelUsage, ModelStreamEvent
 
-BASE_URL = "https://token.sensenova.cn/v1"
-DEFAULT_MODEL = "sensenova-6.7-flash-lite"
 
 
 class ChatCompletionsAdapter(ModelAdapter):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        base_url: str = BASE_URL,
-        model: str = DEFAULT_MODEL,
+        base_url:  Optional[str]=None,
+        model:  Optional[str]=None,
         extra_payload: Optional[dict] = None,
         thinking_style: str = "none",
     ):

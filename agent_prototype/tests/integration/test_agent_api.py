@@ -57,9 +57,24 @@ class TestAgentApi(unittest.TestCase):
         )
         self.mock_build_adapter = self.build_adapter_patcher.start()
 
+        # Mock CompactService._build_session_adapter 同步绕过物理配置校验
+        from agent_prototype.memory.summary.service import CompactService
+        self.compact_build_adapter_patcher = patch.object(
+            CompactService,
+            "_build_session_adapter",
+            return_value=ChatCompletionsAdapter(
+                api_key="mock-api-key",
+                base_url="mock-base-url",
+                model="mock-model",
+            )
+        )
+        self.mock_compact_build_adapter = self.compact_build_adapter_patcher.start()
+
     def tearDown(self):
         if hasattr(self, "build_adapter_patcher"):
             self.build_adapter_patcher.stop()
+        if hasattr(self, "compact_build_adapter_patcher"):
+            self.compact_build_adapter_patcher.stop()
         app.dependency_overrides.clear()
         self.engine.dispose()
         self.temp_dir.cleanup()

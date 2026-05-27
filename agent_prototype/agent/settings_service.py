@@ -1,3 +1,20 @@
+"""应用服务层 (Application Layer) - 全局配置服务
+
+职责：
+1. 编排全局系统配置（API Key, 模型配置参数等）读取和保存的业务用例。
+2. 对设置项的有效性进行业务层规则校验。
+
+不负责：
+1. 配置项在 SQLite 数据库中的物理 CRUD。
+2. HTTP 协议转换和接口路由。
+
+数据流向：
+- 输入：配置修改属性字典。
+- 输出：修改后的系统配置实体。
+- 上游来源：agent_prototype/api/routes/settings_routes.py。
+- 下游流向：调用 agent_prototype/agent/settings_store.py 进行数据持久化。
+"""
+
 import json
 import re
 from typing import Optional

@@ -1,3 +1,20 @@
+"""接口与适配层 (Interface Layer) - 配置路由控制器
+
+职责：
+1. 提供全局系统设置（API Key, 模型参数等）的 HTTP 路由控制器。
+2. 处理设置的获取与保存请求，保证入参符合 DTO 强约束。
+
+不负责：
+1. 系统设置的本地物理持久化或磁盘读写。
+2. 设置字段的高级业务逻辑验证。
+
+数据流向：
+- 输入：HTTP GET / PUT 请求及 Settings DTO。
+- 输出：HTTP JSON 响应。
+- 上游来源：前端设置抽屉面板。
+- 下游流向：调用 agent_prototype/agent/settings_service.py 进行业务处理。
+"""
+
 from typing import Optional
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session

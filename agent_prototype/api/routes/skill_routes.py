@@ -1,3 +1,20 @@
+"""接口与适配层 (Interface Layer) - 技能管理路由控制器
+
+职责：
+1. 提供技能管理的路由控制器，支持技能的列出、上传、启用/禁用。
+2. 进行技能上传的参数与包名验证。
+
+不负责：
+1. 技能 Python 模块的物理动态导入。
+2. 技能在运行时执行上下文中的参数装配。
+
+数据流向：
+- 输入：HTTP 请求及技能动作参数。
+- 输出：技能列表或启用状态 JSON 响应。
+- 上游来源：前端。
+- 下游流向：调用 agent_prototype/skills/service.py。
+"""
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 

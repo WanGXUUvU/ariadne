@@ -1,3 +1,19 @@
+"""应用服务层 (Application Layer) - 技能元数据配置
+
+职责：
+1. 管理动态技能的系统存储路径、模块名转换和运行时缓存配置。
+2. 维护物理技能插件在系统中的硬编码白名单与加载策略。
+
+不负责：
+1. 物理模块加载或技能状态管理。
+
+数据流向：
+- 输入：配置查询请求。
+- 输出：技能存储与动态装配的物理配置。
+- 上游来源：技能加载器（Loader）与技能服务。
+- 下游流向：被 `loader.py` 与 `service.py` 强依赖。
+"""
+
 import json
 from pathlib import Path
 from typing import Optional

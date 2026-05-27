@@ -1,14 +1,15 @@
-"""Run 上下文构建器。
-
-职责：
-- 读取 session 状态、触发自动压缩
-- 加载 Agent 定义 + Skill 上下文
-- 组装 LLM Adapter
-- 读取审批策略
-上游：RunService 调用
-下游：SqliteSessionStore、AgentDefinitionService、SkillContextService、CompactService
 """
+[九层模型 - L8 上下文装配与模型构建层 (Execution Layer)]
 
+文件职责：
+- 充当对话运行时上下文统一装配器（RunContextBuilder）。
+- 读取数据库 Session 记录、拉取当前 Session 的最新状态快照并触发 L5 自动有损历史压缩评估。
+- 调用 L6 层的统一装配器（ContextAssembler）拼装最终系统提示词、加载 Agent 预设人设。
+- 读取审批档位策略（PROFILES），并动态实例化大模型底层适配器（ChatCompletionsAdapter）。
+
+上游依赖：L8 执行层 (RunService)。
+下游依赖：L6 统一装配器 (ContextAssembler)、L5 记忆层 (CompactService & store.py)、L1 模型层 (ChatCompletionsAdapter)、L7 安全策略层 (PROFILES)。
+"""
 from dataclasses import dataclass
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -21,7 +22,7 @@ from agent_prototype.api.dto.schemas import AgentInput, AgentState, ApprovalPoli
 from agent_prototype.agent.definition import AgentDefinition
 from agent_prototype.agent.definition_service import AgentDefinitionService
 from agent_prototype.memory.summary.service import CompactService
-from agent_prototype.context.skill_context import SkillContextService
+from agent_prototype.context.assembler import ContextAssembler
 
 
 @dataclass
@@ -32,7 +33,7 @@ class RunContext:
     adapter: ChatCompletionsAdapter
     approval_policy: ApprovalPolicy
     effective_agent_name: str
-    workspace_path:str
+    workspace_path: str
     session_type: str
 
 
@@ -83,17 +84,24 @@ class RunContextBuilder:
             )
             state = auto_compact_result.state
 
-        # ── 加载 Agent 定义 + Skill ───────────────────────────────────────────
+        # ── 加载 Agent 定义 ───────────────────────────────────────────
         if session_type == "coding":
             effective_agent_name = "software_engineer"
         else:
             effective_agent_name = agent_input.agent_name or "default"
         definition = AgentDefinitionService(self.db).load_definition(effective_agent_name)
-        runtime_definition = SkillContextService(self.db).build_runtime_definition_with_skills(
-            definition,
-            agent_input,
+
+        # ── 使用 L6 统一上下文装配器 (ContextAssembler) 进行装配 ───────────
+        assembler = ContextAssembler(self.db)
+        assembled_ctx = assembler.assemble(
+            agent_input=agent_input,
             session_type=session_type,
             workspace_path=workspace_path,
+            definition=definition,
+        )
+
+        runtime_definition = definition.model_copy(
+            update={"system_prompt": assembled_ctx.system_prompt}
         )
 
         # ── 读取审批策略 ──────────────────────────────────────────────────────

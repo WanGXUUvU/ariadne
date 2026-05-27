@@ -1,3 +1,21 @@
+"""接口与适配层 (Interface Layer) - 执行路由控制器
+
+职责：
+1. 提供执行流（Run）相关 API 路由控制（/run, /run/stream, /run/{run_id}/resume）。
+2. 处理 SSE/HTTP 流式响应及打字机效果数据封装。
+3. 使用 Pydantic 进行输入参数强校验（如 RunInput DTO）。
+
+不负责：
+1. 具体的 Agent 执行流控制（由 Application Runtime 层负责）。
+2. 数据持久化存取细节（由 PersistService 负责）。
+
+数据流向：
+- 输入：HTTP POST / GET / SSE 请求及输入校验 DTO。
+- 输出：HTTP JSON 响应或 SSE 事件流。
+- 上游来源：前端对话视窗 / 审批卡片。
+- 下游流向：调用 agent_prototype/execution/persistence/run_service.py 进行业务编排。
+"""
+
 from fastapi import APIRouter, Depends, status  # 导入路由、依赖和状态码
 from sqlalchemy.orm import Session  # 导入数据库会话
 from fastapi.responses import StreamingResponse

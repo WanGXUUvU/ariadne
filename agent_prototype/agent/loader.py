@@ -1,3 +1,20 @@
+"""应用服务层 (Application Layer) - 内置 Agent 定义加载器
+
+职责：
+1. 从本地 Markdown (.md) 格式描述文件中物理提取并解析内置 Agent 定义。
+2. 解析描述文件中的系统提示词模板、工具列表和元数据信息。
+
+不负责：
+1. 自定义 Agent 的 CRUD 持久化或数据库接口。
+2. 运行时 Agent 运行状态的维护。
+
+数据流向：
+- 输入：本地 Markdown 物理描述文件。
+- 输出：AgentDefinition 系统内置定义对象。
+- 上游来源：agent_prototype/agent/definition_service.py 触发。
+- 下游流向：本地磁盘物理文件读取及正则格式匹配。
+"""
+
 from pathlib import Path
 from typing import Optional
 import yaml

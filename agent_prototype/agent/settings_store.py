@@ -1,3 +1,20 @@
+"""应用服务层 (Application Layer) - 配置仓储层
+
+职责：
+1. 将系统配置记录持久化写入 SQLite 数据库。
+2. 提供数据库表记录到业务配置对象的序列化与反序列化转换。
+
+不负责：
+1. 具体的路由接口配置或 HTTP 网关。
+2. 复杂的配置业务合法性校验。
+
+数据流向：
+- 输入：数据库实体数据或配置查询参数。
+- 输出：持久化后的配置模型。
+- 上游来源：agent_prototype/agent/settings_service.py。
+- 下游流向：调用 SQLAlchemy Session 提交到本地 SQLite 数据库。
+"""
+
 from agent_prototype.infra.db.orm_models import ProviderConfig, ModelSetting
 from typing import Optional
 from sqlalchemy.orm import Session

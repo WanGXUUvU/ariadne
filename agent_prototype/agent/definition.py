@@ -1,3 +1,13 @@
+"""
+[九层模型 - 智能体定义层 (Agent Definition Layer)]
+
+文件职责：
+- 定义智能体（Agent）的人设、系统提示词、允许挂载工具清单等核心静态属性（AgentDefinition）。
+- 提供系统默认智能体及默认助理智能体实例的硬编码退化兜底。
+
+上游依赖：L8 执行层 (RunService)、L6 上下文层 (ContextAssembler)、L10 API 接口层 DTO。
+下游依赖：无。
+"""
 from typing import Optional
 
 from pydantic import BaseModel, Field

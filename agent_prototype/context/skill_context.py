@@ -1,3 +1,14 @@
+"""
+[九层模型 - L6 上下文装配层 (Context Assembly Layer)]
+
+文件职责：
+- 充当技能上下文与人设缝合器（SkillContextService）。
+- 负责扫描内置 Skills，将可用技能的说明文字进行 Catalog 目录清单整合。
+- 根据用户会话请求，动态提取指定激活技能的内容并喂入 Prompt 合成链路。
+
+上游依赖：L6 上下文装配器 (assembler.py)。
+下游依赖：L4 技能载入层 (loader.py)、L2 提示词层 (builder.py)。
+"""
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -44,9 +55,10 @@ class SkillContextService:
         self,
         definition: AgentDefinition,
         agent_input: AgentInput,
-        session_type:str="coding",
-        workspace_path:Optional[str]=None,
-
+        session_type: str = "coding",
+        local_rules_text: Optional[str] = None,
+        agent_soul_text: Optional[str] = None,
+        user_profile_text: Optional[str] = None,
     ) -> AgentDefinition:
         """将选定的技能目录及内容组合进 Agent 的系统提示词中，返回更新后的定义实体"""
         skills = loader_list_skills()
@@ -62,10 +74,11 @@ class SkillContextService:
             skill_catalog_prompt,
             selected_skill_content,
             session_type=session_type,
-            workspace_path=workspace_path,
+            local_rules_text=local_rules_text,
+            agent_soul_text=agent_soul_text,
+            user_profile_text=user_profile_text,
         )
 
         return definition.model_copy(
             update={"system_prompt": runtime_system_prompt}
         )
-

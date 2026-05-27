@@ -1,3 +1,14 @@
+"""
+[九层模型 - L2 提示词层 (Prompt Layer)]
+
+文件职责：
+- 专注于内存中的、纯粹无状态的提示词模板拼接与字符串合成。
+- 拒绝任何物理磁盘 I/O 操作及网络请求，确保 100% 函数级幂等性。
+- 实现双轨制人设切换、技能目录清单构建及 XML 标签包裹拼接。
+
+上游依赖：L6 上下文装配层。
+下游依赖：无，纯无状态计算函数。
+"""
 import os
 from pathlib import Path
 from typing import Optional
@@ -14,7 +25,7 @@ def build_skill_catalog_prompt(skills: list[SkillSummary]) -> str:  # 把 skill 
 
     for skill in enabled_skills:  # 逐个把启用中的 skill 摘要加到目录里
         description = skill.description or "No description"  # description 为空时给一个兜底文案
-        lines.append(f"- {skill.name}: {description}")  # 每行只放名字和摘要，不放完整 instructions
+        lines.append(f"- {skill.name}: {description}")  # 每行只放名字 and 摘要，不放完整 instructions
 
     return "\n".join(lines)  # 用换行把多行目录拼成最终 prompt 文本
 
@@ -23,16 +34,20 @@ def build_runtime_system_prompt(
     skill_catalog_prompt: str,
     selected_skill_content: Optional[str] = None,
     session_type: str = "coding",
-    workspace_path: Optional[str] = None,
+    local_rules_text: Optional[str] = None,
+    agent_soul_text: Optional[str] = None,
+    user_profile_text: Optional[str] = None,
 ) -> str:
-    """双轨制 System Prompt 拼接拼装核心逻辑。
-    
+    """双轨制 System Prompt 拼接拼装核心逻辑 (纯内存无状态函数)。
+        
     输入：
     - base_system_prompt: 基础定义人设提示词
     - skill_catalog_prompt: 已加载 skill 目录文本
     - selected_skill_content: 选定的具体激活 skill 提示词
     - session_type: 会话类型 ("coding" | "assistant")
-    - workspace_path: 绑定的工作区物理路径
+    - local_rules_text: 外部读取的本地规约文本 (如原 AGENTS.md 内容)
+    - agent_soul_text: 外部读取的助理灵魂文件 (如原 SOUL.md 内容)
+    - user_profile_text: 外部读取的用户偏好文件 (如原 USER.md 内容)
     
     输出：
     - 组合拼接后的最终系统运行提示词
@@ -53,43 +68,22 @@ def build_runtime_system_prompt(
     if selected_skill_content:
         sections.append(f"Selected skill instructions:\n{selected_skill_content}")
     # ── 3. 工作区本地心智规约与 AGENTS.md 规则注入 (Rulebook & Mental Files Injection) ──
-    if workspace_path and os.path.exists(workspace_path):
-        root = Path(workspace_path).resolve()
-        # A. 加载 AGENTS.md（在两种会话类型中都必须作为最高规约注入）
-        agents_path = root / "AGENTS.md"
-        if agents_path.exists():
-            try:
-                content = agents_path.read_text(encoding="utf-8").strip()
-                if content:
-                    # 使用极其瞩目的特定 XML 标记包裹，确保 LLM 深刻识别它的最高优先级
-                    sections.append(
-                        f"<WORKSPACE_RULES>\n"
-                        f"You MUST strictly adhere to the following local rules and architecture standards found in the workspace's AGENTS.md:\n\n"
-                        f"{content}\n"
-                        f"These local rules take absolute precedence over any default behaviors or coding patterns.\n"
-                        f"</WORKSPACE_RULES>"
-                    )
-            except Exception as e:
-                # 容错：防止因文件编码或占用导致执行崩溃
-                pass
-        # B. 助理会话特有：加载 SOUL.md 人设文件 与 USER.md 用户偏好
-        if session_type == "assistant":
-            # 灵魂人设注入
-            soul_path = root / "SOUL.md"
-            if soul_path.exists():
-                try:
-                    content = soul_path.read_text(encoding="utf-8").strip()
-                    if content:
-                        sections.append(f"<AGENT_SOUL>\n{content}\n</AGENT_SOUL>")
-                except Exception:
-                    pass
-            # 用户画像/偏好注入
-            user_path = root / "USER.md"
-            if user_path.exists():
-                try:
-                    content = user_path.read_text(encoding="utf-8").strip()
-                    if content:
-                        sections.append(f"<USER_PROFILE>\n{content}\n</USER_PROFILE>")
-                except Exception:
-                    pass
+    if local_rules_text:
+        # 使用极其瞩目的特定 XML 标记包裹，确保 LLM 深刻识别它的最高优先级
+        sections.append(
+            f"<WORKSPACE_RULES>\n"
+            f"You MUST strictly adhere to the following local rules and architecture standards found in the workspace's AGENTS.md:\n\n"
+            f"{local_rules_text}\n"
+            f"These local rules take absolute precedence over any default behaviors or coding patterns.\n"
+            f"</WORKSPACE_RULES>"
+        )
+    # B. 助理会话特有：加载 SOUL.md 人设文件 与 USER.md 用户偏好
+    if session_type == "assistant":
+        # 灵魂人设注入
+        if agent_soul_text:
+            sections.append(f"<AGENT_SOUL>\n{agent_soul_text}\n</AGENT_SOUL>")
+        # 用户画像/偏好注入
+        if user_profile_text:
+            sections.append(f"<USER_PROFILE>\n{user_profile_text}\n</USER_PROFILE>")
+            
     return "\n\n".join(sections)

@@ -1,3 +1,13 @@
+"""
+[九层模型 - L4 技能层 (Skill Loader Layer)]
+
+文件职责：
+- 负责系统技能（Skills）的物理文件扫描、Frontmatter 解析（_parse_frontmatter）和技能状态（使能/禁止）控制。
+- 封装带 30s TTL 缓存策略的 `list_skills()` 接口与 `load_skill_content()` 接口。
+
+上游依赖：L6 技能上下文服务 (skill_context.py)、L10 API 接口层。
+下游依赖：L4 技能配置层 (config.py)。
+"""
 from pathlib import Path
 from typing import Optional
 import time as _time

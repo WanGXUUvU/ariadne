@@ -1,4 +1,7 @@
-"""核心模型协议类型定义。
+"""
+[九层模型 - L1 领域类型层 (Model Domain Layer)]
+
+核心模型协议类型定义。
 
 本模块是 model 层的类型基础，仅包含 LLM 协议原语：
 - 工具调用原语（ToolCall / ToolResult / ToolError）

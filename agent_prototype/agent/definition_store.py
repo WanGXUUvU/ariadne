@@ -1,3 +1,13 @@
+"""
+[九层模型 - 智能体持久化层 (Agent Persistence Layer)]
+
+文件职责：
+- 充当自定义智能体定义记录在 SQLite 数据库中的物理读写仓储（SqliteAgentDefinitionStore）。
+- 封装 Pydantic 的 `AgentDefinition` 域模型与底层 ORM JSON 字符串（AgentDefinitionRecord）之间的序列化与反序列化转换。
+
+上游依赖：L10 助理服务层 (AgentDefinitionService)。
+下游依赖：L0 基础设施 (db / orm_models)。
+"""
 import json
 from typing import Optional
 from sqlalchemy.orm import Session

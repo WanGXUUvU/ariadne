@@ -1,3 +1,19 @@
+"""基础设施层 (Infrastructure Layer) - 文件系统物理写入工具
+
+职责：
+1. 实现具体的本地磁盘物理文件系统写入操作。
+2. 保证文件写入操作的物理事务完整。
+
+不负责：
+1. 任何安全越界过滤（安全越界检测必须由 SandboxPathInterceptor 拦截器在上层进行）。
+
+数据流向：
+- 输入：物理目标绝对路径、待写入的文本内容。
+- 输出：物理写入结果状态。
+- 上游来源：经安全中间件校验后的 Tool 调用。
+- 下游流向：物理操作系统磁盘存储。
+"""
+
 from pathlib import Path  # 处理文件路径
 
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel  # 导入工具定义

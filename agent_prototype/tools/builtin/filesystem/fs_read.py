@@ -1,3 +1,18 @@
+"""基础设施层 (Infrastructure Layer) - 文件系统物理读取工具
+
+职责：
+1. 执行具体的本地磁盘文件读取操作，获取全部文本内容。
+
+不负责：
+1. 路径的安全性验证及物理隔离。
+
+数据流向：
+- 输入：绝对文件路径。
+- 输出：文件完整文本内容。
+- 上游来源：经安全中间件校验后的 Tool 调用。
+- 下游流向：操作系统物理磁盘。
+"""
+
 from pathlib import Path  # 方便处理文件路径
 
 from agent_prototype.tools.protocol import ToolDefinition,RiskLevel  # 导入工具定义

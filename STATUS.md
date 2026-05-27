@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: execution
-- Task: specs/TASK-075-double-track-product-base-upgrade.md (双轨产品共享底座：AGENTS.md规则引擎与动态多中间件机制)
+- Phase: complete
+- Task: specs/TASK-078-architecture-decoupling-and-cleanup.md (整体架构深度解耦与九层模型边界彻底清洗)
 - Gate: Verify / Review
-- Allowed Now: start-implementation
+- Allowed Now: review / coach
 - Lane: Fast
 - Blocked: None
-- Next action: Created TASK-076 task card (并发工具执行与长耗时渐进进度流) to define pragmatic concurrency and streaming updates. Created TASK-077 task card (智能体认知与安全深度演进) to roadmap Google Agentic Design Patterns alignment. Waiting for next implementation plan approval or review.
+- Next action: TASK-078 architectural refactoring has been 100% completed. All 96 unit/integration tests are completely green. Waiting for the next task or code review.
 
 
 ## 读取规则
@@ -23,6 +23,7 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
+| 2026-05-27 | 整体架构极致重构解耦与九层模型边界清洗完成 | Verify / Review | 成功实现 L1-L8 层全解耦。L2 彻底无状态化，L3 桥接工具完全闭包回调化，L5-L8 循环依赖完全剥离，落地 L6 统一装配器 ContextAssembler，96 项单测全部绿灯通过。 |
 | 2026-05-23 | 编写通用中间件地基与工具中间件包并验证 | Verify / Review | 跳过切片5，直接完成切片6。成功实现完全通用的 BaseMiddleware、MiddlewarePipeline 地基，并派生出首个工具特定的 SandboxMiddleware、ApprovalMiddleware 与 4 个单元测试，单测完美通过（81/83 Passed）。 |
 | 2026-05-22 | 已完成任务卡归档 | — | 将 TASK-030/035/036/037/038/038-1/038-2/040/040b/041/071/072a/072b 移入 `specs/done/`；SUPP-03/04 未完成保留原位。 |
 | 2026-05-22 | 极精细镂空 SVG 图标与高内聚工具卡片重构 | Verify / Review | 成功手绘 9 个 1.5px 圆角镂空 SVG 图标，实现事件流按 `tool_call_id` 高度聚拢为单卡片，支持手风琴展开查看参数、耗时及响应，完美通过严格打包。 |

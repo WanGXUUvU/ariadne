@@ -1,3 +1,20 @@
+"""应用服务层 (Application Layer) - 会话管理服务
+
+职责：
+1. 编排会话（Session）与轨迹（Trace）的完整生命周期业务用例。
+2. 处理会话创建、会话重命名、物理删除、以及历史消息回放和轨迹查询。
+
+不负责：
+1. 物理磁盘文件的直接存取。
+2. 底层数据库 SQL 的拼接。
+
+数据流向：
+- 输入：会话 ID、新名称等业务入参。
+- 输出：组装好的会话数据、消息历史或 Trace 记录。
+- 上游来源：agent_prototype/api/routes/session_routes.py。
+- 下游流向：协调调用 agent_prototype/memory/session/store.py。
+"""
+
 # ── 标准库 ────────────────────────────────────────────────────────────────────
 import uuid
 from typing import Optional
