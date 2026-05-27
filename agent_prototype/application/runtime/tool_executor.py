@@ -121,6 +121,7 @@ async def async_handle_tool_calls(
     approval_policy: ApprovalPolicy = ApprovalPolicy.NEVER,
     on_approval_required=None,
     saved_messages: Optional[list[ChatMessage]] = None,
+    session_type:str="coding",
 ) -> AsyncIterator[Union[AgentEvent, ToolTurnResult]]:
     """异步处理一轮 tool calls，支持审批中断。
 
@@ -128,13 +129,15 @@ async def async_handle_tool_calls(
     """
     tool_messages: list[ChatMessage] = []
     current_index = event_index
-    
+    if session_type=="coding":
     #初始化洋葱中间件管道
-    pipeline = MiddlewarePipeline([
-        SandboxMiddleware(),
-        ApprovalMiddleware(),
-    ])
-
+        pipeline = MiddlewarePipeline([
+            SandboxMiddleware(),
+            ApprovalMiddleware(),
+        ])
+    else:
+        pipeline=MiddlewarePipeline([ApprovalMiddleware])
+        
     for tool_call in tool_calls:
         yield AgentEvent(
             index=current_index,

@@ -153,6 +153,7 @@ class StreamRunSession:
             effective_agent_name=self.ctx.effective_agent_name,
             run_id=self.run_id,
             usage=self.agent.last_usage,
+            session_type=self.ctx.session_type,
         )
         return _sse_frame(StreamFrame(
             type="end",

@@ -138,6 +138,7 @@ class CreateSessionInput(BaseModel):
     session_name: Optional[str] = Field(default=None, min_length=1)
     workspace_path: Optional[str] = None # 绑定的工作区物理绝对路径
     workspace_name: Optional[str] = None # 绑定的工作区文件夹名称
+    session_type:Optional[str]=Field(default="coding")
 
 class RenameSessionInput(BaseModel):
     """session 重命名/更新请求体。"""
@@ -171,6 +172,7 @@ class SessionSummary(BaseModel):
     context_tokens: Optional[int] = None
     workspace_path: Optional[str] = None
     workspace_name: Optional[str] = None
+    session_type:Optional[str]=Field(default="coding")
 
 class SessionDetail(SessionSummary):
     """session 详情，继承摘要信息并补上完整 state。"""

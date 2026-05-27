@@ -65,7 +65,8 @@ class SandboxMiddleware(BaseMiddleware):
                 # 路径解析：绝对路径直接 resolve，相对路径拼接工作区根再 resolve
                 p_path = Path(p_str)
                 if p_path.is_absolute():
-                    resolved_p = p_path.resolve()
+                    # ── 升级：虚拟化 chroot 风格，将以 / 开头的路径投影到工作区根目录下 ──
+                    resolved_p = (sandbox_root / p_str.lstrip("/")).resolve()
                 else:
                     # 相对路径 (例如 src/App.vue 或 ../etc/passwd)
                     resolved_p = (sandbox_root / p_str).resolve()

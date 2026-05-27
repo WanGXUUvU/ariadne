@@ -58,6 +58,7 @@ class SessionService:
                 last_reply_preview=None,
                 workspace_path=payload.workspace_path,
                 workspace_name=payload.workspace_name,
+                session_type=payload.session_type,
             )
             record.model_provider_id = default_provider_id
             record.model_id = default_model_id
@@ -79,6 +80,7 @@ class SessionService:
             permission_profile=record.permission_profile,
             workspace_path=record.workspace_path,
             workspace_name=record.workspace_name,
+            session_type=record.session_type,
         )
 
     def reset_session(self, payload: ResetInput) -> dict[str, bool]:

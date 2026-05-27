@@ -43,6 +43,7 @@ def list_sessions_api(db: Session = Depends(get_db)) -> list[SessionSummary]:
             context_tokens=record.context_tokens,
             workspace_path=record.workspace_path,
             workspace_name=record.workspace_name,
+            session_type=record.session_type,
         )
         for record in records
     ]
@@ -76,6 +77,7 @@ def read_session_api(session_id: str, db: Session = Depends(get_db)) -> SessionD
         thinking_effort=record.thinking_effort or "medium",
         workspace_path=record.workspace_path,
         workspace_name=record.workspace_name,
+        session_type=record.session_type,
     )  
 
 

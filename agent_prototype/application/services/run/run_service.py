@@ -77,6 +77,7 @@ class RunService:
             effective_agent_name=ctx.effective_agent_name,
             run_id=run_id,
             usage=output.usage,
+            session_type=ctx.session_type,
         )
 
     async def async_stream_agent(self, agent_input: AgentInput) -> AsyncIterator[str]:

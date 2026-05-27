@@ -67,17 +67,8 @@ need改的层：
     - `session_type == "assistant"`：仅装配 `[ApprovalMiddleware]`。
   - [ ] 运行单测验证不同会话类型下，工具执行经过的中间件链路完全符合预期。
 
-- [ ] **切片 3：工具敏感度分级与安全风控审批**
-  - [ ] 在工具注册表/定义中（如 `agent_prototype/core/tool_types.py`），为所有内置工具和自定义工具增加 `is_sensitive: bool` 属性。
-  - [ ] 将发信、修改系统配置、计划任务调度等工具标为 `is_sensitive = True`。
-  - [ ] 重构 `ApprovalMiddleware.call()`，针对 `is_sensitive == True` 的工具触发暂停审批，低危工具直接放行。
 
-- [ ] **切片 4：用户授权工具制安全校验**
-  - [ ] 校验 `AgentManager` 保存自定义智能体时，`tool_names` 列表是否正确入库。
-  - [ ] 在 `SandboxMiddleware` 第一步准入校验中，动态从运行时拿到当前智能体的 `allow_tool_names`。
-  - [ ] 比对 `context.tool_name` 是否在白名单中，若不在，拦截并返回 `TOOL_NOT_ALLOWED`。
-
-- [ ] **切片 5：双轨子产品前端整合验证**
+- [ ] **切片 3：双轨子产品前端整合验证**
   - [ ] 前端调用 `POST /sessions` 时根据当前模式（开发工作台 vs 个人助理）正确传参 `session_type`。
   - [ ] 在前端进行流式运行与敏感工具测试，验证双子星产品的体验完全对齐。
   - [ ] 保证全量打包 `npm run build` 100% 通过。

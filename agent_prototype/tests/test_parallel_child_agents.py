@@ -8,6 +8,7 @@
 """
 
 _MOCK_PATH = "agent_prototype.application.runtime.agent_runtime.AgentRunner"
+_BUILDER_MOCK_PATH = "agent_prototype.infrastructure.tools.builtin.spawn_child_agent.RunContextBuilder"
 
 import json
 import tempfile
@@ -46,8 +47,12 @@ class TestSpawnReturnsRunIdImmediately(unittest.TestCase):
     def setUp(self):
         self.executor = ThreadPoolExecutor(max_workers=2)
         self.futures = {}
+        self.builder_patcher = patch(_BUILDER_MOCK_PATH)
+        self.mock_builder = self.builder_patcher.start()
+        self.mock_builder.return_value.build_adapter.return_value = MagicMock()
 
     def tearDown(self):
+        self.builder_patcher.stop()
         self.executor.shutdown(wait=False)
 
     def test_spawn_returns_child_run_id(self):
@@ -73,8 +78,12 @@ class TestCheckChildStatus(unittest.TestCase):
     def setUp(self):
         self.executor = ThreadPoolExecutor(max_workers=2)
         self.futures = {}
+        self.builder_patcher = patch(_BUILDER_MOCK_PATH)
+        self.mock_builder = self.builder_patcher.start()
+        self.mock_builder.return_value.build_adapter.return_value = MagicMock()
 
     def tearDown(self):
+        self.builder_patcher.stop()
         self.executor.shutdown(wait=False)
 
     def test_status_done_after_completion(self):
@@ -122,8 +131,12 @@ class TestWaitChildAgent(unittest.TestCase):
     def setUp(self):
         self.executor = ThreadPoolExecutor(max_workers=2)
         self.futures = {}
+        self.builder_patcher = patch(_BUILDER_MOCK_PATH)
+        self.mock_builder = self.builder_patcher.start()
+        self.mock_builder.return_value.build_adapter.return_value = MagicMock()
 
     def tearDown(self):
+        self.builder_patcher.stop()
         self.executor.shutdown(wait=False)
 
     def test_wait_returns_reply(self):
@@ -167,8 +180,12 @@ class TestParallelSpawn(unittest.TestCase):
         self.engine, self.session_local = _make_db(self.temp.name)
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.futures = {}
+        self.builder_patcher = patch(_BUILDER_MOCK_PATH)
+        self.mock_builder = self.builder_patcher.start()
+        self.mock_builder.return_value.build_adapter.return_value = MagicMock()
 
     def tearDown(self):
+        self.builder_patcher.stop()
         self.executor.shutdown(wait=False)
         self.engine.dispose()
         self.temp.cleanup()

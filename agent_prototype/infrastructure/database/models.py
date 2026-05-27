@@ -38,6 +38,7 @@ class SessionRecord(Base):
     thinking_effort    = Column(String,   nullable=False, default="medium")
     workspace_path     = Column(String,   nullable=True)
     workspace_name     = Column(String,   nullable=True)
+    session_type       = Column(String,   nullable=False,default="coding",server_default="coding")
 
 
 

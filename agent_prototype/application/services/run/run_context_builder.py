@@ -33,6 +33,7 @@ class RunContext:
     approval_policy: ApprovalPolicy
     effective_agent_name: str
     workspace_path:str
+    session_type: str
 
 
 class RunContextBuilder:
@@ -71,7 +72,8 @@ class RunContextBuilder:
         )
         # 无模型设置时退化为 context_tokens（比值=1.0），确保有历史 token 的会话仍能触发压缩
         context_length = model_setting.context_length if model_setting and model_setting.context_length else context_tokens
-
+        session_type = record.session_type if record else "assistant"
+        workspace_path = record.workspace_path if record else None
         if state.messages:
             auto_compact_result = CompactService(self.db).auto_compact_in_memory(
                 state=state,
@@ -82,11 +84,16 @@ class RunContextBuilder:
             state = auto_compact_result.state
 
         # ── 加载 Agent 定义 + Skill ───────────────────────────────────────────
-        effective_agent_name = agent_input.agent_name or "default"
+        if session_type == "coding":
+            effective_agent_name = "software_engineer"
+        else:
+            effective_agent_name = agent_input.agent_name or "default"
         definition = AgentDefinitionService(self.db).load_definition(effective_agent_name)
         runtime_definition = SkillContextService(self.db).build_runtime_definition_with_skills(
             definition,
             agent_input,
+            session_type=session_type,
+            workspace_path=workspace_path,
         )
 
         # ── 读取审批策略 ──────────────────────────────────────────────────────
@@ -100,6 +107,7 @@ class RunContextBuilder:
             approval_policy=approval_policy,
             effective_agent_name=effective_agent_name,
             workspace_path=record.workspace_path if record else None,
+            session_type=session_type,
         )
 
     # ── 私有辅助 ──────────────────────────────────────────────────────────────

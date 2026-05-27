@@ -106,18 +106,26 @@ function clearSessionResetHistory(sessionId: string) {
 /** 从 trace run 的 events 列表重建前端 StreamingItem[] timeline。
  *  不依赖 localStorage，stop/刷新后均可从数据库恢复。
  */
-function reconstructTimelineFromEvents(events: AgentEvent[]): StreamingItem[] {
+function reconstructTimelineFromEvents(events: AgentEvent[], reply?: string | null): StreamingItem[] {
   // events 已按 event_index 从 DB 读出，顺序即为执行顺序（thinking 在对应工具调用之前）
   const timeline: StreamingItem[] = [];
+  let hasText = false;
   for (const e of events) {
     if (e.type === 'thinking') {
       // 后端合并保存的 thinking 全文
       if (e.content) timeline.push({ kind: 'thinking', content: e.content });
     } else if (e.type === 'final_answer') {
-      // final_answer 是文字回答的元数据，不进 timeline
+      if (e.content) {
+        timeline.push({ kind: 'text', content: e.content });
+        hasText = true;
+      }
     } else {
       timeline.push({ kind: 'event', event: e });
     }
+  }
+  // 兜底：如果 DB 中有最终回复但事件列表中没有 final_answer 事件，则将 reply 注入为文本段
+  if (!hasText && reply) {
+    timeline.push({ kind: 'text', content: reply });
   }
   return timeline;
 }
@@ -160,7 +168,7 @@ function reconstructUiMessages(
       content: run.reply,
       run_id: run.run_id,
       isActive: isActive,
-      timeline: reconstructTimelineFromEvents(run.events),
+      timeline: reconstructTimelineFromEvents(run.events, run.reply),
       summary_text: summaryText,
     } as AgentMessage);
   });
@@ -381,10 +389,10 @@ export function useWorkspace() {
     }
   };
 
-  const createNewSession = async (workspacePath?: string | null, workspaceName?: string | null, sessionName?: string) => {
+  const createNewSession = async (workspacePath?: string | null, workspaceName?: string | null, sessionName?: string, sessionType: string = 'coding') => {
     try {
       isChatLoading.value = true;
-      const newSession = await api.createSession(workspacePath, workspaceName, sessionName);
+      const newSession = await api.createSession(workspacePath, workspaceName, sessionName, sessionType);
       await loadSessions(newSession.session_id);
       historyMessages.value = [];
       currentMessages.value = [];

@@ -43,7 +43,7 @@ class SqliteSessionStore:
         context_tokens:Optional[int]=None,
         workspace_path=_UNSET,
         workspace_name =_UNSET,
-
+        session_type=_UNSET,
     ) -> SessionRecord:
         """输入：session 标识、状态快照和若干元数据。输出：插入或更新后的 SessionRecord。
 
@@ -77,10 +77,12 @@ class SqliteSessionStore:
                 record.workspace_name=workspace_name
             if workspace_path is not _UNSET:
                 record.workspace_path=workspace_path
+            if session_type is not _UNSET:
+                record.session_type = session_type
             record.context_tokens=context_tokens
         else:
             record = SessionRecord(
-                session_id=session_id,  # 新记录直接使用传入的 session_id
+                session_id=session_id,  # 新记录直接使用传入 the session_id
                 session_name=session_name or session_id,  # 新建时没有名字就回退到 session_id
                 state_json=state_json,  # 保存序列化后的 state
                 last_agent_name=None if last_agent_name is _UNSET else last_agent_name,  # 没传就存 None，传了就按传入值存
@@ -90,6 +92,7 @@ class SqliteSessionStore:
                 context_tokens=context_tokens,
                 workspace_path=None if workspace_path is _UNSET else workspace_path,
                 workspace_name=None if workspace_name is _UNSET else workspace_name,
+                session_type="coding" if session_type is _UNSET else session_type,
             )
 
             self.db.add(record)  # 把新建记录加入当前事务

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
+  mode?: "coding" | "assistant";
   activeView: string;
 }>();
 

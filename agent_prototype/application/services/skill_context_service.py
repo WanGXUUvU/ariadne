@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from agent_prototype.core.agent_definition import AgentDefinition
 from agent_prototype.interface.dto.schemas import AgentInput, SkillSummary
@@ -43,6 +44,9 @@ class SkillContextService:
         self,
         definition: AgentDefinition,
         agent_input: AgentInput,
+        session_type:str="coding",
+        workspace_path:Optional[str]=None,
+
     ) -> AgentDefinition:
         """将选定的技能目录及内容组合进 Agent 的系统提示词中，返回更新后的定义实体"""
         skills = loader_list_skills()
@@ -57,6 +61,8 @@ class SkillContextService:
             definition.system_prompt,
             skill_catalog_prompt,
             selected_skill_content,
+            session_type=session_type,
+            workspace_path=workspace_path,
         )
 
         return definition.model_copy(

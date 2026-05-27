@@ -31,6 +31,7 @@ class RunPersistenceService:
         effective_agent_name: str,
         run_id: str,
         usage: Optional[ModelUsage] = None,
+        session_type: str = "coding",
     ) -> AgentOutput:
         """正常完成时：存快照、存 trace、刷状态为 completed。"""
         metadata = RunMetadata(
@@ -48,6 +49,7 @@ class RunPersistenceService:
                 last_skill_name=agent_input.skill_name,
                 last_reply_preview=build_reply_preview(output.reply),
                 context_tokens=usage.input_tokens if usage else None,
+                session_type=session_type,
             )
             self.store.save_run_trace(
                 session_id=agent_input.session_id,

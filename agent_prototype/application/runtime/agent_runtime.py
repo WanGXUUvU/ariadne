@@ -36,6 +36,7 @@ class AgentRunner:
         allow_tool_names: Optional[list[str]] = None,
         model_adapter: Optional[ModelAdapter] = None,
         approval_policy: ApprovalPolicy = ApprovalPolicy.NEVER,
+        session_type:str="coding",
     ):
         self.state            = state or AgentState()
         self.definition       = definition or DEFAULT_AGENT_DEFINITION
@@ -47,6 +48,7 @@ class AgentRunner:
         self.model_adapter  = model_adapter
         self.approval_policy = approval_policy
         self.last_usage      = None
+        self.session_type    =session_type
 
     # ── 非流式（保留备用） ────────────────────────────────────────────────────
 
@@ -247,6 +249,7 @@ class AgentRunner:
                     saved_messages=list(self.state.messages),
                     run_id=run_id,
                     workspace_path=workspace_path,
+                    session_type=getattr(self, "session_type", "coding"),
                 ):
                     if isinstance(item, AgentEvent):
                         yield item
