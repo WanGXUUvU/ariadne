@@ -15,9 +15,7 @@ from agent_prototype.tools.protocol import ToolDefinition, RiskLevel
 from agent_prototype.model.types.domain import ToolResult, ToolError
 
 def build_wait_child_agent_tool(child_waiter: Callable[[str], str]) -> ToolDefinition:
-    """
-    大白话解释：
-    这是一个“等待子智能体工具的加工厂（构建函数）”。
+    """这是一个“等待子智能体工具的加工厂（构建函数）”。
     它接收一个用来阻塞等待的回调函数，然后将“等待子智能体小帮手并拿回结果”这个工具的定义（ToolDefinition）给加工并打包出来。
 
     需要拿到的东西：
@@ -28,9 +26,7 @@ def build_wait_child_agent_tool(child_waiter: Callable[[str], str]) -> ToolDefin
     """
     
     def wait_child_agent(child_run_id: str) -> ToolResult:
-        """
-        大白话解释：
-        这是真正的“等待子智能体小帮手完成工作”的工具执行函数。
+        """这是真正的“等待子智能体小帮手完成工作”的工具执行函数。
         当你通过 spawn 派出了小助手，但是又急需它的成果时，你可以调用这个函数。它会耐心在原地阻塞等待（最长等待 120 秒），一旦小帮手干完了，就立刻把它的最终回复文本拉回来给你。如果等了很久都超时了，或者根本找不到这个 ID，它会返回相应的报错信息。
 
         需要拿到的东西：

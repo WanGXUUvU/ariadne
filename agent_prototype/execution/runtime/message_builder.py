@@ -30,8 +30,7 @@ def build_model_request(
     allow_tool_names: Optional[list[str]] = None,
     session_id: str = "",
 ) -> ModelRequest:
-    """【大白话解释】
-    这是一个“大模型请求打包盒”。
+    """这是一个“大模型请求打包盒”。
     它的作用是把大模型需要知道的所有背景设定、历史聊天记录、以及大模型这会儿允许调用的所有工具清单（Schemas），
     全部整整齐齐地装进一个叫 `ModelRequest` 的规范盒子里，然后交给大模型适配器拿去发网络请求。
 

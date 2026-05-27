@@ -22,8 +22,7 @@ from agent_prototype.context.skill_context import SkillContextService
 
 @dataclass
 class AssembledContext:
-    """【大白话解释】
-    这是一个用来装“拼装好的上下文数据”的简单小篮子（数据载体）。
+    """这是一个用来装“拼装好的上下文数据”的简单小篮子（数据载体）。
     把拼好的系统提示词和工作区路径打包放在这里，方便后面其他人拿去用。
     """
     system_prompt: str
@@ -31,15 +30,13 @@ class AssembledContext:
 
 
 class ContextAssembler:
-    """【大白话解释】
-    这是一个“大掌柜”角色，专门负责把智能体运行需要的所有背景资料（也就是上下文）给拼装齐全。
+    """这是一个“大掌柜”角色，专门负责把智能体运行需要的所有背景资料（也就是上下文）给拼装齐全。
     它的主要工作是：去硬盘里读取一些写好的规则文件（比如 AGENTS.md, SOUL.md, USER.md），
     然后结合智能体本身的技能设定，把这些杂七杂八的信息揉成一段完整的系统提示词，装进一个小篮子里吐出来。
     """
 
     def __init__(self, db: Session):
-        """【大白话解释】
-        初始化这个大掌柜，给他指派好数据库连接，方便他去找技能数据。
+        """初始化这个大掌柜，给他指派好数据库连接，方便他去找技能数据。
 
         需要拿到的东西：
         - db: 数据库会话对象，用来连数据库查东西。
@@ -54,8 +51,7 @@ class ContextAssembler:
         workspace_path: Optional[str],
         definition: AgentDefinition,
     ) -> AssembledContext:
-        """【大白话解释】
-        开始热火朝天地拼装上下文！它会跑到工作区路径下去读那些本地规则文件，
+        """开始热火朝天地拼装上下文！它会跑到工作区路径下去读那些本地规则文件，
         如果是助理模式还会去读灵魂和用户信息，再配合上技能，打包弄出一个完美的系统提示词。
 
         需要拿到的东西：

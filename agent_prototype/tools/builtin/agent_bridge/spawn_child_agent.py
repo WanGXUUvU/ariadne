@@ -14,9 +14,7 @@ from agent_prototype.tools.protocol import ToolDefinition, RiskLevel
 from agent_prototype.model.types.domain import ToolResult
 
 def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) -> ToolDefinition:
-    """
-    大白话解释：
-    这是一个“派发（召唤）子智能体工具的加工厂（构建函数）”。
+    """这是一个“派发（召唤）子智能体工具的加工厂（构建函数）”。
     它接收一个用来真正分发任务的回调函数，然后将“召唤子智能体小帮手”这个工具的定义（ToolDefinition）给加工并打包出来。
 
     需要拿到的东西：
@@ -27,9 +25,7 @@ def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) ->
     """
 
     def spawn_child_agent(task: str, agent_name: str = "子Agent") -> ToolResult:
-        """
-        大白话解释：
-        这是真正的“召唤子智能体去干活”的工具执行函数。
+        """这是真正的“召唤子智能体去干活”的工具执行函数。
         它可以在后台叫出一个专属的“子 Agent 小帮手”，把任务分给它去异步执行。这个函数会非常爽快，叫完人、发完任务，立马塞给你一个唯一的任务凭证（child_run_id），根本不用等小帮手做完就结束了。
 
         需要拿到的东西：

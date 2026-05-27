@@ -23,14 +23,11 @@ _UNSET=object()
 class SqliteSessionStore:
     """围绕 session 相关数据的 SQLite store。
     
-    大白话解释：
     这个类是“会话数据仓库”。它就像是直接在数据库里干脏活累活的底层工人，专门负责具体的数据读取和写入。比如：往数据库存入聊天历史的快照、记录每一次运行轨迹、帮上层查询会话列表、记下工具（Tool）被调用的过程等。
     """
 
     def __init__(self, db: Session):
-        """
-        大白话解释：
-        数据仓库初始化，拿好操作数据库的“钥匙”。
+        """数据仓库初始化，拿好操作数据库的“钥匙”。
 
         需要拿到的东西：
         - db (Session): 数据库会话连接。
@@ -38,9 +35,7 @@ class SqliteSessionStore:
         self.db = db
 
     def get(self, session_id: str) -> Optional[AgentState]:
-        """
-        大白话解释：
-        获取一个会话当前的聊天状态。
+        """获取一个会话当前的聊天状态。
 
         需要拿到的东西：
         - session_id (str): 会话 ID。
@@ -64,9 +59,7 @@ class SqliteSessionStore:
         workspace_name =_UNSET,
         session_type=_UNSET,
     ) -> SessionRecord:
-        """
-        大白话解释：
-        保存或更新会话的“快照”（也就是当前的聊天状态和相关信息）。
+        """保存或更新会话的“快照”（也就是当前的聊天状态和相关信息）。
         "upsert" 的意思是：如果数据库里已经有这个会话，那就把最新的消息和参数更新进去；如果没有，那就创建一个新的会话记录存起来。
 
         需要拿到的东西：
@@ -144,9 +137,7 @@ class SqliteSessionStore:
         reply: str,
         events: list[AgentEvent],
     ) -> SessionRunRecord:
-        """
-        大白话解释：
-        保存一次完整的运行轨迹（Trace）。
+        """保存一次完整的运行轨迹（Trace）。
         把这次运行的基本信息（比如哪个 Agent 在干活、干了什么、用户的提问是什么、助手的最终回复是什么）存入主表，然后把运行中发生的所有“事件”（比如调用了什么工具、吐出了什么中间文本）按顺序存入事件子表中。
 
         需要拿到的东西：
@@ -207,9 +198,7 @@ class SqliteSessionStore:
             state:AgentState,
             events:list = [],
     )->SessionRunRecord:
-        """
-        大白话解释：
-        保存“部分/未完成”的运行记录（流式输出或者中间被掐断时的保存操作）。
+        """保存“部分/未完成”的运行记录（流式输出或者中间被掐断时的保存操作）。
         如果这次运行记录在数据库里已经存在了，就把新的事件补进去；如果还没有，就建一条新的。并且还会顺便把当前的中间聊天状态写进会话主表中。
 
         需要拿到的东西：
@@ -302,9 +291,7 @@ class SqliteSessionStore:
         return run_record
 
     def rename_session(self,session_id,new_name:str)->bool:
-        """
-        大白话解释：
-        在数据库里给指定会话改名。
+        """在数据库里给指定会话改名。
 
         需要拿到的东西：
         - session_id: 要改名的会话 ID。
@@ -320,9 +307,7 @@ class SqliteSessionStore:
         return True
 
     def delete_session(self, session_id: str) -> bool:
-        """
-        大白话解释：
-        在数据库里彻底把一个会话连根拔除。
+        """在数据库里彻底把一个会话连根拔除。
         除了删掉会话主记录，还会把该会话对应的所有运行历史记录、步骤事件、工具调用记录通通一并清空，绝不留任何无用数据。
 
         需要拿到的东西：
@@ -348,9 +333,7 @@ class SqliteSessionStore:
         return True
 
     def list_run_records(self, session_id: str, run_id: Optional[str] = None) -> list[SessionRunRecord]:
-        """
-        大白话解释：
-        列出某个会话的所有运行记录。可以用来还原聊天流逝的轨迹或者单独查某一轮运行。
+        """列出某个会话的所有运行记录。可以用来还原聊天流逝的轨迹或者单独查某一轮运行。
 
         需要拿到的东西：
         - session_id (str): 会话 ID。
@@ -366,9 +349,7 @@ class SqliteSessionStore:
         return query.order_by(SessionRunRecord.created_at.asc(), SessionRunRecord.id.asc()).all()
 
     def list_run_events(self, run_id: str) -> list[SessionRunEventRecord]:
-        """
-        大白话解释：
-        获取某一次运行中发生的全部步骤事件（比如先调用了文件读取工具，又进行了安全审查，最后吐出思考）。
+        """获取某一次运行中发生的全部步骤事件（比如先调用了文件读取工具，又进行了安全审查，最后吐出思考）。
 
         需要拿到的东西：
         - run_id (str): 运行 ID。
@@ -385,9 +366,7 @@ class SqliteSessionStore:
         )
 
     def append_run_events(self,*,run_id,new_events:list[AgentEvent],final_reply:str,)->None:
-        """
-        大白话解释：
-        给一次正在进行或已经告一段落的运行追加新的步骤事件，并更新它的最终答复。
+        """给一次正在进行或已经告一段落的运行追加新的步骤事件，并更新它的最终答复。
 
         需要拿到的东西：
         - run_id: 运行 ID。
@@ -426,9 +405,7 @@ class SqliteSessionStore:
 
 
     def list_sessions(self) -> list[SessionRecord]:
-        """
-        大白话解释:
-        获取数据库中所有的会话列表，用来在界面左侧侧边栏展示。
+        """获取数据库中所有的会话列表，用来在界面左侧侧边栏展示。
 
         会给出来的结果：
         - list[SessionRecord]: 会话记录列表，按照最近更新时间倒序排列（越新活跃的越排在前面）。
@@ -441,9 +418,7 @@ class SqliteSessionStore:
         )
 
     def read_session_record(self, session_id: str) -> Optional[SessionRecord]:
-        """
-        大白话解释：
-        根据会话 ID 查出它在数据库里的主记录对象。
+        """根据会话 ID 查出它在数据库里的主记录对象。
 
         需要拿到的东西：
         - session_id (str): 会话 ID。
@@ -459,9 +434,7 @@ class SqliteSessionStore:
         )
 
     def read_session_state(self, session_id: str) -> Optional[AgentState]:
-        """
-        大白话解释：
-        读取并反序列化一个会话的完整聊天状态（包含历史消息列表等）。因为数据库里存的是一串 JSON 文本，这里会把它转换回方便 Python 代码直接操作的 `AgentState` 对象。
+        """读取并反序列化一个会话的完整聊天状态（包含历史消息列表等）。因为数据库里存的是一串 JSON 文本，这里会把它转换回方便 Python 代码直接操作的 `AgentState` 对象。
 
         需要拿到的东西：
         - session_id (str): 会话 ID。
@@ -484,9 +457,7 @@ class SqliteSessionStore:
             tool_call_id:Optional[str],
             input_json: Optional[str],
     )->int:
-        """
-        大白话解释：
-        工具开始运行之前，在数据库中创建一条“工具调用记录”。用来记录哪个工具在什么时间开始跑、喂给它的输入参数是什么。
+        """工具开始运行之前，在数据库中创建一条“工具调用记录”。用来记录哪个工具在什么时间开始跑、喂给它的输入参数是什么。
 
         需要拿到的东西：
         - run_id (str): 属于哪次运行。
@@ -515,9 +486,7 @@ class SqliteSessionStore:
             status:str,
             result_json:Optional[str]
     )->None:
-        """
-        大白话解释：
-        当一个工具跑完了（无论成功还是失败），更新对应的工具调用记录。把状态改成“成功”或“失败”，并记下吐出来的结果和结束时间。
+        """当一个工具跑完了（无论成功还是失败），更新对应的工具调用记录。把状态改成“成功”或“失败”，并记下吐出来的结果和结束时间。
 
         需要拿到的东西：
         - record_id (int): 要更新的工具调用记录的 ID（就是 create_tool_call 返回的那个数字）。
@@ -531,9 +500,7 @@ class SqliteSessionStore:
             record.finished_at=func.now()
     
     def update_run_status(self, *, run_id: str, status: str) -> None:
-        """
-        大白话解释：
-        更新一次运行（Run）的当前状态。比如从“运行中”更新为“已完成”。
+        """更新一次运行（Run）的当前状态。比如从“运行中”更新为“已完成”。
 
         需要拿到的东西：
         - run_id (str): 运行 ID。
@@ -547,9 +514,7 @@ class SqliteSessionStore:
                 record.finished_at=func.now()
     
     def update_run_active(self, *, run_id: str, is_active: int) -> None:
-        """
-        大白话解释：
-        设置一次运行是否为活跃状态。
+        """设置一次运行是否为活跃状态。
 
         需要拿到的东西：
         - run_id (str): 运行 ID。
@@ -561,9 +526,7 @@ class SqliteSessionStore:
             record.is_active = str(is_active)
 
     def reset_session_runs(self, session_id: str) -> None:
-        """
-        大白话解释：
-        把某个会话下的所有核心运行记录全部标记为“非活跃”（即 `is_active = 0`），表示聊天被重置，这一批记录成为了历史轨迹。
+        """把某个会话下的所有核心运行记录全部标记为“非活跃”（即 `is_active = 0`），表示聊天被重置，这一批记录成为了历史轨迹。
 
         需要拿到的东西：
         - session_id (str): 会话 ID。
@@ -574,9 +537,7 @@ class SqliteSessionStore:
         ).update({"is_active": "0"}, synchronize_session=False)
 
     def get_run_detail(self, run_id: str):
-        """
-        大白话解释：
-        获取某一次运行的详细内容，包括这次运行的主记录，以及在这次运行里发生的所有工具调用记录。
+        """获取某一次运行的详细内容，包括这次运行的主记录，以及在这次运行里发生的所有工具调用记录。
 
         需要拿到的东西：
         - run_id (str): 运行 ID。
@@ -606,9 +567,7 @@ class SqliteSessionStore:
             reply:str,
             events:list[AgentEvent],
     )->SessionRunRecord:
-        """
-        大白话解释：
-        为“子 Agent”（就是大 Agent 派生出去干活的辅助小助手）创建一条关联的子运行记录，并把它跟父级运行 ID 绑定。同时把小助手执行时发生的所有事件按顺序写进事件子表中。
+        """为“子 Agent”（就是大 Agent 派生出去干活的辅助小助手）创建一条关联的子运行记录，并把它跟父级运行 ID 绑定。同时把小助手执行时发生的所有事件按顺序写进事件子表中。
 
         需要拿到的东西：
         - parent_run_id (str): 父级（大 Agent）的运行 ID。
@@ -654,9 +613,7 @@ class SqliteSessionStore:
         return run_record
     
     def get_children_runs(self, parent_run_id: str) -> list[SessionRunRecord]:
-        """
-        大白话解释：
-        获取某个父运行下面所有派生出的子 Agent 运行记录。
+        """获取某个父运行下面所有派生出的子 Agent 运行记录。
 
         需要拿到的东西：
         - parent_run_id (str): 父级运行 ID。

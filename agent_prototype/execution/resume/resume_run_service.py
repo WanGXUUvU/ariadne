@@ -34,16 +34,14 @@ from agent_prototype.execution.persistence.run_persistence import RunPersistence
 
 
 class ResumeRunService:
-    """【大白话解释】
-    这是一个“审批通过后的恢复运行指挥官”。
+    """这是一个“审批通过后的恢复运行指挥官”。
     它的核心职责是：当一个需要敏感权限的工具调用被人工审批（通过或拒绝）之后，
     重建这个智能体中断时的上下文环境（还原聊天历史、接通大模型适配器），
     把审批后的工具执行结果塞给智能体，然后拉起智能体继续顺着之前中断的地方流式往下运行，并将结果保存落库。
     """
 
     def __init__(self, db: Session):
-        """【大白话解释】
-        初始化恢复运行指挥官，给他分配数据库连接、审批仓库、落库助手和会话仓库。
+        """初始化恢复运行指挥官，给他分配数据库连接、审批仓库、落库助手和会话仓库。
 
         需要拿到的东西：
         - db: 数据库连接会话对象。
@@ -54,8 +52,7 @@ class ResumeRunService:
         self.session_store  = SqliteSessionStore(db)
 
     async def resume_run(self, approval_id: str, rejected: bool = False) -> AsyncIterator[str]:
-        """【大白话解释】
-        执行审批结果并拉起智能体继续运行！
+        """执行审批结果并拉起智能体继续运行！
         它会先去读审批记录，把之前的聊天历史原样倒回智能体内存，
         如果用户“同意”就真正去执行那个敏感工具，拿回工具执行结果；如果用户“拒绝”就构造一个被拒绝的失败结果。
         接着，它会把这个结果以 `tool_result` 事件吐给前端，并重新建立 AgentRunner，让智能体顺着这个结果继续流式推导、回答，

@@ -25,16 +25,14 @@ from agent_prototype.skills.loader import (
 
 
 class SkillContextService:
-    """【大白话解释】
-    这是一个“技能与人设缝合器”服务。
+    """这是一个“技能与人设缝合器”服务。
     它的主要功能是帮我们管理和拼装各种“技能描述”与“性格人设（灵魂）”。
     它会去扫描系统自带了哪些技能，把这些技能做成一个“技能清单”，让大模型知道它都能干嘛。
     如果用户指定要用某个特定技能，它还会去把那个技能的具体操作指引内容读取出来，塞进大模型的系统提示词里。
     """
     
     def __init__(self, db: Session = None):
-        """【大白话解释】
-        初始化缝合器服务，指定数据库连接。
+        """初始化缝合器服务，指定数据库连接。
 
         需要拿到的东西：
         - db: 数据库连接会话对象（非必传，留着备用）。
@@ -42,8 +40,7 @@ class SkillContextService:
         self.db = db
 
     def _get_selected_skill_or_raise(self, skill_name: str, skills: list[SkillSummary]) -> SkillSummary:
-        """【大白话解释】
-        内部使用的一个“严格质检员”小帮手。
+        """内部使用的一个“严格质检员”小帮手。
         它用来检查用户想要的某个技能存不存在，并且看看这个技能是不是正开着（激活状态）。
         如果找不到或者没开，它就会生气地抛出异常（ValueError）不干了。
 
@@ -76,8 +73,7 @@ class SkillContextService:
         agent_soul_text: Optional[str] = None,
         user_profile_text: Optional[str] = None,
     ) -> AgentDefinition:
-        """【大白话解释】
-        这是缝合器的核心大招！它把智能体原有的基本设定、当前能用的所有技能清单、
+        """这是缝合器的核心大招！它把智能体原有的基本设定、当前能用的所有技能清单、
         用户这次点名要用的特定技能指引、还有从硬盘里读出来的本地规则/灵魂/用户信息，
         全部完美缝合在一起，生成一段超级无敌详细的、给大模型看的系统提示词，
         最后返回一个换上了这套新系统提示词的智能体新定义实体。

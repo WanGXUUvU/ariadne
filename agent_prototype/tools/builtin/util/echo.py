@@ -19,9 +19,7 @@ from agent_prototype.model.types.domain import ToolResult
 from agent_prototype.tools.protocol import RiskLevel
 
 def echo_tool(text: str) -> ToolResult:
-    """
-    大白话解释：
-    这是“回声（Echo）工具”的具体执行函数。
+    """这是“回声（Echo）工具”的具体执行函数。
     它其实就像是一个传声筒或者山谷里的回音，你喂给它一段文字，它就会原封不动地在前头加个“我收到啦：”的标识，然后把这段话回传给你。这主要是用来测试系统是不是跑通了、工具调用的链路是不是正常的。
 
     需要拿到的东西：
@@ -58,9 +56,7 @@ ECHO_TOOL_SCHEMA = {  # 给模型看的工具说明
 }
 
 def build_echo_tool_definition() -> ToolDefinition:  # 构造注册对象
-    """
-    大白话解释：
-    把上面的“回声（Echo）工具”打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+    """把上面的“回声（Echo）工具”打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
 
     会给出来的结果：
     - ToolDefinition: 打包好、带安全等级的工具定义对象。

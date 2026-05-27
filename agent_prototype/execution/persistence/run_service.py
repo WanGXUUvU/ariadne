@@ -35,15 +35,13 @@ from agent_prototype.execution.streaming.stream_run_session import StreamRunSess
 
 
 class RunService:
-    """【大白话解释】
-    这是整个智能体系统的“运行时总指挥官”。
+    """这是整个智能体系统的“运行时总指挥官”。
     它主要负责协调和调度智能体的实际运行。比如：准备物料（RunContextBuilder）、启动智能体（AgentRunner）、
     管理子智能体的并发调用（多线程派发、状态查询、阻塞等待）、并且在完事之后指挥落库小助手（RunPersistenceService）把数据保存下来。
     """
 
     def __init__(self, db: Session):
-        """【大白话解释】
-        初始化总指挥官，给他分配好数据库连接、会话存储、审批记录存储和落库小助手。
+        """初始化总指挥官，给他分配好数据库连接、会话存储、审批记录存储和落库小助手。
 
         需要拿到的东西：
         - db: 数据库连接会话对象。
@@ -56,8 +54,7 @@ class RunService:
     # ── 私有辅助 ──────────────────────────────────────────────────────────────
 
     def _make_child_dispatcher(self, parent_run_id: str, session_id: str) -> Callable[[str, str], str]:
-        """【大白话解释】
-        内部方法：生产一个“子智能体派发器”。
+        """内部方法：生产一个“子智能体派发器”。
         当大模型觉得任务太复杂，需要雇佣一个“子智能体（小弟）”去独立干活时，这个派发器就会在后台默默启动一个新线程来跑小弟的任务。
 
         需要拿到的东西：
@@ -84,8 +81,7 @@ class RunService:
         return child_dispatcher
 
     def _make_status_checker(self) -> Callable[[list[str]], dict]:
-        """【大白话解释】
-        内部方法：生产一个“小弟工作进度查询器”。
+        """内部方法：生产一个“小弟工作进度查询器”。
         老大派发了小弟干活之后，可以通过这个查询器，随时去看看这批小弟到底是干完了、还在跑、还是出错了。
 
         会给出来的结果：
@@ -110,8 +106,7 @@ class RunService:
         return status_checker
 
     def _make_child_waiter(self) -> Callable[[str], str]:
-        """【大白话解释】
-        内部方法：生产一个“催活专员”。
+        """内部方法：生产一个“催活专员”。
         当老大必须拿到某个小弟的工作结果才能继续往下走时，这个专员就会死等（阻塞等待最多 120 秒），直到小弟干完并把结果交出来。
 
         会给出来的结果：
@@ -135,8 +130,7 @@ class RunService:
         session_id: str,
         agent_name: str = "子Agent"
     ):
-        """【大白话解释】
-        这才是子智能体（小弟）在后台默默流汗干活的“实际车间方法”！
+        """这才是子智能体（小弟）在后台默默流汗干活的“实际车间方法”！
         因为是在单独的后台线程里跑，所以它会自己开一个干净的数据库连接，启动一个全新的 AgentRunner，
         跑完之后还会把小弟的运行痕痕迹和产生的所有事件老老实实写进数据库，最后自动把数据库连接关掉。
 
@@ -197,8 +191,7 @@ class RunService:
             db.close()
 
     def _build_agent_runner(self, ctx, run_id: str, agent_input: AgentInput) -> AgentRunner:
-        """【大白话解释】
-        内部组装方法：把智能体底座（AgentRunner）给捏出来。
+        """内部组装方法：把智能体底座（AgentRunner）给捏出来。
         它会把大模型的适配器、人设定义、审批规则全给它，最重要的是会把“派发小弟、查询进度、催活”这三个闭包锦囊妙计塞给它，实现解耦。
 
         需要拿到的东西：
@@ -226,8 +219,7 @@ class RunService:
     # ── 公开方法 ──────────────────────────────────────────────────────────────
 
     def run_agent(self, agent_input: AgentInput) -> AgentOutput:
-        """【大白话解释】
-        同步普通运行主入口：一口气让智能体从头跑到尾！
+        """同步普通运行主入口：一口气让智能体从头跑到尾！
         会先打包好运行时物料，组装出智能体底座，让它一口气跑完，最后再把所有的聊天数据和 Token 消耗都写进数据库，返回最终结果。
 
         需要拿到的东西：
@@ -252,8 +244,7 @@ class RunService:
         )
 
     async def async_stream_agent(self, agent_input: AgentInput) -> AsyncIterator[str]:
-        """【大白话解释】
-        异步流式运行主入口：像挤牙膏一样，把智能体的思考过程和回答实时吐给前端（SSE 格式）！
+        """异步流式运行主入口：像挤牙膏一样，把智能体的思考过程和回答实时吐给前端（SSE 格式）！
         支持高并发、中间需要审批时会中断等待、并且能在调工具的中间状态也进行数据落库。
 
         需要拿到的东西：
@@ -279,8 +270,7 @@ class RunService:
         agent_name: Optional[str],
         skill_name: Optional[str],
     ) -> dict:
-        """【大白话解释】
-        当运行被突然中止时，紧急调用落库小助手的 save_cancelled 来善后，保存残缺的半成品数据并把状态更新为取消。
+        """当运行被突然中止时，紧急调用落库小助手的 save_cancelled 来善后，保存残缺的半成品数据并把状态更新为取消。
 
         需要拿到的东西：
         - session_id: 会话 ID。
@@ -298,8 +288,7 @@ class RunService:
         )
 
     def get_run_detail(self, session_id: str, run_id: str):
-        """【大白话解释】
-        查账！去数据库查某次具体运行的详情（如智能体的回答和调用过的工具）。
+        """查账！去数据库查某次具体运行的详情（如智能体的回答和调用过的工具）。
 
         需要拿到的东西：
         - session_id: 会话 ID。

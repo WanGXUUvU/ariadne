@@ -29,8 +29,7 @@ def split_messages_for_compaction(
         messages:list[ChatMessage], #输入完整历史消息列表
         keep_recent_count:int=DEFAULT_KEEP_RECENT_COUNT, #输入要保留的最近原始消息数量
 )->tuple[list[ChatMessage],list[ChatMessage],list[ChatMessage]]:
-    """【大白话解释】
-    把一长串的历史聊天记录切成三段：开头（前锚点）、中间（准备被压扁压缩的一段）和结尾（最近发生的、原样保留的几条）。
+    """把一长串的历史聊天记录切成三段：开头（前锚点）、中间（准备被压扁压缩的一段）和结尾（最近发生的、原样保留的几条）。
     这样我们就知道要把哪部分送去让大模型压缩了。
 
     需要拿到的东西：
@@ -56,8 +55,7 @@ def split_messages_for_compaction(
     return anchor_messages,middle_messages,recent_messages
 
 def build_compact_prompt(middle_messages:list[ChatMessage])->str:
-    """【大白话解释】
-    专门为大模型准备一个“压缩指令”！把中间那段长长的聊天记录整理一下，
+    """专门为大模型准备一个“压缩指令”！把中间那段长长的聊天记录整理一下，
     加上提示词，做成一个任务书，拜托大模型帮我们把这段内容归纳总结一下。
 
     需要拿到的东西：
@@ -92,8 +90,7 @@ def build_compact_prompt(middle_messages:list[ChatMessage])->str:
     return "\n".join(lines)
 
 def build_compact_summary_message(summary_text: str) -> ChatMessage:
-    """【大白话解释】
-    大模型写好摘要文本后，这个函数会把文本包装成一条系统（system）消息，
+    """大模型写好摘要文本后，这个函数会把文本包装成一条系统（system）消息，
     并在开头贴上一个标签，告诉大家：“注意啦，下面是之前聊天中段的压缩版摘要！”
 
     需要拿到的东西：
@@ -113,8 +110,7 @@ def compact_state_with_summary(
         summary_text:str, #输入模型已经完整好的 compact 摘要文本
         keep_recent_count:int=DEFAULT_KEEP_RECENT_COUNT,
 )->CompactOutput:
-    """【大白话解释】
-    真正动手把历史聊天状态里的“中段”替换成大模型写好的“压缩摘要”！
+    """真正动手把历史聊天状态里的“中段”替换成大模型写好的“压缩摘要”！
     它会检查如果中段消息其实很少就懒得压缩了；如果确实压缩了，就组装出一个全新的状态，并数数这次帮用户省下了多少条消息。
 
     需要拿到的东西：
@@ -146,15 +142,13 @@ def compact_state_with_summary(
 
 
 class HistoryCompactor:
-    """【大白话解释】
-    这是一个“历史记录压缩调度员”。
+    """这是一个“历史记录压缩调度员”。
     它的工作是协调大模型适配器（ModelAdapter），把对话历史中太长太旧的中间部分，
     让大模型给精简压缩成一句话摘要，以便腾出更多上下文空间，不让大模型“忘事”或者超出字数限制。
     """
 
     def __init__(self, adapter: ModelAdapter):
-        """【大白话解释】
-        初始化压缩调度员，给他配备一个跟大模型沟通的“传声筒”（ModelAdapter）。
+        """初始化压缩调度员，给他配备一个跟大模型沟通的“传声筒”（ModelAdapter）。
 
         需要拿到的东西：
         - adapter: 模型适配器，用来向大模型发请求。
@@ -163,8 +157,7 @@ class HistoryCompactor:
         self.last_compact_tokens: Optional[int] = None
 
     def compact(self, messages: list[ChatMessage], keep_recent: int) -> str:
-        """【大白话解释】
-        调度员的核心工作：挑出消息里能压缩的中间部分，拼好任务提示词发送给大模型，拿到大模型回复的摘要并返回。
+        """调度员的核心工作：挑出消息里能压缩的中间部分，拼好任务提示词发送给大模型，拿到大模型回复的摘要并返回。
 
         需要拿到的东西：
         - messages: 原始的所有消息列表。

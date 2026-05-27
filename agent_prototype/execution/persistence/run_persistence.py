@@ -18,15 +18,13 @@ from agent_prototype.execution.streaming.sse import build_reply_preview
 
 
 class RunPersistenceService:
-    """【大白话解释】
-    这是一个“数据落库小助手（持久化服务）”。
+    """这是一个“数据落库小助手（持久化服务）”。
     它的工作非常单纯，就是负责把智能体运行的最终结果（无论是顺利跑完、中途取消、还是审批通过后恢复运行）给老老实实地保存到数据库里，
     同时在需要的时候，能帮我们从数据库里把运行的详情信息给查出来。
     """
 
     def __init__(self, db: Session):
-        """【大白话解释】
-        初始化落库小助手，给他分配数据库连接和 SQLite 存储仓库。
+        """初始化落库小助手，给他分配数据库连接和 SQLite 存储仓库。
 
         需要拿到的东西：
         - db: 数据库连接会话对象。
@@ -43,8 +41,7 @@ class RunPersistenceService:
         usage: Optional[ModelUsage] = None,
         session_type: str = "coding",
     ) -> AgentOutput:
-        """【大白话解释】
-        当智能体顺利完成工作时调用！把这次对话的快照、详细执行轨迹（Trace）全部保存，
+        """当智能体顺利完成工作时调用！把这次对话的快照、详细执行轨迹（Trace）全部保存，
         并且把这次运行的状态更新为“已完成（completed）”。
 
         需要拿到的东西：
@@ -102,8 +99,7 @@ class RunPersistenceService:
         skill_name: Optional[str],
         events: Optional[list] = None,
     ) -> dict:
-        """【大白话解释】
-        当智能体运行被打断或取消时调用！作为一个兜底保护，它要把目前已经产生的半成品回复、
+        """当智能体运行被打断或取消时调用！作为一个兜底保护，它要把目前已经产生的半成品回复、
         当前最新的聊天状态和事件都给存下来，不让用户的聊天记录丢失，并且把这次运行的状态标记为“已取消（cancelled）”。
 
         需要拿到的东西：
@@ -149,8 +145,7 @@ class RunPersistenceService:
         partial_reply: str,
         agent_state,
     ) -> None:
-        """【大白话解释】
-        当人工审批通过，智能体恢复运行并且彻底把后面的工作做完时调用！
+        """当人工审批通过，智能体恢复运行并且彻底把后面的工作做完时调用！
         它会把新产生的事件追加到记录里，同步保存最新的会话状态快照，最后把状态改成“已完成（completed）”。
 
         需要拿到的东西：
@@ -177,8 +172,7 @@ class RunPersistenceService:
             raise
 
     def get_run_detail(self, session_id: str, run_id: str):
-        """【大白话解释】
-        查账！去数据库里查询某一次具体运行的详情（比如智能体的回答和调用过的工具），
+        """查账！去数据库里查询某一次具体运行的详情（比如智能体的回答和调用过的工具），
         并且会仔细核对这个运行是不是真的属于当前这个会话，防止查错。
 
         需要拿到的东西：

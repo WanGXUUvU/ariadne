@@ -27,21 +27,16 @@ from .builtin.agent_bridge.wait_child_agent import build_wait_child_agent_tool
 class ToolRegistry:  # 工具注册中心
     """工具注册管理中心类 (OOP)
     
-    大白话解释：
     这个类是一个“工具百宝箱/工具柜”。
     用来统一保管系统里所有大大小小的工具（比如读文件、写文件、网络搜索、召唤子智能体等）。它不仅负责把新工具贴好标签收纳起来（register），还能把工具的说明书拿给 AI 看（get_tool_schemas），以及当 AI 决定调用某个工具时，负责把参数解析好，启动真正的工具代码并安全地把执行结果拿回来（execute_tool_call）。
     """
     def __init__(self) -> None:
-        """
-        大白话解释：
-        工具百宝箱初始化，准备好一个空的收纳架。
+        """工具百宝箱初始化，准备好一个空的收纳架。
         """
         self._tools: dict[str, ToolDefinition] = {}  # 用名字保存所有工具
 
     def clone(self) -> "ToolRegistry":
-        """
-        大白话解释：
-        把当前的百宝箱完整复制一份新的（深拷贝收纳架上的工具索引），以防在不同的会话或运行轨迹里互相干扰。
+        """把当前的百宝箱完整复制一份新的（深拷贝收纳架上的工具索引），以防在不同的会话或运行轨迹里互相干扰。
 
         会给出来的结果：
         - ToolRegistry: 一个跟当前一模一样但互相独立的新百宝箱实例。
@@ -52,9 +47,7 @@ class ToolRegistry:  # 工具注册中心
     
     # 注册时会把完整的 ToolDefinition 注册进去
     def register(self, tool: ToolDefinition) -> None:
-        """
-        大白话解释：
-        往百宝箱里登记并收纳一个新工具。
+        """往百宝箱里登记并收纳一个新工具。
 
         需要拿到的东西：
         - tool (ToolDefinition): 编写好并打包规范的工具定义对象。
@@ -63,9 +56,7 @@ class ToolRegistry:  # 工具注册中心
 
     # 把注册的 tool 的 schema 抽出来 组成一个列表
     def get_tool_schemas(self, tool_names: Optional[list[str]] = None) -> list[dict]:
-        """
-        大白话解释：
-        抽调出工具的“使用说明书”（JSON Schema 描述）汇集成一个列表，好打包塞给 AI，让 AI 知道有哪些工具可以点、每个工具该怎么喂参数。
+        """抽调出工具的“使用说明书”（JSON Schema 描述）汇集成一个列表，好打包塞给 AI，让 AI 知道有哪些工具可以点、每个工具该怎么喂参数。
 
         需要拿到的东西：
         - tool_names (list[str], 可选): 想要提取说明书的工具名称列表。如果不传，默认把百宝箱里全部工具的说明书都拿出来。
@@ -81,9 +72,7 @@ class ToolRegistry:  # 工具注册中心
         return [tool.schema for tool in tools]  # 只返回 schema 列表
 
     def get_risk_level(self, name: str) -> RiskLevel:
-        """
-        大白话解释：
-        查看某个工具的安全风险等级（是纯人畜无害的 SAFE，还是需要申请审批的写磁盘 WRITE/敏感操作等）。
+        """查看某个工具的安全风险等级（是纯人畜无害的 SAFE，还是需要申请审批的写磁盘 WRITE/敏感操作等）。
 
         需要拿到的东西：
         - name (str): 工具的名字。
@@ -97,9 +86,7 @@ class ToolRegistry:  # 工具注册中心
         return tool.risk_level
 
     def execute_tool_call(self, name: str, arguments: str) -> ToolResult:
-        """
-        大白话解释：
-        当 AI 决定要用某个工具时，由这个函数来“拉开架势，安全执行”。
+        """当 AI 决定要用某个工具时，由这个函数来“拉开架势，安全执行”。
         它会先从百宝箱里找到这个工具，然后把 AI 吐出来的一大串 JSON 参数字符串解析成 Python 字典，最后小心翼翼地调用工具底层的 Python 函数。中途如果参数解析失败、或者工具执行报错，它会把错误包装得工工整整地返回，而不是直接让整个系统崩溃。
 
          need拿到的东西：
@@ -155,9 +142,7 @@ class ToolRegistry:  # 工具注册中心
 
 
 def build_default_tool_registry() -> ToolRegistry:
-    """
-    大白话解释：
-    创建一个默认的百宝箱，并预先塞入所有最常用、最基础的内置工具（比如读写文件、回声测试、网络搜索等）。
+    """创建一个默认的百宝箱，并预先塞入所有最常用、最基础的内置工具（比如读写文件、回声测试、网络搜索等）。
 
     会给出来的结果：
     - ToolRegistry: 装载了默认工具集的百宝箱。
@@ -178,9 +163,7 @@ def build_run_registry(
     status_checker: Callable[[list[str]], dict],
     child_waiter: Callable[[str], str],
 ) -> ToolRegistry:
-    """
-    大白话解释：
-    为单次会话执行构建一个专属的百宝箱。
+    """为单次会话执行构建一个专属的百宝箱。
     不仅包含默认的所有内置工具，还会把跟“召唤和等待子智能体小帮手”相关的专属桥接工具（配好了相关的异步回调函数）也一起塞进百宝箱。
 
     需要拿到的东西：

@@ -36,14 +36,11 @@ from agent_prototype.memory.session.store import SqliteSessionStore
 class SessionService:
     """会话生命周期管理服务类 (OOP)
     
-    大白话解释：
     这个类是一个“会话大管家”。它主要用来打理跟“聊天会话”（Session）有关的所有核心业务，比如：创建一个新会话、把会话重置清空、给会话改名字、彻底删除会话，或者更新会话里绑定的模型和安全策略等。它不直接和数据库打交道，而是指挥底下的 store 模块去干活，并且负责管好“事务”（就是保证一连串数据库操作要么全成功，要么有一步失败了就全部退回原样，防止数据搞乱）。
     """
     
     def __init__(self, db: Session):
-        """
-        大白话解释：
-        大管家初始化。把数据库连接和底下的数据仓库（Store）都准备好，方便后面随时读写数据。
+        """大管家初始化。把数据库连接和底下的数据仓库（Store）都准备好，方便后面随时读写数据。
 
         需要拿到的东西：
         - db (Session): 数据库会话连接，也就是操作数据库的“钥匙”。
@@ -54,9 +51,7 @@ class SessionService:
     # ── 会话生命周期 ────────────────────────────────────────────────────────────
 
     def create_session(self, payload: CreateSessionInput) -> SessionSummary:
-        """
-        大白话解释：
-        创建一个全新、空白的聊天会话。
+        """创建一个全新、空白的聊天会话。
         这个函数会自动生成一个独一无二的会话 ID，查一下数据库有没有默认的 AI 模型和模型供应商，有的话就自动和这个新会话绑定。然后把这些配置信息存进数据库，最后把新创建的会话信息打包好返还给调用方。
 
         需要拿到的东西：
@@ -117,9 +112,7 @@ class SessionService:
         )
 
     def reset_session(self, payload: ResetInput) -> dict[str, bool]:
-        """
-        大白话解释：
-        重置指定的会话，把里面的聊天历史、运行轨迹全部擦除干净，变回像新买的手机一样的出厂设置，但会保留会话本身的名字、绑定的模型和安全配置不被删掉。
+        """重置指定的会话，把里面的聊天历史、运行轨迹全部擦除干净，变回像新买的手机一样的出厂设置，但会保留会话本身的名字、绑定的模型和安全配置不被删掉。
 
         需要拿到的东西：
         - payload (ResetInput): 重置入参。最主要的就是会话 ID (session_id)。
@@ -150,9 +143,7 @@ class SessionService:
         return {"ok": True}
 
     def delete_session(self, session_id: str) -> dict[str, bool]:
-        """
-        大白话解释：
-        把一个指定的会话彻底从数据库里删掉（物理删除），并且把它相关的运行历史、步骤轨迹等等也一并清理干净，防止残留垃圾数据。
+        """把一个指定的会话彻底从数据库里删掉（物理删除），并且把它相关的运行历史、步骤轨迹等等也一并清理干净，防止残留垃圾数据。
 
         需要拿到的东西：
         - session_id (str): 想要删除的那个会话的唯一身份证号（ID）。
@@ -173,9 +164,7 @@ class SessionService:
         return {"ok": True}
 
     def rename_session(self, session_id: str, new_name: str) -> dict[str, bool]:
-        """
-        大白话解释：
-        给一个已经存在的会话重新起个名字。比如把“未命名会话”改成“我的智能助手”。
+        """给一个已经存在的会话重新起个名字。比如把“未命名会话”改成“我的智能助手”。
 
         需要拿到的东西：
         - session_id (str): 需要改名的会话 ID。
@@ -200,9 +189,7 @@ class SessionService:
         return {"ok": True}
 
     def update_session(self, session_id: str, payload: RenameSessionInput) -> dict[str, bool]:
-        """
-        大白话解释：
-        一站式多功能会话更新。如果想同时改会话名字、切换安全权限档位、换模型、换模型服务商，或者开启/关闭深度思考参数，都可以通过这个函数一次性搞定。
+        """一站式多功能会话更新。如果想同时改会话名字、切换安全权限档位、换模型、换模型服务商，或者开启/关闭深度思考参数，都可以通过这个函数一次性搞定。
 
         需要拿到的东西：
         - session_id (str): 要更新的会话 ID。

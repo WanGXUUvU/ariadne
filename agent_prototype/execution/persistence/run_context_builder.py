@@ -27,8 +27,7 @@ from agent_prototype.context.assembler import ContextAssembler
 
 @dataclass
 class RunContext:
-    """【大白话解释】
-    这是一个用来装“智能体单次运行所需的所有背景物料”的小背包（数据载体）。
+    """这是一个用来装“智能体单次运行所需的所有背景物料”的小背包（数据载体）。
     里面装了智能体现在的聊天状态、它的定义设定、与大模型沟通的适配器、审批规则、它的名字、工作区路径、以及会话类型。
     """
     state: AgentState
@@ -41,15 +40,13 @@ class RunContext:
 
 
 class RunContextBuilder:
-    """【大白话解释】
-    这是一个“运行物料装配工”。
+    """这是一个“运行物料装配工”。
     它的核心工作是在智能体开始跑起来之前，把所有的背景物料（比如聊天状态、系统提示词、大模型连接器、审批策略等）给搜集打包好，
     装进 `RunContext` 这个小背包里，然后递给执行服务 `RunService`。
     """
 
     def __init__(self, db: Session):
-        """【大白话解释】
-        初始化这个装配工，给他连上数据库，并且给他分配一个会话存储仓库，方便他查数据和状态。
+        """初始化这个装配工，给他连上数据库，并且给他分配一个会话存储仓库，方便他查数据和状态。
 
         需要拿到的东西：
         - db: 数据库连接会话对象。
@@ -58,8 +55,7 @@ class RunContextBuilder:
         self.store = SqliteSessionStore(db)
 
     def build_adapter(self, session_id: str) -> ChatCompletionsAdapter:
-        """【大白话解释】
-        快捷通道：不组装完整的物料背包，只单独把大模型适配器（也就是跟大模型沟通的电话线）给接通。
+        """快捷通道：不组装完整的物料背包，只单独把大模型适配器（也就是跟大模型沟通的电话线）给接通。
         适合在“恢复运行”（resume）等不需要其他复杂背景物料的场景下使用。
 
         需要拿到的东西：
@@ -71,8 +67,7 @@ class RunContextBuilder:
         return self._build_adapter(session_id)
 
     def build(self, agent_input: AgentInput) -> RunContext:
-        """【大白话解释】
-        火力全开！把这次运行需要的所有上下文背景物料给完整拼装出来。
+        """火力全开！把这次运行需要的所有上下文背景物料给完整拼装出来。
         它会去读数据库里的会话记录，接通大模型适配器，拿出来历史聊天记录并看看要不要压缩精简，
         再去加载智能体的人设定义，把本地工作区的文件缝合进系统提示词，最后配上安全审批策略，打包塞进小背包里。
 
@@ -153,8 +148,7 @@ class RunContextBuilder:
     # ── 私有辅助 ──────────────────────────────────────────────────────────────
 
     def _build_adapter(self, session_id: str, record=None) -> ChatCompletionsAdapter:
-        """【大白话解释】
-        内部核心私有方法：真正去读数据库里的模型配置，把大模型适配器给生产出来的实际逻辑。
+        """内部核心私有方法：真正去读数据库里的模型配置，把大模型适配器给生产出来的实际逻辑。
         它还会把模型的“思考深度”配置（thinking payload）给合理加进去。
 
         需要拿到的东西：

@@ -19,15 +19,12 @@ logger = logging.getLogger(__name__)
 class ApprovalRequiredException(Exception):
     """当工具调用需要审批拦截时抛出的特定控制流中断异常。
     
-    大白话解释：
     这是一个“审批拉闸异常”。
     当 AI 想要调用的某个工具有点危险（比如删库、发邮件等敏感写操作），而且安全策略规定必须经过人工同意时，系统就会故意扔出这个“异常”，像拉电闸一样瞬间暂停正在执行的代码，把 AI 定在那里，等待人类管理员点下“同意”或“拒绝”。
     """
 
     def __init__(self, approval_id: str):
-        """
-        大白话解释：
-        初始化这个拉闸异常，并记下这张审批单的编号。
+        """初始化这个拉闸异常，并记下这张审批单的编号。
 
         需要拿到的东西：
         - approval_id (str): 审批单的 ID 编号。
@@ -39,7 +36,6 @@ class ApprovalRequiredException(Exception):
 class ApprovalMiddleware(BaseMiddleware):
     """人工审批中间件。
     
-    大白话解释：
     这个类是一个“安全安检站（审批中间件）”。
     当 AI 尝试运行任何工具时，都必须经过这个安检站。它会检查这个工具的风险级别，如果属于危险操作（比如写磁盘），且系统当前的安全策略不是“完全信任”，它就会在数据库里生成一张“待审批单”（pending_approval），然后无情地抛出 `ApprovalRequiredException` 异常，把当前的执行流程强行挂起，等管理员审批。
     """
@@ -49,9 +45,7 @@ class ApprovalMiddleware(BaseMiddleware):
         context: ToolCallContext,
         next_call: Callable[[], Awaitable[ToolResult]],
     ) -> ToolResult:
-        """
-        大白话解释：
-        这是安检站值班的具体检查动作。
+        """这是安检站值班的具体检查动作。
         它会看一看即将调用的工具和安全参数，判断需不需要拦截。需要的话就生成审批单并抛异常拉闸；不需要的话，就大声喊“放行！”，让下一个安检环节（或者真正执行工具的函数）继续跑下去。
 
         需要拿到的东西：

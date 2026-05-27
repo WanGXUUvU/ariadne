@@ -30,14 +30,11 @@ COMPACT_MODEL = os.getenv("COMPACT_MODEL", "deepseek-v4-flash")
 class CompactService:
     """上下文长历史压缩管理服务类 (OOP)
     
-    大白话解释：
     这个类是“聊天历史瘦身教练”。它的主要任务是防止聊天记录太长，导致 AI 记不住或者消耗太多 Token（算力话费）。当聊天历史太长时，它会把旧的聊天内容打包总结成一段简短的“前情提要”，只留下最近的几条聊天消息，从而给聊天上下文“减肥瘦身”。
     """
     
     def __init__(self, db: Session):
-        """
-        大白话解释：
-        初始化瘦身教练，带上数据库的钥匙并叫上底下的“数据仓库”。
+        """初始化瘦身教练，带上数据库的钥匙并叫上底下的“数据仓库”。
 
         需要拿到的东西：
         - db (Session): 操作数据库的钥匙。
@@ -46,9 +43,7 @@ class CompactService:
         self.store = SqliteSessionStore(db)
 
     def _build_session_adapter(self, session_id: str) -> ChatCompletionsAdapter:
-        """
-        大白话解释：
-        根据会话 ID 去数据库里查找这个会话关联的 AI 模型和 API Key，并创建对应的 AI 客户端适配器，好让它一会儿能找 AI 进行历史压缩总结。
+        """根据会话 ID 去数据库里查找这个会话关联的 AI 模型和 API Key，并创建对应的 AI 客户端适配器，好让它一会儿能找 AI 进行历史压缩总结。
 
         需要拿到的东西：
         - session_id (str): 会话 ID。
@@ -97,9 +92,7 @@ class CompactService:
         force: bool = False,
         compactor: Optional[HistoryCompactor] = None,
     ) -> CompactOutput:
-        """
-        大白话解释：
-        在内存里模拟做一次瘦身，不做持久化落库。
+        """在内存里模拟做一次瘦身，不做持久化落库。
         它会先看看目前的 Token 消耗是不是已经到了临界线（通常占用了模型总容量的 70% 以上）。如果是，或者被强制要求压缩，它就会把除了最近留底（keep_recent_count 条）以外的历史消息，交给大模型做个提炼总结，然后把总结出的“前情提要”放到第一条，把其余旧消息删掉，从而给聊天历史减负。
 
         需要拿到的东西：
@@ -150,9 +143,7 @@ class CompactService:
         return compact_result
 
     def compact_session(self, payload: CompactInput) -> CompactOutput:
-        """
-        大白话解释：
-        正式执行聊天历史有损压缩（瘦身）的入口。
+        """正式执行聊天历史有损压缩（瘦身）的入口。
         它会去数据库读出指定会话的全部聊天历史，判断是否达到了触发压缩的条件（或者用户强制触发）。一旦决定压缩，它就调用内存压缩算法搞定总结，然后把压缩后带有“前情提要”的最新历史快照存回数据库。同时它还会贴心地把很多历史运行记录标记为非活跃，防止前端界面加载时过于臃肿。
 
         需要拿到的东西：

@@ -19,9 +19,7 @@ from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
 from agent_prototype.model.types.domain import ToolResult
 
 def web_search(query: str, num_results: int = 5) -> ToolResult:
-    """
-    大白话解释：
-    这是“网页搜索引擎”的具体执行函数。
+    """这是“网页搜索引擎”的具体执行函数。
     当你想查一下最新的新闻、最新的代码库用法，或者 AI 的知识库不够新时，这个工具会飞快地跑去 Tavily 搜索引擎发起网络搜索，把查到的核心网页文本和参考链接原封不动拉回来给你看。
 
     需要拿到的东西：
@@ -82,9 +80,7 @@ WEB_SEARCH_TOOL_SCHEMA = {
 }
 
 def build_web_search_tool_definition() -> ToolDefinition:
-    """
-    大白话解释：
-    把上面的“网页搜索引擎”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+    """把上面的“网页搜索引擎”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
 
     会给出来的结果：
     - ToolDefinition: 打包好、带安全等级的工具定义对象。

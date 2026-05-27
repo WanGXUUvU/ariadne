@@ -24,7 +24,6 @@ from agent_prototype.model.types.model_types import ModelRequest, ModelResponse,
 class ChatCompletionsAdapter(ModelAdapter):
     """大模型 Chat Completions 通信适配器 (OOP)
     
-    大白话解释：
     这个类是“大模型皇家同声传译翻译官（API 适配器）”。
     它的核心职责是当系统想找 AI 聊天时，负责把标准的对话请求翻译成不同供应商（比如 OpenAI、DeepSeek）听得懂的 HTTP 格式发过去。由于很多高级 AI 会吐出“思维链内容”（也就是在思考的过程，一般夹在 `<think>...</think>` 里），这个适配器还非常机智地实现了一个“有状态流式解析器”，能把 AI 实时吐出的字流，智能切分成“AI 正在思考中（thinking_delta）”和“AI 最终回答内容（delta）”的流式事件送给前端，让界面可以优雅地展示 AI 的思考过程。
     """
@@ -36,9 +35,7 @@ class ChatCompletionsAdapter(ModelAdapter):
         extra_payload: Optional[dict] = None,
         thinking_style: str = "none",
     ):
-        """
-        大白话解释：
-        翻译官初始化，穿戴好装备，记好接口地址、密钥（API Key）以及这次想找哪个大模型（model）聊天。
+        """翻译官初始化，穿戴好装备，记好接口地址、密钥（API Key）以及这次想找哪个大模型（model）聊天。
         """
         self.api_key = api_key or os.environ.get("API_KEY")
         self.base_url = base_url
@@ -51,9 +48,7 @@ class ChatCompletionsAdapter(ModelAdapter):
     # ── thinking 解析工具 ──────────────────────────────────────────────────
 
     def _reset_think_state(self) -> None:
-        """
-        大白话解释：
-        流式对话开始前重置状态。
+        """流式对话开始前重置状态。
         因为流式吐字像挤牙膏，在每次跟 AI 开始聊天前，得把“我目前是不是在看思考内容”的标记设为否，并清空上回留下来的半个标签缓存。
         """
         self._in_think = False
@@ -61,9 +56,7 @@ class ChatCompletionsAdapter(ModelAdapter):
 
     @staticmethod
     def _partial_suffix(text: str, tag: str) -> str:
-        """
-        大白话解释：
-        边缘截断检测小助手。
+        """边缘截断检测小助手。
         有时候流式返回一个字一个字蹦，可能刚好把 `<think>` 标签拦腰斩断成 `<thi` 放在了当前的字块（chunk）末尾。这个函数就是用来检查文本末尾是不是刚好匹配 `<think>` 标签的前几个字母，方便下次拼起来。
 
         需要拿到的东西：
@@ -79,9 +72,7 @@ class ChatCompletionsAdapter(ModelAdapter):
         return ""
 
     def _parse_think_content(self, raw: str, finish_reason) -> list[ModelStreamEvent]:
-        """
-        大白话解释：
-        有状态地剥离并切分思维链内容。
+        """有状态地剥离并切分思维链内容。
         因为有些大模型喜欢把思维链装在 `<think>...</think>` 里混在最终回答里吐出来。这个函数会像剥洋葱一样，把夹在中间的思考段落切成 `thinking_delta` 事件吐给前端，把后面的正常回答切成 `delta` 事件吐出来。
 
         需要拿到的东西：
@@ -129,9 +120,7 @@ class ChatCompletionsAdapter(ModelAdapter):
         return events
 
     def _parse_delta(self, delta: dict, finish_reason) -> list[ModelStreamEvent]:
-        """
-        大白话解释：
-        将单次流式网络返回的零碎碎片，智能包装成前端能识别的标准数据流事件。
+        """将单次流式网络返回的零碎碎片，智能包装成前端能识别的标准数据流事件。
         它会根据不同模型的风格（比如是不是标签形式的 `always_on_style`，还是像某些大模型一样有独立的 reasoning_content 字段）来自动做处理和分类。
 
         需要拿到的东西：
@@ -170,9 +159,7 @@ class ChatCompletionsAdapter(ModelAdapter):
     # ── 请求方法 ──────────────────────────────────────────────────────────
 
     def generate(self, request: ModelRequest) -> ModelResponse:
-        """
-        大白话解释：
-        【非流式同步调用接口】。
+        """【非流式同步调用接口】。
         一口气把所有的聊天历史和工具选项打包发给大模型，然后一直在那里等着，直到大模型想完整了、把答案一次性全部吐出来之后，这个函数才慢吞吞地返回最终的 ModelResponse 结果包。
 
         需要拿到的东西：
@@ -265,9 +252,7 @@ class ChatCompletionsAdapter(ModelAdapter):
         )
 
     def stream_generate(self, request: ModelRequest) -> Iterator[ModelStreamEvent]:
-        """
-        大白话解释：
-        【同步流式调用接口】。
+        """【同步流式调用接口】。
         把请求发出去后，不需要傻等 AI 把长篇大论全写完。这个函数会像挤牙膏或者像打字机一样，大模型吐出来一个字或一个事件，它就通过 `yield` 立马给你递出来一个流式事件，适合命令行或者传统的同步流展示。
 
         需要拿到的东西：
@@ -368,9 +353,7 @@ class ChatCompletionsAdapter(ModelAdapter):
                 yield event
 
     async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
-        """
-        大白话解释：
-        【异步流式调用接口】。
+        """【异步流式调用接口】。
         这是在 Web 网页后端最常用、最高效的接口。它使用 `httpx` 异步客户端向大模型发请求，大模型吐出来一个字，它就用异步生成器给前端 `yield` 递出去。由于中途等待大模型码字时使用的是极其轻量的 `await` 挂起，在此期间整个系统的 CPU 可以去做别的事情（比如并发响应其他用户的网页请求），实现极高的吞吐性能。
 
          need拿到的东西：

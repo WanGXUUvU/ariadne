@@ -17,9 +17,7 @@ from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
 from pathlib import Path
 
 def list_dir(path: str) -> str:
-    """
-    大白话解释：
-    这是“列出文件夹内容”的具体执行函数。
+    """这是“列出文件夹内容”的具体执行函数。
     就像你在电脑上双击打开一个文件夹，或者在命令行打 `ls` / `dir`，它会把你指定文件夹底下的所有文件和子文件夹名字按字母顺序排好，用换行符连成一大串文字拿给你看。
 
     需要拿到的东西：
@@ -59,9 +57,7 @@ LIST_DIR_SCHEMA = {  # 给模型看的工具说明
 
 
 def build_list_dir_definition() -> ToolDefinition:
-    """
-    大白话解释：
-    把上面的“列出文件夹内容”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+    """把上面的“列出文件夹内容”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
 
     会给出来的结果：
     - ToolDefinition: 打包好、带安全等级的工具定义对象。

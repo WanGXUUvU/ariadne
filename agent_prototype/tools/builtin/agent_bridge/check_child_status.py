@@ -15,9 +15,7 @@ from agent_prototype.model.types.domain import ToolResult, RiskLevel
 import json
 
 def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -> ToolDefinition:
-    """
-    大白话解释：
-    这是一个“子智能体状态查询工具的加工厂（构建函数）”。
+    """这是一个“子智能体状态查询工具的加工厂（构建函数）”。
     它接收一个用来真正干活的查询回调函数，然后把真正的工具定义（ToolDefinition）给加工并打包出来。
 
     需要拿到的东西：
@@ -28,9 +26,7 @@ def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -
     """
 
     def check_child_status(child_run_ids: str) -> ToolResult:
-        """
-        大白话解释：
-        这是真正的“查询子智能体状态”的工具执行函数。
+        """这是真正的“查询子智能体状态”的工具执行函数。
         它会去查一查之前派出去干异步任务的“子智能体小帮手们”现在都进行到哪一步了（是还在跑、已经跑完、出错了、还是根本找不到这个小帮手）。它不会傻等小帮手干完，而是“非阻塞”地看一眼状态就走。
 
         需要拿到的东西：

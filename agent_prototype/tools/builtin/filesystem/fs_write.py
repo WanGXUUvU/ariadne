@@ -19,9 +19,7 @@ from agent_prototype.tools.protocol import ToolDefinition,RiskLevel  # 导入工
 
 
 def write_file(path: str, content: str) -> str:  # 把内容写入文件
-    """
-    大白话解释：
-    这是“把文字写入文件”的具体执行函数。
+    """这是“把文字写入文件”的具体执行函数。
     就像你在电脑上新建或者打开一个文本文件，把一堆字粘贴进去然后点击“保存”。如果存放这个文件的文件夹根本不存在，它还会很贴心地自动把缺失的文件夹全都建好。
 
     需要拿到的东西：
@@ -68,9 +66,7 @@ WRITE_FILE_SCHEMA = {  # 给模型看的工具说明
 
 
 def build_write_file_tool_definition() -> ToolDefinition:  # 构造 registry 需要的工具对象
-    """
-    大白话解释：
-    把上面的“把文字写入文件”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+    """把上面的“把文字写入文件”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
 
     会给出来的结果：
     - ToolDefinition: 打包好、带安全等级的工具定义对象。由于这个工具涉及修改物理磁盘内容，它的风险等级被定为 WRITE（写操作风险）。

@@ -25,8 +25,7 @@ from agent_prototype.execution.persistence.run_persistence import RunPersistence
 
 
 class StreamRunSession:
-    """【大白话解释】
-    这是一个“流式运行大舞台（执行容器）”。
+    """这是一个“流式运行大舞台（执行容器）”。
     它主要负责管理单次流式运行（SSE）的完整生命周期。
     它不直接读写数据库，而是作为一个纯粹的舞台监督，拉起智能体发动机（AgentRunner），
     把产生的文本片段、思维链（Thinking）片段、工具调用等实时 yield 给前端 SSE 帧。
@@ -42,8 +41,7 @@ class StreamRunSession:
         agent_input: AgentInput,
         persist: RunPersistenceService,
     ):
-        """【大白话解释】
-        初始化流式运行舞台，把组装好的一切协作道具和依赖（物料、观察者、智能体、落库小助手）全部准备就绪。
+        """初始化流式运行舞台，把组装好的一切协作道具和依赖（物料、观察者、智能体、落库小助手）全部准备就绪。
 
         需要拿到的东西：
         - ctx: 装配好的运行时物料 RunContext。
@@ -61,8 +59,7 @@ class StreamRunSession:
         self.persist     = persist
 
     async def run(self) -> AsyncIterator[str]:
-        """【大白话解释】
-        流式大戏开演！这是最核心的方法，会按顺序不断吐出 SSE 数据帧。
+        """流式大戏开演！这是最核心的方法，会按顺序不断吐出 SSE 数据帧。
         在执行过程中，它会把大模型的思维过程（thinking_delta）和正文回复（delta）源源不断地挤出来，
         如果在执行工具时遇到审批阻碍，就会自动转入“审批挂起”状态；如果一路顺风顺利答完，就会完成并落库。
         如果在中途被强行中断（异常或取消），它会使用 `save_cancelled` 做好善后，绝对不丢失用户的输入。
@@ -139,8 +136,7 @@ class StreamRunSession:
     # ── 私有帧构造 ────────────────────────────────────────────────────────────
 
     def _start_frame(self) -> str:
-        """【大白话解释】
-        内部方法：生产戏开场的“帷幕拉开（start）”帧。
+        """内部方法：生产戏开场的“帷幕拉开（start）”帧。
         通知前端，我们现在要开始针对哪个会话、哪个运行 ID 进行流式输出了。
 
         会给出来的结果：
@@ -157,8 +153,7 @@ class StreamRunSession:
         ))
 
     def _handle_paused(self, events: List[AgentEvent], partial_reply: str) -> str:
-        """【大白话解释】
-        内部方法：当运行因为工具需要人工审批而暂停时，紧急通过 observer 观察者进行中间态快照落库，并生产一个“暂停（paused）”帧。
+        """内部方法：当运行因为工具需要人工审批而暂停时，紧急通过 observer 观察者进行中间态快照落库，并生产一个“暂停（paused）”帧。
 
         需要拿到的东西：
         - events: 中断前已经产生的所有事件。
@@ -171,8 +166,7 @@ class StreamRunSession:
         return _sse_frame(StreamFrame(type="paused", data={"run_id": self.run_id}))
 
     def _handle_completed(self, events: List[AgentEvent], partial_reply: str) -> str:
-        """【大白话解释】
-        内部方法：当运行正常且顺利完成时，委托 persist 落库小助手把最终结果完整地写入数据库，并生产一个“谢幕（end）”帧。
+        """内部方法：当运行正常且顺利完成时，委托 persist 落库小助手把最终结果完整地写入数据库，并生产一个“谢幕（end）”帧。
 
         需要拿到的东西：
         - events: 运行中产生的所有完整事件。

@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 class SandboxMiddleware(BaseMiddleware):
     """沙箱与工作区虚拟投影中间件。
     
-    大白话解释：
     这个类是一个“路径沙箱安检站（沙箱隔离中间件）”。
     它主要有两个非常硬核的任务：
     1. 【工具准入校验】：检查 AI 调用的工具，是不是当前 Agent 获准使用的白名单工具。如果 AI 偷偷用了不该用的工具，直接拦截并报错“TOOL_NOT_ALLOWED”。
@@ -27,9 +26,7 @@ class SandboxMiddleware(BaseMiddleware):
         context: ToolCallContext,
         next_call: Callable[[], Awaitable[ToolResult]],
     ) -> ToolResult:
-        """
-        大白话解释：
-        这是沙箱安检站的具体检查流程。
+        """这是沙箱安检站的具体检查流程。
         它会先验一验工具是否准入；如果通过了，且绑定了工作区，它就会把工具入参里的所有路径参数都抓出来进行“绝对化 resolve 投影匹配”和改写，确保它们无论如何都逃不出工作区的五指山。完全放行后，把修改为物理绝对路径的参数写回小车，并叫起下一关。
 
         需要拿到的东西：

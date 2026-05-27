@@ -18,9 +18,7 @@ from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
 from pathlib import Path
 
 def search_text(query: str, path: str = ".") -> str:  # 在目录里搜索文本
-    """
-    大白话解释：
-    这是“全文检索”的具体执行函数。
+    """这是“全文检索”的具体执行函数。
     就像你在整个项目文件夹里按快捷键 `Ctrl+Shift+F`（或者用命令 `grep`），输入你想找的字，它就会掘地三尺，把指定文件夹底下所有文本文件里的每一行都翻个遍，只要发现哪一行提到了你的字，就赶紧把“文件名 + 第几行 + 这一行的内容”通通记下来报给你。
 
     需要拿到的东西：
@@ -81,9 +79,7 @@ SEARCH_TEXT_SCHEMA = {  # 给模型看的工具说明
 }
 
 def build_search_text_definition() -> ToolDefinition:
-    """
-    大白话解释：
-    把上面的“全文检索”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
+    """把上面的“全文检索”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
 
     会给出来的结果：
     - ToolDefinition: 打包好、带安全等级的工具定义对象。

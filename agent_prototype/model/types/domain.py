@@ -24,7 +24,6 @@ from pydantic import BaseModel, Field
 class ToolCallFunction(BaseModel):
     """模型返回的 function calling 结构中的函数部分。
     
-    大白话解释：
     这是大模型发出的“函数调用具体内容数据模型”。
     它包含大模型想要调用的具体函数名（name），以及 AI 生成的想喂给函数的参数（arguments，通常是一个 JSON 字符串）。
     """
@@ -36,7 +35,6 @@ class ToolCallFunction(BaseModel):
 class ToolCall(BaseModel):
     """一次工具调用请求。
     
-    大白话解释：
     这是大模型发出的“单次工具调用订单数据模型”。
     它记录了这笔调用的唯一身份订单 ID（id），它的调用类型（默认为 "function"），以及上面所说的具体函数调用内容。
     """
@@ -49,7 +47,6 @@ class ToolCall(BaseModel):
 class ToolError(BaseModel):
     """工具失败时返回给上层的结构化错误。
     
-    大白话解释：
     这是工具执行失败时的“结构化病历单”。
     当工具跑崩了或者出错了，它不会随地吐痰，而是很优雅地开出这张单子，写清楚：错误码是什么（code，比如 SANDBOX_VIOLATION）、调哪个工具错的（tool_name），以及具体的报错大白话原因（message）。
     """
@@ -63,7 +60,6 @@ class ToolError(BaseModel):
 class ToolResult(BaseModel):
     """统一的工具执行结果。
     
-    大白话解释：
     这是统一的“工具执行结果收据包”。
     所有的工具在执行完后，不管成功还是失败，都要把成果塞进这个结果收据包里。包里包含：有没有成功（ok）、如果成功了拿回来的正文数据（content）、如果失败了的结构化错误单（error），以及可以装任何调试元数据的百宝袋（metadata）。
     """
@@ -81,7 +77,6 @@ class ToolResult(BaseModel):
 class ChatMessage(BaseModel):
     """运行时消息对象，既用于上下文，也用于持久化 session state。
     
-    大白话解释：
     这是“单条聊天消息通用模型”。
     就像微信或者 QQ 里的单条气泡消息。它记下了：这条消息是谁发的（role，可以是系统 system、用户 user、助手 assistant，或者是代表工具反馈的 tool）；消息文本内容是什么（content）；如果 AI 发出消息的同时想调工具，这里面还会带上工具订单列表（tool_calls）；如果是工具回传的结果消息，这里面还会标上对应是给哪个订单（tool_call_id）的回复。
     """
@@ -99,7 +94,6 @@ class ChatMessage(BaseModel):
 class RiskLevel(str, Enum):
     """工具风险等级。
     
-    大白话解释：
     这是给工具贴的“危险指数标签”。
     - SAFE: 绝对安全（比如纯读操作、Echo测试），可以绿灯直行，不需要人类审批。
     - WRITE: 有写入操作（比如往磁盘写文件），稍微有点敏感，会根据用户的安全策略决定要不要安检拦截。
