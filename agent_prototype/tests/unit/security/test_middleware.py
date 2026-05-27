@@ -3,7 +3,7 @@ import unittest
 from typing import Any, Awaitable, Callable
 
 from agent_prototype.model.types.domain import ToolResult, ToolError, ApprovalPolicy, RiskLevel
-from agent_prototype.security.middleware.pipeline import BaseMiddleware, MiddlewarePipeline
+from agent_prototype.security.middleware.base import BaseMiddleware, MiddlewarePipeline
 from agent_prototype.security.middleware.base import ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.security.approval.middleware import ApprovalMiddleware

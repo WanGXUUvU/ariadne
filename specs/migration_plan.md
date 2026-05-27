@@ -14,10 +14,10 @@ agent_prototype/
 │   ├── adapters/
 │   │   ├── __init__.py
 │   │   ├── chat_completions.py         ← infrastructure/llm/chat_completions_adapter.py
-│   │   ├── openai.py                   ← infrastructure/llm/openai_adapter.py
 │   │   └── protocol.py                ← infrastructure/llm/model_adapter_protocol.py
 │   ├── types/
 │   │   ├── __init__.py
+│   │   ├── domain.py              ← core/schemas.py  [领域原语: ToolCall/ChatMessage/RiskLevel等]
 │   │   └── model_types.py             ← infrastructure/llm/model_types.py
 │   └── __init__.py
 │
@@ -114,7 +114,7 @@ agent_prototype/
 │   │   └── middleware.py              ← application/runtime/middleware/sandbox.py
 │   ├── middleware/
 │   │   ├── __init__.py
-│   │   └── base.py                    ← application/runtime/middleware/base.py
+│   │   └── base.py                    ← application/runtime/middleware/base.py + core/middleware.py
 │   ├── policy/
 │   │   └── __init__.py                [new — 统一策略执行引擎，预留]
 │   ├── audit/
@@ -193,8 +193,11 @@ agent_prototype/
 │
 ├── agent/                              # Agent 定义与组装入口（跨层）
 │   ├── definition.py                  ← core/agent_definition.py
+│   ├── definition_service.py          ← application/services/agent_definition_service.py
+│   ├── definition_store.py            ← infrastructure/database/repositories/agent_definition_store.py
 │   ├── loader.py                      ← infrastructure/agents/agent_loader.py
 │   ├── settings_service.py            ← application/services/settings_service.py
+│   ├── settings_store.py              ← infrastructure/database/repositories/settings_store.py
 │   ├── builtin/
 │   │   └── __init__.py
 │   └── __init__.py
@@ -262,7 +265,7 @@ agent_prototype/
 |---|---|---|
 | `chat_completions_adapter.py` | `chat_completions.py` | 目录已是 adapters/，后缀冗余 |
 | `model_adapter_protocol.py` | `protocol.py` | 同上，且 model_ 前缀与目录重复 |
-| `openai_adapter.py` | `openai.py` | 同上 |
+| `openai_adapter.py` | 已删除，不迁移 | 迁移前文件已缺失，功能与 chat_completions.py 完全重合 |
 | `model_types.py` | 保持 `model_types.py` | 在 types/ 目录下语义仍清晰 |
 
 **提示词层 `prompt/`**

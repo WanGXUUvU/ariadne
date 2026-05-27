@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 from agent_prototype.model.types.domain import ToolResult, ToolError
-from agent_prototype.security.middleware.pipeline import BaseMiddleware
+from agent_prototype.security.middleware.base import BaseMiddleware
 from agent_prototype.security.middleware.base import ToolCallContext
 
 logger = logging.getLogger(__name__)

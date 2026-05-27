@@ -8,7 +8,7 @@ from agent_prototype.api.dto.schemas import (
     AgentEvent, ApprovalPolicy, ChatMessage, RiskLevel, ToolCall, ToolResult, needs_approval
 )
 from agent_prototype.tools.registry import ToolRegistry
-from agent_prototype.security.middleware.pipeline import MiddlewarePipeline
+from agent_prototype.security.middleware.base import MiddlewarePipeline
 from agent_prototype.security.middleware.base import ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.security.approval.middleware import ApprovalMiddleware, ApprovalRequiredException
