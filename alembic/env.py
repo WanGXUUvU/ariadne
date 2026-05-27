@@ -3,8 +3,8 @@ from logging.config import fileConfig  # 读取 alembic.ini 里的日志配置
 from sqlalchemy import engine_from_config, pool  # 用配置创建数据库引擎，并指定连接池策略
 from alembic import context  # Alembic 的运行上下文对象，迁移时靠它工作
 
-from agent_prototype.infrastructure.database.db import Base  # 导入你项目里的 Base，这里挂着所有模型元数据
-from agent_prototype.infrastructure.database import models  # 导入模型模块，这样 SessionRecord 才会注册到 Base.metadata 上
+from agent_prototype.infra.db.orm_models import Base  # 导入你项目里的 Base，这里挂着所有模型元数据
+import agent_prototype.infra.db.orm_models  # noqa: F401  # 导入模型模块，这样 SessionRecord 才会注册到 Base.metadata 上
 
 config = context.config  # 取得 Alembic 当前加载的配置对象
 
