@@ -10,8 +10,8 @@
 下游依赖：纯无状态 Callable 接口。
 """
 from typing import Callable
-from agent_prototype.tools.protocol import ToolDefinition, RiskLevel
-from agent_prototype.model.types.domain import ToolResult
+from agent_prototype.tools.types import ToolDefinition, RiskLevel
+from agent_prototype.core.types import ToolResult
 
 def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) -> ToolDefinition:
     """这是一个“派发（召唤）子智能体工具的加工厂（构建函数）”。

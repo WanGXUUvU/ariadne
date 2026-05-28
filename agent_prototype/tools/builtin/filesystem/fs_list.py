@@ -13,7 +13,7 @@
 - 下游流向：操作系统本地文件系统。
 """
 
-from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
+from agent_prototype.tools.types import ToolDefinition,RiskLevel
 from pathlib import Path
 
 def list_dir(path: str) -> str:

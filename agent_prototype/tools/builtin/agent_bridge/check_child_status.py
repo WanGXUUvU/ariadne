@@ -10,8 +10,8 @@
 下游依赖：纯无状态 Callable 接口。
 """
 from typing import Callable
-from agent_prototype.tools.protocol import ToolDefinition
-from agent_prototype.model.types.domain import ToolResult, RiskLevel
+from agent_prototype.tools.types import ToolDefinition
+from agent_prototype.core.types import ToolResult, RiskLevel
 import json
 
 def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -> ToolDefinition:

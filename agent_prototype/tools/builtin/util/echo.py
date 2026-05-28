@@ -14,9 +14,9 @@
 - 下游流向：大模型或前端消息面板。
 """
 
-from agent_prototype.tools.protocol import ToolDefinition
-from agent_prototype.model.types.domain import ToolResult
-from agent_prototype.tools.protocol import RiskLevel
+from agent_prototype.tools.types import ToolDefinition
+from agent_prototype.core.types import ToolResult
+from agent_prototype.tools.types import RiskLevel
 
 def echo_tool(text: str) -> ToolResult:
     """这是“回声（Echo）工具”的具体执行函数。

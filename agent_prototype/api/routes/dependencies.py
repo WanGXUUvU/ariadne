@@ -10,28 +10,39 @@
 
 数据流向：
 - 输入：FastAPI 依赖注入机制。
-- 输出：数据库 Session 对象及应用服务实例。
+- 输出：应用服务实例（Service）。
 - 上游来源：FastAPI 路由网关。
 - 下游流向：作为入参被注入到所有的路由控制器中。
+
+架构说明：
+- 本文件是 API 层（L9）与基础设施层（L0）之间的唯一合法桥梁。
+- 所有路由控制器必须从此文件获取 service 实例，禁止直接 import `infra.db.engine`。
 """
 
-from fastapi.responses import JSONResponse  # 返回统一 HTTP 响应
-from agent_prototype.api.dto.schemas import ApiError, ErrorResponse  # 导入统一错误 schema
+from fastapi import Depends
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
-def error_response(status_code:int,code:str,message:str)->JSONResponse:
-    """这个函数是用来生成统一格式的错误响应（JSONResponse）的。
-    
+from agent_prototype.infra.db.engine import get_db
+from agent_prototype.api.dto.schemas import ApiError, ErrorResponse
+
+# ── Service 导入（L7/L8 应用服务层）───────────────────────────────────────────
+from agent_prototype.execution.service import RunService
+from agent_prototype.memory.session.service import SessionService
+from agent_prototype.memory.summary.service import CompactService
+from agent_prototype.skills.service import SkillService
+from agent_prototype.security.approval.service import ApprovalService
+from agent_prototype.execution.resume.service import ResumeRunService
+from agent_prototype.agent.definition import AgentDefinitionService
+from agent_prototype.agent.settings import SettingsService
+from agent_prototype.memory.workspace.service import WorkspaceService
+
+
+def error_response(status_code: int, code: str, message: str) -> JSONResponse:
+    """生成统一格式的错误响应（JSONResponse）。
+
     当系统出错或者输入参数不对时，用它可以保证返回给前端的错误格式是一致的，方便前端解析。
-    
-    需要拿到的东西：
-    - status_code: 整数，比如 400、404、500 等 HTTP 状态码。
-    - code: 字符串，用来给这个错误起一个简短的标识（比如 'bad_request', 'not_found'）。
-    - message: 字符串，具体的错误原因大白话解释，用来展示给用户看。
-    
-    会给出来的结果：
-    - 一个 JSONResponse 对象，里面包裹着符合系统标准格式的错误信息。
     """
-    
     return JSONResponse(
         status_code=status_code,
         content=ErrorResponse(
@@ -41,3 +52,50 @@ def error_response(status_code:int,code:str,message:str)->JSONResponse:
             )
         ).model_dump()
     )
+
+
+# ── Service Provider 工厂（供路由层 Depends 注入）─────────────────────────────
+
+def get_run_service(db: Session = Depends(get_db)) -> RunService:
+    """提供 RunService 实例（含运行时编排、trace 查询、子 Agent 调度）。"""
+    return RunService(db)
+
+
+def get_session_service(db: Session = Depends(get_db)) -> SessionService:
+    """提供 SessionService 实例（含会话 CRUD、状态管理）。"""
+    return SessionService(db)
+
+
+def get_compact_service(db: Session = Depends(get_db)) -> CompactService:
+    """提供 CompactService 实例（含历史消息压缩）。"""
+    return CompactService(db)
+
+
+def get_skill_service(db: Session = Depends(get_db)) -> SkillService:
+    """提供 SkillService 实例（含技能列表、启用/禁用）。"""
+    return SkillService(db)
+
+
+def get_approval_service(db: Session = Depends(get_db)) -> ApprovalService:
+    """提供 ApprovalService 实例（含审批查询、同意/拒绝）。"""
+    return ApprovalService(db)
+
+
+def get_resume_run_service(db: Session = Depends(get_db)) -> ResumeRunService:
+    """提供 ResumeRunService 实例（含审批后恢复流式运行）。"""
+    return ResumeRunService(db)
+
+
+def get_agent_definition_service(db: Session = Depends(get_db)) -> AgentDefinitionService:
+    """提供 AgentDefinitionService 实例（含 Agent 定义 CRUD）。"""
+    return AgentDefinitionService(db)
+
+
+def get_settings_service(db: Session = Depends(get_db)) -> SettingsService:
+    """提供 SettingsService 实例（含 Provider/Model 设置）。"""
+    return SettingsService(db)
+
+
+def get_workspace_service(db: Session = Depends(get_db)) -> WorkspaceService:
+    """提供 WorkspaceService 实例（含工作区列表、选择对话框）。"""
+    return WorkspaceService(db)

@@ -14,7 +14,7 @@
 - 下游流向：操作系统文件系统。
 """
 
-from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
+from agent_prototype.tools.types import ToolDefinition,RiskLevel
 from pathlib import Path
 
 def search_text(query: str, path: str = ".") -> str:  # 在目录里搜索文本

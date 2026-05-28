@@ -11,8 +11,8 @@
 """
 from concurrent.futures import TimeoutError
 from typing import Callable
-from agent_prototype.tools.protocol import ToolDefinition, RiskLevel
-from agent_prototype.model.types.domain import ToolResult, ToolError
+from agent_prototype.tools.types import ToolDefinition, RiskLevel
+from agent_prototype.core.types import ToolResult, ToolError
 
 def build_wait_child_agent_tool(child_waiter: Callable[[str], str]) -> ToolDefinition:
     """这是一个“等待子智能体工具的加工厂（构建函数）”。

@@ -8,10 +8,11 @@
 import logging
 from typing import Awaitable, Callable
 
-from agent_prototype.model.types.domain import ToolResult
-from agent_prototype.security.policy import ApprovalPolicy, needs_approval
+from agent_prototype.core.types import ToolResult
+from agent_prototype.security.policy import ApprovalPolicy
+from agent_prototype.security.approval.checker import needs_approval
 from agent_prototype.security.middleware.base import BaseMiddleware
-from agent_prototype.security.middleware.base import ToolCallContext
+from agent_prototype.security.types import ToolCallContext
 
 logger = logging.getLogger(__name__)
 

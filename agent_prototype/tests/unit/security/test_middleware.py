@@ -2,10 +2,10 @@ import json
 import unittest
 from typing import Any, Awaitable, Callable
 
-from agent_prototype.model.types.domain import ToolResult, ToolError, RiskLevel
+from agent_prototype.core.types import ToolResult, ToolError, RiskLevel
 from agent_prototype.security.policy import ApprovalPolicy
 from agent_prototype.security.middleware.base import BaseMiddleware, MiddlewarePipeline
-from agent_prototype.security.middleware.base import ToolCallContext
+from agent_prototype.security.types import ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.security.approval.middleware import ApprovalMiddleware
 from agent_prototype.security.approval.middleware import ApprovalRequiredException

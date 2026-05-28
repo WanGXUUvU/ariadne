@@ -7,10 +7,10 @@
 import json
 import unittest
 
-from agent_prototype.model.types.domain import ToolResult, ToolError, RiskLevel
+from agent_prototype.core.types import ToolResult, ToolError, RiskLevel
 from agent_prototype.security.policy import ApprovalPolicy
 from agent_prototype.security.middleware.base import BaseMiddleware, MiddlewarePipeline, ToolCallContext
-from agent_prototype.tools.protocol import ToolDefinition
+from agent_prototype.tools.types import ToolDefinition
 from agent_prototype.tools.registry import ToolRegistry
 
 

@@ -11,11 +11,12 @@ import unittest
 from unittest.mock import MagicMock
 from typing import Callable
 
-from agent_prototype.model.types.domain import RiskLevel, ToolCall, ToolCallFunction
+from agent_prototype.core.types import RiskLevel, ToolCall, ToolCallFunction
 from agent_prototype.security.policy import ApprovalPolicy
-from agent_prototype.execution.runtime.tool_runner import needs_approval, async_handle_tool_calls
+from agent_prototype.security.approval.checker import needs_approval
+from agent_prototype.execution.runtime.tool_runner import async_handle_tool_calls
 from agent_prototype.tools.registry import ToolRegistry
-from agent_prototype.tools.protocol import ToolDefinition
+from agent_prototype.tools.types import ToolDefinition
 
 
 # ── 辅助：构造一个 fake ToolRegistry，只返回指定的 risk_level ──────────────
@@ -43,7 +44,7 @@ def make_tool_call(name: str = "fake_tool") -> ToolCall:
 
 async def collect_events(registry, tool_calls, policy, on_approval_required=None):
     """运行 async_handle_tool_calls，收集所有 AgentEvent，返回事件列表。"""
-    from agent_prototype.model.types.agent import AgentEvent
+    from agent_prototype.core.types import AgentEvent
     events = []
     async for item in async_handle_tool_calls(
         tool_registry=registry,

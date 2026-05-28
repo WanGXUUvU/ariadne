@@ -9,28 +9,22 @@
 上游依赖：L8 执行层 (RunContextBuilder)。
 下游依赖：L6 技能上下文服务 (SkillContextService)、L2 提示词层 (builder.py)。
 """
+import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from agent_prototype.agent.definition import AgentDefinition
-from agent_prototype.model.types.agent import AgentInput
+from agent_prototype.core.types import AgentDefinition
+from agent_prototype.core.types import AgentInput
 from agent_prototype.context.skill_context import SkillContextService
 
 
-@dataclass
-class AssembledContext:
-    """这是一个用来装“拼装好的上下文数据”的简单小篮子（数据载体）。
-    把拼好的系统提示词和工作区路径打包放在这里，方便后面其他人拿去用。
-    """
-    system_prompt: str
-    workspace_path: Optional[str]
+from agent_prototype.context.types import AssembledContext
 
 
 class ContextAssembler:
-    """这是一个“大掌柜”角色，专门负责把智能体运行需要的所有背景资料（也就是上下文）给拼装齐全。
+    """这是一个"大掌柜"角色，专门负责把智能体运行需要的所有背景资料（也就是上下文）给拼装齐全。
     它的主要工作是：去硬盘里读取一些写好的规则文件（比如 AGENTS.md, SOUL.md, USER.md），
     然后结合智能体本身的技能设定，把这些杂七杂八的信息揉成一段完整的系统提示词，装进一个小篮子里吐出来。
     """
@@ -78,7 +72,9 @@ class ContextAssembler:
                     if content:
                         local_rules_text = content
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).warning(
+                        "Failed to read AGENTS.md from %s", agents_path, exc_info=True
+                    )
 
             # B. 助理会话特有：加载 SOUL.md 与 USER.md
             if session_type == "assistant":
@@ -89,7 +85,9 @@ class ContextAssembler:
                         if content:
                             agent_soul_text = content
                     except Exception:
-                        pass
+                        logging.getLogger(__name__).warning(
+                            "Failed to read SOUL.md from %s", soul_path, exc_info=True
+                        )
 
                 user_path = root / "USER.md"
                 if user_path.exists():
@@ -98,7 +96,9 @@ class ContextAssembler:
                         if content:
                             user_profile_text = content
                     except Exception:
-                        pass
+                        logging.getLogger(__name__).warning(
+                            "Failed to read USER.md from %s", user_path, exc_info=True
+                        )
 
         # 调用 SkillContextService 完成纯内存的技能和提示词装配
         runtime_definition = self.skill_service.build_runtime_definition_with_skills(

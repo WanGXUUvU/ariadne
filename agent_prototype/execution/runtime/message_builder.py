@@ -17,10 +17,10 @@
 
 from typing import Optional
 
-from agent_prototype.agent.definition import AgentDefinition
-from agent_prototype.model.types.agent import AgentState
-from agent_prototype.model.types.domain import ChatMessage
-from agent_prototype.model.types.model_types import ModelConfig, ModelRequest
+from agent_prototype.core.types import AgentDefinition
+from agent_prototype.core.types import AgentState
+from agent_prototype.core.types import ChatMessage
+from agent_prototype.core.types import ModelConfig, ModelRequest
 from agent_prototype.tools.registry import ToolRegistry
 
 

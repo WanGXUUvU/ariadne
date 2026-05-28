@@ -14,17 +14,18 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from agent_prototype.infra.db.orm_models import SessionRecord, ModelSetting, ProviderConfig
-from agent_prototype.model.types.agent import AgentState
-from agent_prototype.model.types.domain import ChatMessage
-from agent_prototype.api.dto.schemas import CompactInput, CompactOutput
+from agent_prototype.core.types import AgentState
+from agent_prototype.core.types import ChatMessage
+from agent_prototype.core.types import CompactInput, CompactOutput
 from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.run.store import SqliteRunStore
 from agent_prototype.context.compaction import (
     build_compact_prompt,
     compact_state_with_summary,
     split_messages_for_compaction,
     HistoryCompactor
 )
-from agent_prototype.model.adapters.chat_completions import ChatCompletionsAdapter
+from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
 
 COMPACT_MODEL = os.getenv("COMPACT_MODEL", "deepseek-v4-flash")
 
@@ -43,6 +44,7 @@ class CompactService:
         """
         self.db = db
         self.store = SqliteSessionStore(db)
+        self._run_store = SqliteRunStore(db)
 
     def _build_session_adapter(self, session_id: str) -> ChatCompletionsAdapter:
         """根据会话 ID 去数据库里查找这个会话关联的 AI 模型和 API Key，并创建对应的 AI 客户端适配器，好让它一会儿能找 AI 进行历史压缩总结。
@@ -213,7 +215,7 @@ class CompactService:
                 context_tokens=new_context_tokens,
             )
             recent_active_count = payload.keep_recent_count // 2
-            runs = self.store.list_run_records(payload.session_id)
+            runs = self._run_store.list_run_records(payload.session_id)
             # 过滤出主对话 Runs (Scenario C 过滤)
             parent_runs = [r for r in runs if r.parent_run_id is None]
             runs_count = len(parent_runs)

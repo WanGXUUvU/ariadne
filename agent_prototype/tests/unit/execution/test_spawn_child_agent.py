@@ -16,11 +16,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig
-from agent_prototype.model.types.agent import AgentOutput, AgentState, AgentEvent, RunMetadata
+from agent_prototype.core.types import AgentOutput, AgentState, AgentEvent, RunMetadata
 from agent_prototype.infra.db.engine import Base
 from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.run.store import SqliteRunStore
 from agent_prototype.tools.registry import build_run_registry
-from agent_prototype.execution.persistence.run_service import RunService
+from agent_prototype.execution.service import RunService
 
 
 def _make_db(temp_dir):
@@ -116,9 +117,9 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         run_service = RunService(db)
 
         # 核心修复：通过 patch "run_service.AgentRunner" 来正确 mock 线程中实例化的类，并重定向 DB 操作为测试内存库
-        with patch("agent_prototype.execution.persistence.run_service._executor", self.executor), \
-             patch("agent_prototype.execution.persistence.run_service._global_futures", self.futures), \
-             patch("agent_prototype.execution.persistence.run_service.AgentRunner") as MockAgent, \
+        with patch("agent_prototype.execution.service._executor", self.executor), \
+             patch("agent_prototype.execution.service._global_futures", self.futures), \
+             patch("agent_prototype.execution.service.AgentRunner") as MockAgent, \
              patch("agent_prototype.infra.db.engine.SessionLocal", self.session_local):
             
             mock_instance = MagicMock()
@@ -142,8 +143,8 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             self.futures[child_run_id].result(timeout=10)
 
         try:
-            store = SqliteSessionStore(db)
-            children = store.get_children_runs(parent_run_id)
+            run_store = SqliteRunStore(db)
+            children = run_store.get_children_runs(parent_run_id)
             self.assertEqual(len(children), 1)
             self.assertEqual(children[0].run_id, child_run_id)
             self.assertEqual(children[0].parent_run_id, parent_run_id)
@@ -167,9 +168,9 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         db = self.session_local()
         run_service = RunService(db)
 
-        with patch("agent_prototype.execution.persistence.run_service._executor", self.executor), \
-             patch("agent_prototype.execution.persistence.run_service._global_futures", self.futures), \
-             patch("agent_prototype.execution.persistence.run_service.AgentRunner") as MockAgent, \
+        with patch("agent_prototype.execution.service._executor", self.executor), \
+             patch("agent_prototype.execution.service._global_futures", self.futures), \
+             patch("agent_prototype.execution.service.AgentRunner") as MockAgent, \
              patch("agent_prototype.infra.db.engine.SessionLocal", self.session_local):
             
             mock_instance = MagicMock()
@@ -189,8 +190,8 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             self.futures[r2.content].result(timeout=10)
 
         try:
-            store = SqliteSessionStore(db)
-            children = store.get_children_runs(parent_run_id)
+            run_store = SqliteRunStore(db)
+            children = run_store.get_children_runs(parent_run_id)
             self.assertEqual(len(children), 2)
             for child in children:
                 self.assertEqual(child.parent_run_id, parent_run_id)
@@ -213,10 +214,10 @@ class TestGetChildrenRuns(unittest.TestCase):
     def test_children_isolated_from_other_parents(self):
         db = self.session_local()
         try:
-            store = SqliteSessionStore(db)
+            run_store = SqliteRunStore(db)
 
             # parent A 有一个子 run
-            store.create_child_run(
+            run_store.create_child_run(
                 parent_run_id="parent-A",
                 session_id="session-A1",
                 run_id="run-A1",
@@ -226,7 +227,7 @@ class TestGetChildrenRuns(unittest.TestCase):
                 events=[],
             )
             # parent B 有一个子 run
-            store.create_child_run(
+            run_store.create_child_run(
                 parent_run_id="parent-B",
                 session_id="session-B1",
                 run_id="run-B1",
@@ -237,16 +238,16 @@ class TestGetChildrenRuns(unittest.TestCase):
             )
             db.commit()
 
-            children_of_a = store.get_children_runs("parent-A")
+            children_of_a = run_store.get_children_runs("parent-A")
             self.assertEqual(len(children_of_a), 1)
             self.assertEqual(children_of_a[0].run_id, "run-A1")
 
-            children_of_b = store.get_children_runs("parent-B")
+            children_of_b = run_store.get_children_runs("parent-B")
             self.assertEqual(len(children_of_b), 1)
             self.assertEqual(children_of_b[0].run_id, "run-B1")
 
             # 不存在的 parent 返回空列表
-            self.assertEqual(store.get_children_runs("parent-none"), [])
+            self.assertEqual(run_store.get_children_runs("parent-none"), [])
         finally:
             db.close()
 

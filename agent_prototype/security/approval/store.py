@@ -21,7 +21,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from agent_prototype.infra.db.orm_models import PendingApproval
-from agent_prototype.model.types.domain import ChatMessage
+from agent_prototype.core.types import ChatMessage
 
 class SqliteApprovalStore:
     """SQLite 审批持久化仓储类

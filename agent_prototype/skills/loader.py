@@ -1,59 +1,107 @@
 """
-[九层模型 - L4 技能层 (Skill Loader Layer)]
+[九层模型 - L4 技能层 - 基础设施 (Skill Loader Infra)]
 
 文件职责：
-- 负责系统技能（Skills）的物理文件扫描、Frontmatter 解析（_parse_frontmatter）和技能状态（使能/禁止）控制。
-- 封装带 30s TTL 缓存策略的 `list_skills()` 接口与 `load_skill_content()` 接口。
+1. 负责系统技能（Skills）的物理文件扫描、Frontmatter 解析和启用状态持久化配置。
+2. 整合原 skills/loader/config.py 与 skills/loader/loader.py，消灭多余的 loader/ 子目录。
 
-上游依赖：L6 技能上下文服务 (skill_context.py)、L10 API 接口层。
-下游依赖：L4 技能配置层 (config.py)。
+数据流向：
+- 输入：物理技能文件的读取请求与配置变更。
+- 输出：SkillSummary 对象列表、完整技能 Markdown 文本。
 """
+
+import json
+import logging
+import time as _time
 from pathlib import Path
 from typing import Optional
-import time as _time
 from agent_prototype.skills.types import SkillSummary
-from . import config as _skill_config
-from .config import (
-    DEFAULT_PROTECTED_SKILL_NAMES,
-    SkillConfig,
-)
-# 模块级变量 —— 进程启动时只创建一次，相当于"全局内存格子"
-_list_skills_cache:Optional[list]=None
-_list_skills_cache_ts:float=0.0
-_LIST_SKILLS_TTL=30
+
+logger = logging.getLogger(__name__)
+
+# --- 1. 配置契约与实体声明 ---
+DEFAULT_PROTECTED_SKILL_NAMES = {"default"}  # 默认保护的 skill，防止被误禁用
+SKILL_CONFIG_FILENAME = "skill-config.json"  # skill 配置文件名
+_list_skills_cache: Optional[list] = None
+_list_skills_cache_ts: float = 0.0
+_LIST_SKILLS_TTL = 30
+
+
+class SkillConfig:
+    """保存禁用 skill 名单的配置对象。"""
+
+    def __init__(self, disabled: set[str]):
+        """输入：disabled 名称集合。输出：初始化后的 SkillConfig 实例。"""
+        self.disabled = disabled
+
 
 def get_default_skill_config_path() -> Path:
-    return _skill_config.get_default_skill_config_path()
+    """输入：无。输出：默认 skill 配置文件路径。"""
+    repo_root = Path(__file__).resolve().parents[3]  # 反推至仓库根目录 (infra/ → skills/ → agent_prototype/ → repo)
+    return repo_root / ".agent" / SKILL_CONFIG_FILENAME
+
+
+def _normalize_name_set(values: object) -> set[str]:
+    """输入：任意 JSON 字段值。输出：过滤后的 skill 名称集合。"""
+    if not isinstance(values, list):
+        return set()
+    return {str(item) for item in values if str(item).strip()}
 
 
 def load_skill_config(config_path: Optional[Path] = None) -> SkillConfig:
+    """输入：可选的配置文件路径。输出：SkillConfig 配置对象。"""
     path = config_path or get_default_skill_config_path()
-    return _skill_config.load_skill_config(path)
+
+    if not path.exists():
+        return SkillConfig(disabled=set())
+
+    try:
+        raw_data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        logger.warning("Failed to parse skill config at %s, falling back to empty", path, exc_info=True)
+        return SkillConfig(disabled=set())
+
+    disabled_names = _normalize_name_set(raw_data.get("disabled"))
+    return SkillConfig(disabled=disabled_names)
 
 
 def is_skill_disabled(skill_name: str, config: SkillConfig) -> bool:
-    return _skill_config.is_skill_disabled(skill_name, config)
+    """输入：skill 名称、SkillConfig 对象。输出：这个 skill 是否在禁用名单里。"""
+    return skill_name in config.disabled
 
 
 def save_skill_config(config: SkillConfig, config_path: Optional[Path] = None) -> None:
+    """输入：SkillConfig 对象、可选的配置文件路径。输出：无，副作用是把配置写回磁盘并清除内存缓存。"""
     global _list_skills_cache, _list_skills_cache_ts
     path = config_path or get_default_skill_config_path()
-    _skill_config.save_skill_config(config, path)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "disabled": sorted(config.disabled)
+    }
+
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     # 配置变更后立即失效缓存，确保下次 list_skills 重新读取
     _list_skills_cache = None
     _list_skills_cache_ts = 0.0
 
 
-def get_default_skill_roots() -> list[tuple[str, Path]]:  # 返回默认要扫描的skill的根目录
+# --- 2. 动态技能文件扫描与解析基础设施 ---
+
+def get_default_skill_roots() -> list[tuple[str, Path]]:
     """输入：无。输出：默认 skill 根目录列表。"""
-    repo_root = Path(__file__).resolve().parents[2]  # 从当前文件反推到仓库根目录
-    package_root = Path(__file__).resolve().parents[1]  # 反推到agent_prototype根目录
-    home_root = Path.home()  # 全局目录
-    return [  # 返回“来源标签 + 实际路径”，方便后面做安全 path
-        ("opencode", repo_root / ".opencode" / "skills"),  # 项目内 opencode skills 目录
-        ("agents", repo_root / ".agents" / "skills"),  # 项目内 agents skills 目录
-        ("builtin", package_root / "skills"),  # 应用内置 skills 目录
-        ("user-codex", home_root / ".codex" / "skills"),  # 用户级skill
+    repo_root = Path(__file__).resolve().parents[3]  # 从当前文件反推至仓库根目录
+    package_root = Path(__file__).resolve().parents[2]  # 反推至 agent_prototype 根目录
+    home_root = Path.home()
+    return [
+        ("opencode", repo_root / ".opencode" / "skills"),
+        ("agents", repo_root / ".agents" / "skills"),
+        ("builtin", package_root / "skills"),
+        ("user-codex", home_root / ".codex" / "skills"),
         ("user", home_root / ".agents" / "skills"),
     ]
 
@@ -64,29 +112,29 @@ def list_skills(
 ) -> list[SkillSummary]:
     """输入：可选的 skill 根目录列表、可选的配置文件路径。输出：合并启用状态后的 SkillSummary 列表。"""
     global _list_skills_cache, _list_skills_cache_ts
-    # ↑ 声明"我要修改模块级变量"，不写 global 的话 Python 会把赋值当成局部变量
-    use_cache=skill_roots is None and config_path is None
-    # ↑ 只有用默认参数调用时才走缓存；传了自定义路径的调用跳过缓存
+    use_cache = skill_roots is None and config_path is None
     if use_cache:
-        now=_time.monotonic()# ↑ monotonic() = 单调递增的时钟，只用来算时间差，不受系统时间调整影响
+        now = _time.monotonic()
         if _list_skills_cache is not None and now - _list_skills_cache_ts < _LIST_SKILLS_TTL:
             return _list_skills_cache
-    roots = skill_roots or get_default_skill_roots()  # 没传目录时，使用默认 skill 扫描目录
-    if config_path is not None or skill_roots is None:
-        config = load_skill_config(config_path)  # 先读取 skill 配置，拿到 disabled 名单
-    else:
-        config = SkillConfig(disabled=set())  # 测试/自定义 roots 场景默认不叠加全局配置
-    results: list[SkillSummary] = []  # 返回的结果
 
-    for source_name, root_path in roots:  # 逐个扫描每个目录
-        if not root_path.exists():  # 目录不存在直接提哦啊过
+    roots = skill_roots or get_default_skill_roots()
+    if config_path is not None or skill_roots is None:
+        config = load_skill_config(config_path)
+    else:
+        config = SkillConfig(disabled=set())
+
+    results: list[SkillSummary] = []
+
+    for source_name, root_path in roots:
+        if not root_path.exists():
             continue
 
-        for skill_file in sorted(root_path.glob("*/SKILL.md")):  # 只匹配一级目录下的SKILL.md
-            summary = _load_skill_summary(skill_file, source_name, root_path)  # 先按原逻辑解析出一个 SkillSummary
+        for skill_file in sorted(root_path.glob("*/SKILL.md")):
+            summary = _load_skill_summary(skill_file, source_name, root_path)
             if summary.enabled and is_skill_disabled(summary.name, config):
-                summary = summary.model_copy(update={"enabled": False})  # 命中 disabled 名单时，把 enabled 改成 False
-            results.append(summary)  # 逐个读取摘要
+                summary = summary.model_copy(update={"enabled": False})
+            results.append(summary)
 
     result = sorted(results, key=lambda item: item.name.lower())
 
@@ -99,8 +147,8 @@ def list_skills(
 
 def _load_skill_summary(skill_file: Path, source_name: str, root_path: Path) -> SkillSummary:
     """输入：单个 SKILL.md 路径、来源名、来源根目录。输出：一个 SkillSummary。"""
-    safe_relative_path = skill_file.relative_to(root_path).as_posix()  # 先算相对路径 /Users/haoyu/.agent/skills/python_debug/SKILL.md
-    safe_path = f"{source_name}/{safe_relative_path}"  # 给前端返回“来源+相对路径” user/python_debug/SKILL.md
+    safe_relative_path = skill_file.relative_to(root_path).as_posix()
+    safe_path = f"{source_name}/{safe_relative_path}"
 
     try:
         content = skill_file.read_text(encoding="utf-8")
@@ -121,47 +169,47 @@ def _load_skill_summary(skill_file: Path, source_name: str, root_path: Path) -> 
         )
 
 
-def _parse_frontmatter(content: str) -> dict[str, str]:  # 从SKILL.md提取frontmatter字段
+def _parse_frontmatter(content: str) -> dict[str, str]:
     """输入：SKILL.md 全文字符串。输出：frontmatter 键值字典。"""
-    lines = content.splitlines()  # 按行拆
+    lines = content.splitlines()
 
-    if len(lines) < 3 or lines[0].strip() != "---":  # 没有frontmatter视为坏的skill
+    if len(lines) < 3 or lines[0].strip() != "---":
         raise ValueError("Missing frontmatter")
 
-    metadata: dict[str, str] = {}  # 存解析出来的键值对
+    metadata: dict[str, str] = {}
 
-    for line in lines[1:]:  # 从第二行开始读frontmatter 内容
+    for line in lines[1:]:
         if line.strip() == "---":
             return metadata
 
-        if ":" not in line:  # frontmatter 行至少要有 key: value
+        if ":" not in line:
             raise ValueError(f"Invalid frontmatter line: {line}")
 
-        key, value = line.split(":", 1)  # 只按第一个冒号切，避免值里再有冒号时切坏
-        metadata[key.strip()] = value.strip().strip('"').strip("'")  # 去掉前后空格和简单引号
+        key, value = line.split(":", 1)
+        metadata[key.strip()] = value.strip().strip('"').strip("'")
 
-    raise ValueError("Frontmatter not closed")  # 没遇到结束边界，说明 frontmatter 不完整
+    raise ValueError("Frontmatter not closed")
 
 
-def load_skill_content(skill_name: str, skill_roots: Optional[list[tuple[str, Path]]] = None) -> str:  # 按名字加载完整 skill 正文
-    """输入：skill 名称、可选的 skill 根目录列表。输出：目标 skill 的完整 SKILL.md 文本。"""  # 说明这个函数返回的是全文，不是摘要
+def load_skill_content(skill_name: str, skill_roots: Optional[list[tuple[str, Path]]] = None) -> str:
+    """输入：skill 名称、可选的 skill 根目录列表。输出：目标 skill 的完整 SKILL.md 文本。"""
+    roots = skill_roots or get_default_skill_roots()
 
-    roots = skill_roots or get_default_skill_roots()  # 没传自定义目录时，使用默认扫描根目录
+    for _, root_path in roots:
+        if not root_path.exists():
+            continue
 
-    for _, root_path in roots:  # 逐个扫描每个 skill 根目录
-        if not root_path.exists():  # 目录不存在时直接跳过
-            continue  # 不把缺失目录当成错误
+        for skill_file in sorted(root_path.glob("*/SKILL.md")):
+            try:
+                content = skill_file.read_text(encoding="utf-8")
+                metadata = _parse_frontmatter(content)
+            except Exception:
+                logger.warning("Failed to parse skill file %s, skipping", skill_file, exc_info=True)
+                continue
 
-        for skill_file in sorted(root_path.glob("*/SKILL.md")):  # 逐个检查每个 SKILL.md
-            try:  # 单个坏 skill 不应该打断整个查找流程
-                content = skill_file.read_text(encoding="utf-8")  # 先读完整文件内容
-                metadata = _parse_frontmatter(content)  # 解析 frontmatter，拿到 skill 名字
-            except Exception:  # 如果这个 skill 自己坏了
-                continue  # 直接跳过它，继续找别的 skill
+            current_name = str(metadata.get("name") or skill_file.parent.name)
 
-            current_name = str(metadata.get("name") or skill_file.parent.name)  # 优先用 frontmatter.name，没有就退回目录名
+            if current_name == skill_name:
+                return content
 
-            if current_name == skill_name:  # 找到目标 skill
-                return content  # 返回完整 SKILL.md 文本
-
-    raise ValueError(f"Skill not found: {skill_name}")  # 所有目录都没找到时抛错
+    raise ValueError(f"Skill not found: {skill_name}")

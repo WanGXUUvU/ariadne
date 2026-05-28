@@ -10,11 +10,11 @@
 下游依赖：L1 模型层 (ModelAdapter)。
 """
 from typing import Optional
-from agent_prototype.model.types.domain import ChatMessage
-from agent_prototype.model.types.agent import AgentState
-from agent_prototype.api.dto.schemas import CompactOutput
-from agent_prototype.model.adapters.protocol import ModelAdapter
-from agent_prototype.model.types.model_types import ModelRequest, ModelConfig
+from agent_prototype.core.types import ChatMessage
+from agent_prototype.core.types import AgentState
+from agent_prototype.core.types import CompactOutput
+from agent_prototype.core.types import ModelAdapter
+from agent_prototype.core.types import ModelRequest, ModelConfig
 
 DEFAULT_COMPACT_THRESHOLD=12 #默认超过12条消息时触发 compact
 DEFAULT_KEEP_RECENT_COUNT=4 #默认 compact 后保留最近 4 条原始消息

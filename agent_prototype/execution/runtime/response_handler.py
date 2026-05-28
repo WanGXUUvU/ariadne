@@ -15,8 +15,8 @@
 - 下游流向：提供给 Runtime 引擎进行会话状态追加。
 """
 
-from agent_prototype.model.types.agent import AgentEvent
-from agent_prototype.model.types.domain import ChatMessage
+from agent_prototype.core.types import AgentEvent
+from agent_prototype.core.types import ChatMessage
 
 def build_final_turn(raw_reply:str,event_index:int)->tuple[str,AgentEvent,ChatMessage]:
     """这是一个“最终回复打包机”。

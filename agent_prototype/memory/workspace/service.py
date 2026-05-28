@@ -20,7 +20,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from agent_prototype.infra.db.orm_models import WorkspaceRecord
 from agent_prototype.memory.workspace.store import SqliteWorkspaceStore
-from agent_prototype.tools.builtin.os.apple_script import open_folder_dialog
+from agent_prototype.tools.builtin.system.apple_script import open_folder_dialog
 
 class WorkspaceService:
     """工作空间服务类 (OOP)

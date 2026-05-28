@@ -13,78 +13,77 @@
 - 输入：HTTP POST / GET / SSE 请求及输入校验 DTO。
 - 输出：HTTP JSON 响应或 SSE 事件流。
 - 上游来源：前端对话视窗 / 审批卡片。
-- 下游流向：调用 agent_prototype/execution/persistence/run_service.py 进行业务编排。
+- 下游流向：调用 agent_prototype/execution/service.py 进行业务编排。
 """
 
-from fastapi import APIRouter, Depends, status  # 导入路由、依赖和状态码
-from sqlalchemy.orm import Session  # 导入数据库会话
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
-from agent_prototype.model.types.agent import AgentInput, AgentOutput, FinalizeRunInput
-from agent_prototype.api.dto.schemas import ResetInput, RunDetailResponse, ToolCallSummary  # 导入请求响应模型
-from agent_prototype.execution.persistence.run_service import RunService
-from agent_prototype.execution.runtime.agent_executor import _global_futures  # 导入全新的 RunService
-from agent_prototype.memory.session.service import SessionService  # 导入全新的 SessionService
-from agent_prototype.infra.db.engine import get_db  # 导入数据库依赖
-from agent_prototype.api.routes.dependencies import error_response  # 导入统一错误响应
+from agent_prototype.core.types import AgentInput, AgentOutput, FinalizeRunInput, ResetInput
+from agent_prototype.api.dto.schemas import RunDetailResponse, ToolCallSummary
+from agent_prototype.execution.service import RunService
+from agent_prototype.execution.runtime.agent_executor import _global_futures
+from agent_prototype.memory.session.service import SessionService
+from agent_prototype.api.routes.dependencies import (
+    error_response,
+    get_run_service,
+    get_session_service,
+)
 
 router = APIRouter()  # 创建本文件路由器
 
 
-@router.post("/run", response_model=AgentOutput)  # 定义 /run 接口
-def run_agent_api(agent_input: AgentInput, db: Session = Depends(get_db)) -> AgentOutput:  # 接收输入和 DB
+@router.post("/run", response_model=AgentOutput)
+def run_agent_api(agent_input: AgentInput, service: RunService = Depends(get_run_service)) -> AgentOutput:
     """这个函数是用来让指定的 Agent 跑起来并立刻给出完整答复的（非流式）。
     
     就像发微信消息一样，你发一句话，它在后台默默思考、查工具，等全部想好之后一次性把完整答案回给你。
     
     需要拿到的东西：
     - agent_input: AgentInput 对象，里面包含当前在哪个会话聊天、用户发了什么、用哪个 Agent 模板等。
-    - db: 数据库连接会话，用于在运行中读写数据库。
+    - service: RunService 实例，由依赖注入提供。
     
     会给出来的结果：
     - AgentOutput 对象，里面包含了 Agent 的回答以及这次运行的一些状态信息。
     """
-    try:  # 捕获业务错误
-        service = RunService(db)
-        return service.run_agent(agent_input)  # 实例化并调用 OOP 成员方法
-    except ValueError as exc:  # 捕获参数或业务校验错误
-        return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))  # 返回统一错误
+    try:
+        return service.run_agent(agent_input)
+    except ValueError as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
 
 
-@router.post("/reset")  # 定义 /reset 接口
-def reset_session_api(payload: ResetInput, db: Session = Depends(get_db)) -> dict[str, bool]:  # 接收重置请求
+@router.post("/reset")
+def reset_session_api(payload: ResetInput, service: SessionService = Depends(get_session_service)) -> dict[str, bool]:
     """这个函数是用来彻底重置或者清空某个聊天会话的历史记录的。
     
     就像你跟客服聊天按了“清除历史记录”或者“重新开始”一样，清空后可以重新开始一段干净的对话。
     
     需要拿到的东西：
     - payload: ResetInput 对象，里面需要包含你要重置哪一个会话（session_id）。
-    - db: 数据库连接会话，用来清理数据库中该会话下的所有历史消息。
+    - service: SessionService 实例，由依赖注入提供。
     
     会给出来的结果：
     - 一个字典，形如 {"status": True}，告诉你重置操作是否成功了。
     """
-    try:  # 捕获业务错误
-        service = SessionService(db)
-        return service.reset_session(payload)  # 实例化并调用 SessionService 成员方法
-    except ValueError as exc:  # 捕获业务错误
-        return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))  # 返回统一错误
+    try:
+        return service.reset_session(payload)
+    except ValueError as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
 
 
 @router.post("/run/stream")
-async def run_stream_api(agent_input: AgentInput, db: Session = Depends(get_db)) -> StreamingResponse:
+async def run_stream_api(agent_input: AgentInput, service: RunService = Depends(get_run_service)) -> StreamingResponse:
     """这个函数是用来让指定的 Agent 跑起来并像“打字机”一样源源不断地实时流式返回它的思考和回答的（SSE 协议）。
     
     当你要做聊天界面，希望用户能实时看到 Agent 正在一个字一个字蹦出来答案时，就用这个接口。
     
     需要拿到的东西：
     - agent_input: AgentInput 对象，包含了会话、用户输入和 Agent 配置。
-    - db: 数据库连接会话，用来在运行时读写状态。
+    - service: RunService 实例，由依赖注入提供。
     
     会给出来的结果：
     - 一个 StreamingResponse 流式响应，浏览器可以通过 EventSource 监听并实时渲染 Agent 的打字效果。
     """
     try:
-        service = RunService(db)
         return StreamingResponse(
             service.async_stream_agent(agent_input),
             media_type="text/event-stream",
@@ -94,7 +93,7 @@ async def run_stream_api(agent_input: AgentInput, db: Session = Depends(get_db))
 
 
 @router.post("/sessions/{session_id}/runs/{run_id}/finalize")
-def finalize_run_api(session_id: str, run_id: str, payload: FinalizeRunInput, db: Session = Depends(get_db)):
+def finalize_run_api(session_id: str, run_id: str, payload: FinalizeRunInput, service: RunService = Depends(get_run_service)):
     """这个函数是用来手动终结或归档一次 Agent 运行记录的。
     
     当一次运行由于异常、用户打断或某些外部原因没有正常结束，或者需要人工把回复内容强行写进历史记录时，可以用这个接口来强行写个结尾。
@@ -103,13 +102,12 @@ def finalize_run_api(session_id: str, run_id: str, payload: FinalizeRunInput, db
     - session_id: 字符串类型，当前会话的唯一标识。
     - run_id: 字符串类型，当前运行实例的唯一标识.
     - payload: FinalizeRunInput 对象，包含强行写入的用户输入、部分回复、Agent 名字和 Skill 名字等信息。
-    - db: 数据库连接会话，用来将数据最终存入数据库。
+    - service: RunService 实例，由依赖注入提供。
     
     会给出来的结果：
     - 归档操作完成后的运行记录结果。
     """
     try:
-        service = RunService(db)
         return service.finalize_run(
             session_id=session_id,
             run_id=run_id,
@@ -123,7 +121,7 @@ def finalize_run_api(session_id: str, run_id: str, payload: FinalizeRunInput, db
 
 
 @router.get("/sessions/{session_id}/runs/{run_id}")
-def get_run_detail_api(session_id: str, run_id: str, db: Session = Depends(get_db)):
+def get_run_detail_api(session_id: str, run_id: str, service: RunService = Depends(get_run_service)):
     """这个函数是用来获取某次 Agent 运行的超详细内幕信息的。
     
     比如这次运行中，Agent 到底调用了哪些工具？工具是什么时候开始调用的，什么时候结束的，工具的输入参数是什么，吐出来的结果是什么，都会被一览无余地查出来。
@@ -131,12 +129,11 @@ def get_run_detail_api(session_id: str, run_id: str, db: Session = Depends(get_d
     需要拿到的东西：
     - session_id: 字符串类型，会话 ID。
     - run_id: 字符串类型，运行记录 ID。
-    - db: 数据库连接会话，用来从数据库里捞出运行数据和工具调用记录。
+    - service: RunService 实例，由依赖注入提供。
     
     会给出来的结果：
     - RunDetailResponse 对象，里面有运行状态、用户输入、最终回复，以及详细的 tool_calls 工具调用记录列表。
     """
-    service = RunService(db)
     run, tool_calls = service.get_run_detail(session_id, run_id)
     if not run:
         return error_response(status.HTTP_404_NOT_FOUND, "not found", "run not found")

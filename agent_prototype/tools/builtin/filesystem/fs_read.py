@@ -14,7 +14,7 @@
 """
 
 from pathlib import Path  # 方便处理文件路径
-from agent_prototype.tools.protocol import ToolDefinition,RiskLevel  # 导入工具定义
+from agent_prototype.tools.types import ToolDefinition,RiskLevel  # 导入工具定义
 
 
 def read_file(path: str) -> str:  # 真正读文件的函数

@@ -15,7 +15,7 @@
 """
 
 from pathlib import Path  # 处理文件路径
-from agent_prototype.tools.protocol import ToolDefinition,RiskLevel  # 导入工具定义
+from agent_prototype.tools.types import ToolDefinition,RiskLevel  # 导入工具定义
 
 
 def write_file(path: str, content: str) -> str:  # 把内容写入文件

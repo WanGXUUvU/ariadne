@@ -12,8 +12,8 @@
 import json  # 解析工具参数 JSON
 from typing import Optional, Callable  # 类型标注
 
-from agent_prototype.model.types.domain import ToolError, ToolResult
-from agent_prototype.tools.protocol import ToolDefinition, RiskLevel
+from agent_prototype.core.types import ToolError, ToolResult
+from agent_prototype.tools.types import ToolDefinition, RiskLevel
 from .builtin.util.echo import build_echo_tool_definition
 from .builtin.filesystem.fs_read import build_read_file_tool_definition
 from .builtin.filesystem.fs_list import build_list_dir_definition

@@ -10,19 +10,22 @@
 """
 
 # ── 标准库 ────────────────────────────────────────────────────────────────────
+import logging
 from typing import AsyncIterator, List
 
+logger = logging.getLogger(__name__)
+
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.model.types.model_types import ModelStreamEvent
-from agent_prototype.model.types.agent import (
+from agent_prototype.core.types import ModelStreamEvent
+from agent_prototype.core.types import (
     AgentEvent, AgentInput, AgentOutput, RunMetadata,
 )
 from agent_prototype.execution.streaming.types import StreamFrame
 from agent_prototype.execution.streaming.sse import _sse_frame
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
-from agent_prototype.observation.hooks.tool_run_observer import ToolRunObserver
-from agent_prototype.execution.persistence.run_context_builder import RunContext
-from agent_prototype.execution.persistence.run_persistence import RunPersistenceService
+from agent_prototype.observation.tool_run_observer import ToolRunObserver
+from agent_prototype.execution.persistence.builder import RunContext
+from agent_prototype.execution.persistence.service import RunPersistenceService
 
 
 class StreamRunSession:
@@ -132,7 +135,11 @@ class StreamRunSession:
                         events=events,
                     )
                 except Exception:
-                    pass
+                    logger.exception(
+                        "Failed to persist cancelled run: session_id=%s run_id=%s",
+                        self.agent_input.session_id,
+                        self.run_id,
+                    )
 
     # ── 私有帧构造 ────────────────────────────────────────────────────────────
 

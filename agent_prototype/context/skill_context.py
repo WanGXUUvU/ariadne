@@ -12,8 +12,8 @@
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from agent_prototype.agent.definition import AgentDefinition
-from agent_prototype.model.types.agent import AgentInput
+from agent_prototype.core.types import AgentDefinition
+from agent_prototype.core.types import AgentInput
 from agent_prototype.skills.types import SkillSummary
 from agent_prototype.prompt.builder import (
     build_runtime_system_prompt,

@@ -21,12 +21,13 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import AsyncIterator, Optional, Union
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.model.types.agent import AgentEvent
-from agent_prototype.model.types.domain import ChatMessage, RiskLevel, ToolCall, ToolResult
-from agent_prototype.security.policy import ApprovalPolicy, needs_approval
+from agent_prototype.core.types import AgentEvent
+from agent_prototype.core.types import ChatMessage, RiskLevel, ToolCall, ToolResult
+from agent_prototype.security.policy import ApprovalPolicy
+from agent_prototype.security.approval.checker import needs_approval
 from agent_prototype.tools.registry import ToolRegistry
 from agent_prototype.security.middleware.base import MiddlewarePipeline
-from agent_prototype.security.middleware.base import ToolCallContext
+from agent_prototype.security.types import ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.security.approval.middleware import ApprovalMiddleware, ApprovalRequiredException
 
@@ -43,17 +44,7 @@ TOOL_TIMEOUT = 120  # 单次工具调用最长等待秒数
 
 # ── 数据类 ────────────────────────────────────────────────────────────────────
 
-@dataclass
-class ToolTurnResult:
-    """这是一个“一轮工具调用处理完后的结算账单（结果实体）”。
-    当智能体把一轮里的所有工具全部调用完（或者中途因为需要审批而暂停）后，它会用这个账单把产生的事件、追加的消息、
-    下一个事件的序号、以及是不是“因为要审批所以暂停了”等信息给汇总打包。
-    """
-
-    events: list[AgentEvent]
-    tool_messages: list[ChatMessage]
-    next_event_index: int
-    paused_for_approval: bool = False
+from agent_prototype.execution.runtime.types import ToolTurnResult
 
 # ── 同步工具执行 ──────────────────────────────────────────────────────────────
 

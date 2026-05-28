@@ -22,7 +22,7 @@ from agent_prototype.skills.loader import (
     list_skills as loader_list_skills,
     save_skill_config,
     load_skill_config,
-    DEFAULT_PROTECTED_SKILL_NAMES
+    DEFAULT_PROTECTED_SKILL_NAMES,
 )
 
 
@@ -78,4 +78,3 @@ class SkillService:
         save_skill_config(config)
 
         return self._reload_skill(skill_name)
-

@@ -24,10 +24,8 @@ from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
 from agent_prototype.security.policy import PROFILES
-from agent_prototype.model.types.agent import AgentState
-from agent_prototype.security.policy import ApprovalPolicy, PermissionProfile, SandboxMode
-from agent_prototype.api.dto.schemas import (
-    CreateSessionInput, RenameSessionInput, ResetInput, SessionSummary,
+from agent_prototype.core.types import (
+    AgentState, CreateSessionInput, RenameSessionInput, ResetInput, SessionSummary,
 )
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig
 from agent_prototype.memory.session.store import SqliteSessionStore
@@ -227,4 +225,42 @@ class SessionService:
             self.db.rollback()
             raise
         return {"ok": True}
+
+    def list_sessions(self) -> list[SessionSummary]:
+        """列出系统中所有会话的摘要列表。
+
+        会给出来的结果：
+        - 包含多个 SessionSummary 对象的列表。
+        """
+        records = self.store.list_sessions()
+        return [
+            SessionSummary(
+                session_id=record.session_id,
+                session_name=record.session_name,
+                created_at=record.created_at,
+                updated_at=record.updated_at,
+                last_agent_name=record.last_agent_name,
+                last_skill_name=record.last_skill_name,
+                message_count=record.message_count,
+                last_reply_preview=record.last_reply_preview,
+                permission_profile=record.permission_profile,
+                context_tokens=record.context_tokens,
+                workspace_path=record.workspace_path,
+                workspace_name=record.workspace_name,
+                session_type=record.session_type,
+            )
+            for record in records
+        ]
+
+    def get_session(self, session_id: str):
+        """读取单个会话的详细记录和状态。
+
+        会给出来的结果：
+        - 一个元组 (record, state)，如果找不到则返回 (None, None)。
+        """
+        record = self.store.read_session_record(session_id)
+        if record is None:
+            return None, None
+        state = self.store.read_session_state(session_id)
+        return record, state
 

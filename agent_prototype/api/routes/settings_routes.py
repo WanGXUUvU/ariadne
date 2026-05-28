@@ -17,12 +17,11 @@
 
 from typing import Optional
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.orm import Session
 
-from agent_prototype.api.dto.schemas import CreateProviderInput, ModelOut, PatchModelInput, PatchProviderInput, ProviderOut
-from agent_prototype.agent.settings_service import SettingsService
-from agent_prototype.infra.db.engine import get_db
-from agent_prototype.api.routes.dependencies import error_response
+from agent_prototype.core.types import ModelOut, ProviderOut
+from agent_prototype.api.dto.schemas import CreateProviderInput, PatchModelInput, PatchProviderInput
+from agent_prototype.agent.settings import SettingsService
+from agent_prototype.api.routes.dependencies import error_response, get_settings_service
 
 router = APIRouter(prefix="/settings")
 
@@ -32,19 +31,18 @@ router = APIRouter(prefix="/settings")
 # ---------------------------------------------------------------------------
 
 @router.post("/providers", response_model=ProviderOut, status_code=status.HTTP_201_CREATED)
-def create_provider_api(payload: CreateProviderInput, db: Session = Depends(get_db)) -> ProviderOut:
+def create_provider_api(payload: CreateProviderInput, service: SettingsService = Depends(get_settings_service)) -> ProviderOut:
     """这个函数是用来创建一个新的大模型厂商（Provider）的。
     
     比如你想添加一个新的 OpenAI 兼容厂商或者本地的 Ollama 服务，你就需要把它的名字、接口地址和 API Key 传过来。
     
     需要拿到的东西：
     - payload: CreateProviderInput 对象，里面包含厂商的名字、API 地址（base_url）以及密钥（api_key）。
-    - db: 数据库连接会话，用于将数据存到数据库中。
+    - service: SettingsService 实例，由依赖注入提供。
     
     会给出来的结果：
     - ProviderOut 对象，也就是刚刚创建成功的模型厂商的详细信息（包含自动分配的厂商 ID 等）。
     """
-    service = SettingsService(db)
     return service.create_provider(
         name=payload.name,
         base_url=payload.base_url,
@@ -53,43 +51,41 @@ def create_provider_api(payload: CreateProviderInput, db: Session = Depends(get_
 
 
 @router.get("/providers", response_model=list[ProviderOut])
-def list_providers_api(db: Session = Depends(get_db)) -> list[ProviderOut]:
+def list_providers_api(service: SettingsService = Depends(get_settings_service)) -> list[ProviderOut]:
     """这个函数是用来列出系统里所有已配置的大模型厂商（Provider）的。
     
     方便你在设置界面上查看目前都有哪些大模型厂商可用。
     
     需要拿到的东西：
-    - db: 数据库连接会话，用于去数据库中查找所有的厂商配置。
+    - service: SettingsService 实例，由依赖注入提供。
     
     会给出来的结果：
     - 包含所有已配置厂商信息的列表（List[ProviderOut]）。
     """
-    service = SettingsService(db)
     return service.list_providers()
 
 
 @router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_provider_api(provider_id: int, db: Session = Depends(get_db)) -> None:
+def delete_provider_api(provider_id: int, service: SettingsService = Depends(get_settings_service)) -> None:
     """这个函数是用来删除指定 ID 的大模型厂商的。
     
     如果某个厂商不用它了，可以通过这个接口删掉它。
     
     需要拿到的东西：
     - provider_id: 整数类型，也就是你要删除的大模型厂商的唯一 ID。
-    - db: 数据库连接会话，用于在数据库中执行删除。
+    - service: SettingsService 实例，由依赖注入提供。
     
     会给出来的结果：
     - 成功删除后没有返回值（统一返回 204 No Content）。如果找不到对应的厂商，会返回 404 错误。
     """
     try:
-        service = SettingsService(db)
         service.delete_provider(provider_id)
     except ValueError as exc:
         return error_response(status.HTTP_404_NOT_FOUND, "provider_not_found", str(exc))
 
 
 @router.patch("/providers/{provider_id}", response_model=ProviderOut)
-def patch_provider_api(provider_id: int, payload: PatchProviderInput, db: Session = Depends(get_db)) -> ProviderOut:
+def patch_provider_api(provider_id: int, payload: PatchProviderInput, service: SettingsService = Depends(get_settings_service)) -> ProviderOut:
     """这个函数是用来修改或者更新某个大模型厂商的配置的。
     
     比如你修改了厂商的 API Key 或者 API 接口地址，甚至是要把它设为默认厂商，都可以调用这个接口。
@@ -97,13 +93,12 @@ def patch_provider_api(provider_id: int, payload: PatchProviderInput, db: Sessio
     需要拿到的东西：
     - provider_id: 整数类型，代表你要修改的大模型厂商的 ID。
     - payload: PatchProviderInput 对象，里面有你要更新的名字、地址、密钥或是否设为默认等信息。
-    - db: 数据库连接会话。
+    - service: SettingsService 实例，由依赖注入提供。
     
     会给出来的结果：
     - ProviderOut 对象，修改成功后的厂商最新配置信息。
     """
     try:
-        service = SettingsService(db)
         return service.patch_provider(
             provider_id,
             name=payload.name,
@@ -120,20 +115,19 @@ def patch_provider_api(provider_id: int, payload: PatchProviderInput, db: Sessio
 # ---------------------------------------------------------------------------
 
 @router.get("/providers/{provider_id}/models", response_model=list[ModelOut])
-def sync_provider_models_api(provider_id: int, db: Session = Depends(get_db)) -> list[ModelOut]:
+def sync_provider_models_api(provider_id: int, service: SettingsService = Depends(get_settings_service)) -> list[ModelOut]:
     """这个函数是用来同步大模型厂商所拥有的具体模型列表的。
     
     它会去厂商那边打个招呼，把厂商支持的所有大语言模型（比如 gpt-4o, claude-3-5 等）拉下来存入我们的本地数据库。
     
     需要拿到的东西：
     - provider_id: 整数类型，你要同步的厂商 ID。
-    - db: 数据库连接会话。
+    - service: SettingsService 实例，由依赖注入提供。
     
     会给出来的结果：
     - 同步完成后的最新模型列表（List[ModelOut]）。
     """
     try:
-        service = SettingsService(db)
         return service.sync_provider_models(provider_id)
     except ValueError as exc:
         return error_response(status.HTTP_404_NOT_FOUND, "provider_not_found", str(exc))
@@ -147,7 +141,7 @@ def sync_provider_models_api(provider_id: int, db: Session = Depends(get_db)) ->
 def list_models_api(
     provider_id: Optional[int] = None,
     enabled: Optional[bool] = None,
-    db: Session = Depends(get_db),
+    service: SettingsService = Depends(get_settings_service),
 ) -> list[ModelOut]:
     """这个函数是用来列出本地数据库中保存的所有可用模型的。
     
@@ -156,17 +150,16 @@ def list_models_api(
     需要拿到的东西：
     - provider_id: 可选的整数，用来过滤特定厂商的模型。
     - enabled: 可选的布尔值，如果为 True 则只返回当前被启用的模型。
-    - db: 数据库连接会话。
+    - service: SettingsService 实例，由依赖注入提供。
     
     会给出来的结果：
     - 包含符合过滤条件的模型列表（List[ModelOut]）。
     """
-    service = SettingsService(db)
     return service.list_models(provider_id=provider_id, enabled_only=enabled is True)
 
 
 @router.patch("/models/{model_id}", response_model=ModelOut)
-def patch_model_api(model_id: int, payload: PatchModelInput, db: Session = Depends(get_db)) -> ModelOut:
+def patch_model_api(model_id: int, payload: PatchModelInput, service: SettingsService = Depends(get_settings_service)) -> ModelOut:
     """这个函数是用来修改单个模型配置的。
     
     比如你想把某个模型禁用/启用，或者给它起一个好听的中文别名（显示名称），就可以调用这个接口。
@@ -174,13 +167,12 @@ def patch_model_api(model_id: int, payload: PatchModelInput, db: Session = Depen
     需要拿到的东西：
     - model_id: 整数类型，要修改的模型 ID。
     - payload: PatchModelInput 对象，里面有你要设置的是否启用状态或者展示名字。
-    - db: 数据库连接会话。
+    - service: SettingsService 实例，由依赖注入提供。
     
     会给出来的结果：
     - ModelOut 对象，修改成功后的模型最新配置信息。
     """
     try:
-        service = SettingsService(db)
         return service.patch_model(
             model_id,
             enabled=payload.enabled,

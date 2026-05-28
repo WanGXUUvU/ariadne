@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.model.types.agent import AgentState
+from agent_prototype.core.types import AgentState
 from agent_prototype.infra.db.engine import Base
 from agent_prototype.memory.session.store import SqliteSessionStore
 

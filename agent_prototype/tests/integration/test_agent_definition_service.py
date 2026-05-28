@@ -5,10 +5,10 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agent_prototype.agent.definition_service import AgentDefinitionService
-from agent_prototype.agent.definition import AgentDefinition
+from agent_prototype.agent.definition import AgentDefinitionService
+from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.infra.db.engine import Base
-from agent_prototype.agent.definition_store import SqliteAgentDefinitionStore
+from agent_prototype.agent.definition import SqliteAgentDefinitionStore
 
 
 class TestAgentLoader(unittest.TestCase):

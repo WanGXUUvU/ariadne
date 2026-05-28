@@ -15,8 +15,8 @@
 """
 
 import os,httpx,json
-from agent_prototype.tools.protocol import ToolDefinition,RiskLevel
-from agent_prototype.model.types.domain import ToolResult
+from agent_prototype.tools.types import ToolDefinition,RiskLevel
+from agent_prototype.core.types import ToolResult
 
 def web_search(query: str, num_results: int = 5) -> ToolResult:
     """这是“网页搜索引擎”的具体执行函数。
