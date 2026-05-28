@@ -24,16 +24,12 @@ def _sse_frame(frame: StreamFrame) -> str:
 
 
 def build_reply_preview(reply: str, max_len: int = 120) -> str:
-    """这是一个“超简短回答摘要生成器”。
-    当智能体洋洋洒洒回答了一大堆字时，如果直接把所有字塞进会话列表里，页面会显得很挤。
-    这个生成器就是把完整的多行长文本压缩成一行，并且最多只保留 120 个字（超出的截断），方便做列表预览展示。
+    """生成用于会话列表的单行回复预览。
 
-    需要拿到的东西：
-    - reply: 完整的回答文本。
-    - max_len: 最大保留的字数长度（默认 120 个字符）。
+    将多行/多空格文本合并为单行，并截断到 `max_len` 字符。
 
-    会给出来的结果：
-    - 处理后的单行摘要纯文本字符串。
+    注意：数据库中 `session_records.last_reply_preview` 定义为 `String(120)`，
+    因此默认长度设为 120 以保持一致性。
     """
     text = " ".join(reply.split())
     return text[:max_len]
