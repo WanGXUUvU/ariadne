@@ -8,23 +8,27 @@
 from typing import AsyncIterator, Iterator, Optional, Union
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.core.types import AgentDefinition, DEFAULT_AGENT_DEFINITION
+from agent_prototype.agent.types import AgentDefinition, DEFAULT_AGENT_DEFINITION
 from agent_prototype.core.types import (
-    AgentEvent, AgentInput, AgentOutput, AgentState, RunMetadata,
+    ChatMessage,
+    ToolCall,
+    ToolCallFunction,
+    ModelAdapter,
 )
-from agent_prototype.core.types import ChatMessage, ToolCall, ToolCallFunction
-from agent_prototype.security.policy import ApprovalPolicy
-from agent_prototype.core.types import ModelAdapter
-from agent_prototype.core.types import ModelStreamEvent
+from agent_prototype.execution.persistence.types import AgentInput, AgentOutput, RunMetadata
+from agent_prototype.execution.runtime.types import AgentEvent, AgentState
+from agent_prototype.security.policy.types import ApprovalPolicy
 from agent_prototype.tools.registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
 from agent_prototype.execution.runtime.message_builder import build_model_request
 from agent_prototype.execution.runtime.response_handler import build_final_turn
 from agent_prototype.execution.runtime.tool_runner import (
-    handle_tool_calls, async_handle_tool_calls,
+    handle_tool_calls,
+    async_handle_tool_calls,
 )
 
 
 # ── AgentRunner ───────────────────────────────────────────────────────────────
+
 
 class AgentRunner:
     """这是一个“智能体运行载体（发动机）”。
@@ -41,7 +45,7 @@ class AgentRunner:
         allow_tool_names: Optional[list[str]] = None,
         model_adapter: Optional[ModelAdapter] = None,
         approval_policy: ApprovalPolicy = ApprovalPolicy.NEVER,
-        session_type:str="coding",
+        session_type: str = "coding",
     ):
         """组装这个智能体发动机，给他配置好初始聊天状态、人设定义、可用的工具箱、大模型电话线、审批策略等参数。
 
@@ -54,17 +58,16 @@ class AgentRunner:
         - approval_policy: 审批策略，决定调用工具时需不需要人类手动审批（默认从不审批）。
         - session_type: 会话类型（默认是写代码模式 "coding"）。
         """
-        self.state            = state or AgentState()
-        self.definition       = definition or DEFAULT_AGENT_DEFINITION
-        self.tool_registry    = tool_registry or DEFAULT_TOOL_REGISTRY
+        self.state = state or AgentState()
+        self.definition = definition or DEFAULT_AGENT_DEFINITION
+        self.tool_registry = tool_registry or DEFAULT_TOOL_REGISTRY
         self.allow_tool_names = (
-            allow_tool_names if allow_tool_names is not None
-            else self.definition.tool_names
+            allow_tool_names if allow_tool_names is not None else self.definition.tool_names
         )
-        self.model_adapter  = model_adapter
+        self.model_adapter = model_adapter
         self.approval_policy = approval_policy
-        self.last_usage      = None
-        self.session_type    =session_type
+        self.last_usage = None
+        self.session_type = session_type
 
     # ── 非流式（保留备用） ────────────────────────────────────────────────────
 
@@ -87,8 +90,10 @@ class AgentRunner:
 
         while True:
             request = build_model_request(
-                self.definition, self.state,
-                self.tool_registry, self.allow_tool_names,
+                self.definition,
+                self.state,
+                self.tool_registry,
+                self.allow_tool_names,
                 agent_input.session_id,
             )
             response = self.model_adapter.generate(request)
@@ -98,8 +103,10 @@ class AgentRunner:
             if tool_calls:
                 self.state.messages.append(assistant_message)
                 tool_turn = handle_tool_calls(
-                    self.tool_registry, tool_calls,
-                    self.allow_tool_names, event_index,
+                    self.tool_registry,
+                    tool_calls,
+                    self.allow_tool_names,
+                    event_index,
                 )
                 events.extend(tool_turn.events)
                 event_index = tool_turn.next_event_index
@@ -138,8 +145,10 @@ class AgentRunner:
 
         while True:
             request = build_model_request(
-                self.definition, self.state,
-                self.tool_registry, self.allow_tool_names,
+                self.definition,
+                self.state,
+                self.tool_registry,
+                self.allow_tool_names,
                 agent_input.session_id,
             )
 
@@ -165,7 +174,11 @@ class AgentRunner:
                     for tc in event.raw_event.get("tool_calls", [{}]):
                         idx = tc.get("index", 0)
                         if idx not in tool_call_buffers:
-                            tool_call_buffers[idx] = {"id": "", "name_chunks": [], "args_chunks": []}
+                            tool_call_buffers[idx] = {
+                                "id": "",
+                                "name_chunks": [],
+                                "args_chunks": [],
+                            }
                         buf = tool_call_buffers[idx]
                         buf["id"] = buf["id"] or tc.get("id", "")
                         fn = tc.get("function", {})
@@ -185,8 +198,10 @@ class AgentRunner:
                 ]
                 self.state.messages.append(ChatMessage(role="assistant", tool_calls=tool_calls))
                 tool_turn = handle_tool_calls(
-                    self.tool_registry, tool_calls,
-                    self.allow_tool_names, event_index,
+                    self.tool_registry,
+                    tool_calls,
+                    self.allow_tool_names,
+                    event_index,
                 )
                 for event in tool_turn.events:
                     yield event
@@ -236,8 +251,10 @@ class AgentRunner:
 
         while True:
             request = build_model_request(
-                self.definition, self.state,
-                self.tool_registry, self.allow_tool_names,
+                self.definition,
+                self.state,
+                self.tool_registry,
+                self.allow_tool_names,
                 agent_input.session_id,
             )
 
@@ -263,7 +280,11 @@ class AgentRunner:
                     for tc in event.raw_event.get("tool_calls", [{}]):
                         idx = tc.get("index", 0)
                         if idx not in tool_call_buffers:
-                            tool_call_buffers[idx] = {"id": "", "name_chunks": [], "args_chunks": []}
+                            tool_call_buffers[idx] = {
+                                "id": "",
+                                "name_chunks": [],
+                                "args_chunks": [],
+                            }
                         buf = tool_call_buffers[idx]
                         buf["id"] = buf["id"] or tc.get("id", "")
                         fn = tc.get("function", {})

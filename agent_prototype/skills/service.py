@@ -15,8 +15,6 @@
 - 下游流向：调用 agent_prototype/skills/loader.py。
 """
 
-from sqlalchemy.orm import Session
-
 from agent_prototype.skills.types import SkillSummary
 from agent_prototype.skills.loader import (
     list_skills as loader_list_skills,
@@ -28,15 +26,11 @@ from agent_prototype.skills.loader import (
 
 class SkillService:
     """技能管理服务类 (OOP)
-    
+
     职责：
     1. 负责本地方案支持技能的发现、状态清单的导出；
     2. 提供细粒度的技能状态（激活/停用）管理。
     """
-    
-    def __init__(self, db: Session = None):
-        """构造函数依赖注入：聚合 db 会话，支持规范结构"""
-        self.db = db
 
     def list_skills(self) -> list[SkillSummary]:
         """获取所有可用技能清单"""
@@ -62,7 +56,7 @@ class SkillService:
 
         if skill_name in DEFAULT_PROTECTED_SKILL_NAMES:
             raise ValueError(f"Skill is protected and cannot be disabled: {skill_name}")
-        
+
         config = load_skill_config()
         config.disabled.add(skill_name)
         save_skill_config(config)
@@ -72,7 +66,7 @@ class SkillService:
     def enable_skill(self, skill_name: str) -> SkillSummary:
         """激活启用的技能"""
         self._get_skill_or_raise(skill_name)
-        
+
         config = load_skill_config()
         config.disabled.discard(skill_name)
         save_skill_config(config)

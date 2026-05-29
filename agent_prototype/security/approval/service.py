@@ -27,11 +27,11 @@ from agent_prototype.security.approval.store import SqliteApprovalStore
 
 class ApprovalService:
     """工具调用审批管理服务类
-    
+
     这个类是“审批业务大管家”。
     它主要负责在业务层打理一切审批工作。比如：帮别人去查一张审批工单的详情；当人类点击了“同意”按钮时，它来批准这笔工单；点击“拒绝”时，它来驳回工单；或者点击“全自动执行（approve_all）”时，它不仅同意当前这笔，还会顺便把当前会话的权限级别直接连升三级变成“full-auto 全自动运行状态”，并且负责保存并提交数据库事务。
     """
-    
+
     def __init__(self, db: Session):
         """审批服务大管家初始化，带上数据库的“钥匙”，并且叫上底下的工单仓库管理员。
 
@@ -92,7 +92,6 @@ class ApprovalService:
         会给出来的结果：
         - Optional[PendingApproval]: 批准成功后的审批记录详情，如果找不到就返回 None。
         """
-        from agent_prototype.infra.db.orm_models import SessionRecord
 
         record = self.store.update_status(approval_id, "approved")
         if record is None:

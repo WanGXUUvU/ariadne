@@ -4,8 +4,8 @@
 属于 security/approval 审批闭环的一部分：checker(判定) → middleware(拦截) → store(持久化)。
 """
 
-from agent_prototype.core.types import RiskLevel
-from agent_prototype.security.policy import ApprovalPolicy
+from agent_prototype.tools.types import RiskLevel
+from agent_prototype.security.policy.types import ApprovalPolicy
 
 
 def needs_approval(policy: ApprovalPolicy, risk: RiskLevel) -> bool:

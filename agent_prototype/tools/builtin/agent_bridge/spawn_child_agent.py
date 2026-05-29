@@ -1,4 +1,6 @@
 """
+from agent_prototype.tools.result_types import ToolResult
+from agent_prototype.tools.types import RiskLevel
 [九层模型 - L3 工具层 (Tools Layer)]
 
 文件职责：
@@ -9,9 +11,12 @@
 上游依赖：L8 执行层通过 build_run_registry 进行闭包回调注入。
 下游依赖：纯无状态 Callable 接口。
 """
+
 from typing import Callable
-from agent_prototype.tools.types import ToolDefinition, RiskLevel
-from agent_prototype.core.types import ToolResult
+from agent_prototype.tools.types import ToolDefinition
+from agent_prototype.tools.result_types import ToolResult
+from agent_prototype.tools.types import RiskLevel
+
 
 def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) -> ToolDefinition:
     """这是一个“派发（召唤）子智能体工具的加工厂（构建函数）”。
@@ -40,7 +45,11 @@ def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) ->
             return ToolResult(
                 ok=True,
                 content=child_run_id,
-                metadata={"tool_name": "spawn_child_agent", "child_run_id": child_run_id, "agent_name": agent_name},
+                metadata={
+                    "tool_name": "spawn_child_agent",
+                    "child_run_id": child_run_id,
+                    "agent_name": agent_name,
+                },
             )
         except Exception as e:
             return ToolResult(
@@ -48,7 +57,7 @@ def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) ->
                 content=f"Failed to spawn child agent: {e}",
                 metadata={"tool_name": "spawn_child_agent", "agent_name": agent_name},
             )
-    
+
     SCHEMA = {
         "type": "function",
         "function": {

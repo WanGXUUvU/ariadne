@@ -1,5 +1,6 @@
 """基础设施层 (Infrastructure Layer) - 文件系统文本检索工具
 
+from agent_prototype.tools.types import RiskLevel
 职责：
 1. 提供本地磁盘物理文件系统的搜索与正则匹配功能。
 2. 对指定目录下的内容进行文本检索，返回匹配的位置及片段。
@@ -14,8 +15,10 @@
 - 下游流向：操作系统文件系统。
 """
 
-from agent_prototype.tools.types import ToolDefinition,RiskLevel
+from agent_prototype.tools.types import ToolDefinition
+from agent_prototype.tools.types import RiskLevel
 from pathlib import Path
+
 
 def search_text(query: str, path: str = ".") -> str:  # 在目录里搜索文本
     """这是“全文检索”的具体执行函数。
@@ -78,6 +81,7 @@ SEARCH_TEXT_SCHEMA = {  # 给模型看的工具说明
     },
 }
 
+
 def build_search_text_definition() -> ToolDefinition:
     """把上面的“全文检索”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
 
@@ -88,5 +92,5 @@ def build_search_text_definition() -> ToolDefinition:
         name="search_text",
         schema=SEARCH_TEXT_SCHEMA,
         handler=search_text,
-        risk_level=RiskLevel.SAFE
+        risk_level=RiskLevel.SAFE,
     )

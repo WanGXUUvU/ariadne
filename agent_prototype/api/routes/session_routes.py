@@ -17,7 +17,11 @@
 
 from fastapi import APIRouter, Depends, status
 
-from agent_prototype.core.types import CreateSessionInput, SessionSummary, RenameSessionInput
+from agent_prototype.memory.session.types import (
+    CreateSessionInput,
+    SessionSummary,
+    RenameSessionInput,
+)
 from agent_prototype.api.dto.schemas import SessionDetail
 from agent_prototype.memory.session.service import SessionService
 from agent_prototype.api.routes.dependencies import error_response, get_session_service
@@ -26,15 +30,17 @@ router = APIRouter()
 
 
 @router.post("/sessions", response_model=SessionSummary)
-def create_session_api(payload: CreateSessionInput, service: SessionService = Depends(get_session_service)) -> SessionSummary:
+def create_session_api(
+    payload: CreateSessionInput, service: SessionService = Depends(get_session_service)
+) -> SessionSummary:
     """这个函数是用来创建一个新的会话（Session）的。
-    
+
     每次你想跟 Agent 开启一段全新的聊天，或者换一个工作区重新做任务时，就用这个接口建一个新会话。
-    
+
     需要拿到的东西：
     - payload: CreateSessionInput 对象，里面包含新会话的名字、使用哪种权限、关联哪个工作区等配置。
     - service: SessionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - SessionSummary 对象，也就是这个新会话的简要基本信息（比如 ID、名字、创建时间等）。
     """
@@ -42,15 +48,17 @@ def create_session_api(payload: CreateSessionInput, service: SessionService = De
 
 
 @router.delete("/sessions/{session_id}")
-def delete_session_api(session_id: str, service: SessionService = Depends(get_session_service)) -> dict[str, bool]:
+def delete_session_api(
+    session_id: str, service: SessionService = Depends(get_session_service)
+) -> dict[str, bool]:
     """这个函数是用来彻底删除某一个不需要的会话的。
-    
+
     调用这个接口后，该会话下的所有聊天历史记录和相关数据都会被清理干净。
-    
+
     需要拿到的东西：
     - session_id: 字符串类型，代表要删除的那个会话的唯一身份证。
     - service: SessionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - 一个字典，形如 {"status": True}，代表删除操作是否成功完成。
     """
@@ -61,14 +69,16 @@ def delete_session_api(session_id: str, service: SessionService = Depends(get_se
 
 
 @router.get("/sessions", response_model=list[SessionSummary])
-def list_sessions_api(service: SessionService = Depends(get_session_service)) -> list[SessionSummary]:
+def list_sessions_api(
+    service: SessionService = Depends(get_session_service),
+) -> list[SessionSummary]:
     """这个函数是用来获取系统里所有会话的摘要列表的。
-    
+
     常用于前端侧边栏（Sidebar）初始化时，展示用户以前聊过的所有会话列表。
-    
+
     需要拿到的东西：
     - service: SessionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - 一个包含多个 SessionSummary 对象的列表，列表里每个元素都装有对应会话的名字、最后一条消息预览、消息数量等概要信息。
     """
@@ -76,13 +86,15 @@ def list_sessions_api(service: SessionService = Depends(get_session_service)) ->
 
 
 @router.get("/sessions/{session_id}", response_model=SessionDetail)
-def read_session_api(session_id: str, service: SessionService = Depends(get_session_service)) -> SessionDetail:
+def read_session_api(
+    session_id: str, service: SessionService = Depends(get_session_service)
+) -> SessionDetail:
     """这个函数是用来读取单个会话的极详细内幕信息的（比如它里面的具体聊天消息、使用的模型、是否开启深度思考等）。
-    
+
     需要拿到的东西：
     - session_id: 字符串类型，也就是你要查看的会话的唯一身份证。
     - service: SessionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - SessionDetail 对象，里面包含了会话的所有细节和完整的历史消息状态。
     """
@@ -108,18 +120,22 @@ def read_session_api(session_id: str, service: SessionService = Depends(get_sess
         workspace_path=record.workspace_path,
         workspace_name=record.workspace_name,
         session_type=record.session_type,
-    )  
+    )
 
 
 @router.patch("/sessions/{session_id}")
-def rename_session_api(session_id: str, payload: RenameSessionInput, service: SessionService = Depends(get_session_service)) -> dict[str, bool]:
+def rename_session_api(
+    session_id: str,
+    payload: RenameSessionInput,
+    service: SessionService = Depends(get_session_service),
+) -> dict[str, bool]:
     """这个函数是用来修改会话属性的，比如给会话改个更贴切的新名字，或者更换关联的模型和工作区参数等。
-    
+
     需要拿到的东西：
     - session_id: 字符串类型，你要修改的会话的唯一身份证。
     - payload: RenameSessionInput 对象，里面包含了新的会话名字、选用的模型等要更新的参数。
     - service: SessionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - 一个字典，形如 {"status": True}，代表会话信息修改（如改名）是否成功。
     """

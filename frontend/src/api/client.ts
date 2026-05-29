@@ -127,6 +127,22 @@ export const api = {
   resetSession: (session_id: string) => fetchApi<{ok: boolean}>(`/reset`, { method: 'POST', body: JSON.stringify({ session_id }) }),
   deleteSession: (session_id: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'DELETE' }),
   renameSession: (session_id: string, session_name: string) => fetchApi<{ok: boolean}>(`/sessions/${session_id}`, { method: 'PATCH', body: JSON.stringify({ session_name }) }),
+  patchSession: (
+    session_id: string,
+    patch: {
+      session_name?: string;
+      permission_profile?: string;
+      model_id?: string | null;
+      model_provider_id?: number | null;
+      thinking_enabled?: boolean;
+      thinking_effort?: string;
+      workspace_path?: string | null;
+      workspace_name?: string | null;
+    },
+  ) => fetchApi<{ ok: boolean }>(`/sessions/${session_id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  }),
   getChildRunStatus: (run_id: string) => fetchApi<{ status: string; reply: string | null; error: string | null }>(`/child-runs/${run_id}`),
   getAgents: () => fetchApi<{ id: string; name: string; description: string | null; tool_names: string[] | null; is_builtin: boolean }[]>('/agents'),
   getTools: () => fetchApi<{ name: string }[]>('/tools'),

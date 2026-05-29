@@ -1,5 +1,6 @@
 """基础设施层 (Infrastructure Layer) - 文件系统物理写入工具
 
+from agent_prototype.tools.types import RiskLevel
 职责：
 1. 实现具体的本地磁盘物理文件系统写入操作。
 2. 保证文件写入操作的物理事务完整。
@@ -15,7 +16,8 @@
 """
 
 from pathlib import Path  # 处理文件路径
-from agent_prototype.tools.types import ToolDefinition,RiskLevel  # 导入工具定义
+from agent_prototype.tools.types import ToolDefinition  # 导入工具定义
+from agent_prototype.tools.types import RiskLevel
 
 
 def write_file(path: str, content: str) -> str:  # 把内容写入文件
@@ -75,5 +77,5 @@ def build_write_file_tool_definition() -> ToolDefinition:  # 构造 registry 需
         name="write_file",  # 工具名
         schema=WRITE_FILE_SCHEMA,  # schema
         handler=write_file,  # 真正执行函数
-        risk_level=RiskLevel.WRITE
+        risk_level=RiskLevel.WRITE,
     )

@@ -1,5 +1,7 @@
 """基础设施层 (Infrastructure Layer) - 测试回显工具
 
+from agent_prototype.tools.result_types import ToolResult
+from agent_prototype.tools.types import RiskLevel
 职责：
 1. 内置的回显（Echo）物理工具，直接返回用户传入的内容，用于系统连通性与参数流传走通。
 2. 提供测试工具标准的 Pydantic 入参模型。
@@ -15,8 +17,9 @@
 """
 
 from agent_prototype.tools.types import ToolDefinition
-from agent_prototype.core.types import ToolResult
+from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.tools.types import RiskLevel
+
 
 def echo_tool(text: str) -> ToolResult:
     """这是“回声（Echo）工具”的具体执行函数。
@@ -33,8 +36,9 @@ def echo_tool(text: str) -> ToolResult:
     return ToolResult(
         ok=True,
         content=f"tool received:{text}",
-        metadata={"tool_name":"echo_tool"},
+        metadata={"tool_name": "echo_tool"},
     )
+
 
 ECHO_TOOL_SCHEMA = {  # 给模型看的工具说明
     "type": "function",
@@ -55,6 +59,7 @@ ECHO_TOOL_SCHEMA = {  # 给模型看的工具说明
     },
 }
 
+
 def build_echo_tool_definition() -> ToolDefinition:  # 构造注册对象
     """把上面的“回声（Echo）工具”打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。
 
@@ -65,5 +70,5 @@ def build_echo_tool_definition() -> ToolDefinition:  # 构造注册对象
         name="echo_tool",  # 工具名
         schema=ECHO_TOOL_SCHEMA,  # schema
         handler=echo_tool,  # 执行函数
-        risk_level=RiskLevel.SAFE
+        risk_level=RiskLevel.SAFE,
     )

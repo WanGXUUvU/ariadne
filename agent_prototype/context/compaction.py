@@ -9,15 +9,14 @@
 上游依赖：L5 记忆层 (CompactService)。
 下游依赖：L1 模型层 (ModelAdapter)。
 """
-from typing import Optional
-from agent_prototype.core.types import ChatMessage
-from agent_prototype.core.types import AgentState
-from agent_prototype.core.types import CompactOutput
-from agent_prototype.core.types import ModelAdapter
-from agent_prototype.core.types import ModelRequest, ModelConfig
 
-DEFAULT_COMPACT_THRESHOLD=12 #默认超过12条消息时触发 compact
-DEFAULT_KEEP_RECENT_COUNT=4 #默认 compact 后保留最近 4 条原始消息
+from typing import Optional
+from agent_prototype.core.types import ChatMessage, ModelAdapter, ModelRequest, ModelConfig
+from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.memory.summary.types import CompactOutput
+
+DEFAULT_COMPACT_THRESHOLD = 12  # 默认超过12条消息时触发 compact
+DEFAULT_KEEP_RECENT_COUNT = 4  # 默认 compact 后保留最近 4 条原始消息
 
 COMPACT_SUMMARY_PREFIX = (  # 定义 compact summary 的固定前缀，明确告诉模型这不是逐字历史
     "[COMPACT_SUMMARY]\n"
@@ -26,10 +25,11 @@ COMPACT_SUMMARY_PREFIX = (  # 定义 compact summary 的固定前缀，明确告
     "Preserve task goals, constraints, important tool results, and unfinished work."  # 要求保留目标、约束、工具结果和未完成事项
 )
 
+
 def split_messages_for_compaction(
-        messages:list[ChatMessage], #输入完整历史消息列表
-        keep_recent_count:int=DEFAULT_KEEP_RECENT_COUNT, #输入要保留的最近原始消息数量
-)->tuple[list[ChatMessage],list[ChatMessage],list[ChatMessage]]:
+    messages: list[ChatMessage],  # 输入完整历史消息列表
+    keep_recent_count: int = DEFAULT_KEEP_RECENT_COUNT,  # 输入要保留的最近原始消息数量
+) -> tuple[list[ChatMessage], list[ChatMessage], list[ChatMessage]]:
     """把一长串的历史聊天记录切成三段：开头（前锚点）、中间（准备被压扁压缩的一段）和结尾（最近发生的、原样保留的几条）。
     这样我们就知道要把哪部分送去让大模型压缩了。
 
@@ -42,20 +42,23 @@ def split_messages_for_compaction(
     """
 
     if not messages:
-        return [],[],[]
-    
+        return [], [], []
+
     anchor_messages = [messages[0]]
     remaining_messages = messages[1:]
 
     if len(remaining_messages) <= keep_recent_count:
-        return anchor_messages,[],remaining_messages
-    
-    middle_messages = remaining_messages[:-keep_recent_count]  # 去掉最后 recent 后，中间这段就是要压缩的主体
+        return anchor_messages, [], remaining_messages
+
+    middle_messages = remaining_messages[
+        :-keep_recent_count
+    ]  # 去掉最后 recent 后，中间这段就是要压缩的主体
     recent_messages = remaining_messages[-keep_recent_count:]  # 最后几条消息作为 recent 原样保留
 
-    return anchor_messages,middle_messages,recent_messages
+    return anchor_messages, middle_messages, recent_messages
 
-def build_compact_prompt(middle_messages:list[ChatMessage])->str:
+
+def build_compact_prompt(middle_messages: list[ChatMessage]) -> str:
     """专门为大模型准备一个“压缩指令”！把中间那段长长的聊天记录整理一下，
     加上提示词，做成一个任务书，拜托大模型帮我们把这段内容归纳总结一下。
 
@@ -79,7 +82,9 @@ def build_compact_prompt(middle_messages:list[ChatMessage])->str:
 
     for message in middle_messages:
         if message.tool_calls:
-            tool_names = ",".join(tc.function.name for tc in message.tool_calls)  # 只记录工具名，不展开参数
+            tool_names = ",".join(
+                tc.function.name for tc in message.tool_calls
+            )  # 只记录工具名，不展开参数
             lines.append(f"- assistant 调用了工具: {tool_names}")
             continue
         content = message.content or "(空)"
@@ -89,6 +94,7 @@ def build_compact_prompt(middle_messages:list[ChatMessage])->str:
     lines.append("请直接输出摘要，语言与对话保持一致，不要重复上面的指令：")
 
     return "\n".join(lines)
+
 
 def build_compact_summary_message(summary_text: str) -> ChatMessage:
     """大模型写好摘要文本后，这个函数会把文本包装成一条系统（system）消息，
@@ -106,11 +112,12 @@ def build_compact_summary_message(summary_text: str) -> ChatMessage:
         content=f"{COMPACT_SUMMARY_PREFIX}\n\n{summary_text.strip()}",  # 把固定前缀 and 模型返回正文拼成最终摘要消息内容
     )
 
-def compact_state_with_summary( 
-        state:AgentState, #输入当前完整会话状态
-        summary_text:str, #输入模型已经完整好的 compact 摘要文本
-        keep_recent_count:int=DEFAULT_KEEP_RECENT_COUNT,
-)->CompactOutput:
+
+def compact_state_with_summary(
+    state: AgentState,  # 输入当前完整会话状态
+    summary_text: str,  # 输入模型已经完整好的 compact 摘要文本
+    keep_recent_count: int = DEFAULT_KEEP_RECENT_COUNT,
+) -> CompactOutput:
     """真正动手把历史聊天状态里的“中段”替换成大模型写好的“压缩摘要”！
     它会检查如果中段消息其实很少就懒得压缩了；如果确实压缩了，就组装出一个全新的状态，并数数这次帮用户省下了多少条消息。
 
@@ -123,22 +130,29 @@ def compact_state_with_summary(
     - 一个 CompactOutput 对象，里面包含了：压缩后的新状态、到底有没有真的进行压缩（布尔值）、以及一共删掉了多少条原始消息。
     """
 
-    anchor_messages,middle_messages,recent_messages = split_messages_for_compaction(#把历史切成三段
-        state.messages, #传入原始消息列表
-        keep_recent_count=keep_recent_count, #把 recent 保留数量传进去
+    anchor_messages, middle_messages, recent_messages = (
+        split_messages_for_compaction(  # 把历史切成三段
+            state.messages,  # 传入原始消息列表
+            keep_recent_count=keep_recent_count,  # 把 recent 保留数量传进去
+        )
     )
 
     if len(middle_messages) < 2:  # 中段消息少于 2 条时，内容太短，没有压缩价值，直接跳过
-        return CompactOutput(state=state,did_compact=False,removed_count=0) #说明这次不需要 compact 原样返回
-    
+        return CompactOutput(
+            state=state, did_compact=False, removed_count=0
+        )  # 说明这次不需要 compact 原样返回
+
     summary_message = build_compact_summary_message(summary_text)
     compacted_messages = anchor_messages + [summary_message] + recent_messages
-    compacted_state = state.model_copy(update={"messages": compacted_messages})  # 基于旧 state 复制一个只替换 messages 的新 state
+    compacted_state = state.model_copy(
+        update={"messages": compacted_messages}
+    )  # 基于旧 state 复制一个只替换 messages 的新 state
 
     return CompactOutput(
         state=compacted_state,  # 返回 compact 后的新状态
         did_compact=True,  # 标记这次确实发生了 compact
-        removed_count=len(state.messages) - len(compacted_messages),  # 计算这次一共折叠掉了多少条原始消息
+        removed_count=len(state.messages)
+        - len(compacted_messages),  # 计算这次一共折叠掉了多少条原始消息
     )
 
 
@@ -185,7 +199,7 @@ class HistoryCompactor:
             metadata={"mode": "compact"},
         )
         summary_response = self.adapter.generate(request)
-        
+
         if summary_response.usage and summary_response.usage.input_tokens:
             self.last_compact_tokens = summary_response.usage.input_tokens
         else:

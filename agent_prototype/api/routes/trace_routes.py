@@ -23,17 +23,20 @@ from agent_prototype.api.routes.dependencies import error_response, get_run_serv
 
 router = APIRouter()  # 创建路由器
 
+
 @router.get("/sessions/{session_id}/trace", response_model=TraceResponse)
-def read_session_trace_api(session_id: str, run_id: Optional[str] = None, service: RunService = Depends(get_run_service)) -> TraceResponse:
+def read_session_trace_api(
+    session_id: str, run_id: Optional[str] = None, service: RunService = Depends(get_run_service)
+) -> TraceResponse:
     """这个函数是用来读取会话在后台运行时的详细执行轨迹（Trace/运行步骤）的。
-    
+
     它可以帮你还原 Agent 思考的每一步：到底是在脑子里想（Thinking），还是在调用工具（Tool Calling），又或者是出错了（Error），方便你调试和追踪。
-    
+
     需要拿到的东西：
     - session_id: 字符串类型，当前会话的唯一身份证。
     - run_id: 可选的字符串，如果传了就只查某一次运行的具体轨迹；如果不传，就会列出这个会话下所有的运行轨迹。
     - service: RunService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - TraceResponse 对象，里面不仅包含了运行概况（比如输入、最终回复、耗时等），还包含了最核心的事件步骤列表 events，还原 Agent 思考的完整链路。
     """

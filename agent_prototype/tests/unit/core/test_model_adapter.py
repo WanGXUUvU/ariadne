@@ -3,8 +3,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from agent_prototype.core.types import ChatMessage
-from agent_prototype.core.types import ModelConfig, ModelRequest
+from agent_prototype.core.types import ChatMessage, ModelConfig, ModelRequest
 from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
 
 

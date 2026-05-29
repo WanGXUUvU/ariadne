@@ -12,7 +12,8 @@ from typing import Optional
 
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.memory.run.store import SqliteRunStore
-from agent_prototype.core.types import AgentEvent, AgentInput, AgentState
+from agent_prototype.execution.persistence.types import AgentInput
+from agent_prototype.execution.runtime.types import AgentEvent, AgentState
 
 
 class ToolRunObserver:

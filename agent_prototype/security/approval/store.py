@@ -15,7 +15,7 @@
 - 下游流向：通过 DB Engine 写入 SQLite。
 """
 
-import uuid,json
+import uuid
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -23,9 +23,10 @@ from sqlalchemy.orm import Session
 from agent_prototype.infra.db.orm_models import PendingApproval
 from agent_prototype.core.types import ChatMessage
 
+
 class SqliteApprovalStore:
     """SQLite 审批持久化仓储类
-    
+
     这个类是“审批工单数据库管家”。
     专门负责在数据库的“待审批表”（PendingApproval）里打杂，比如：AI 调用敏感工具时，在这个表里登记一张包含当前聊天进度和工具参数的全新“审批工单”；根据单号（approval_id）查询工单详情；工单被主人批准或驳回后更新工单状态；以及在需要重跑的时候把工单里存的聊天历史重新还原出来。
     """
@@ -37,16 +38,16 @@ class SqliteApprovalStore:
         - db (Session): 数据库会话连接。
         """
         self.db = db
-    
+
     def create(
-            self,
-            session_id: str,
-            run_id: str,
-            tool_name: str,
-            tool_call_id: str,
-            arguments: str,
-            saved_messages: list[ChatMessage],
-            event_index: int,
+        self,
+        session_id: str,
+        run_id: str,
+        tool_name: str,
+        tool_call_id: str,
+        arguments: str,
+        saved_messages: list[ChatMessage],
+        event_index: int,
     ) -> PendingApproval:
         """在数据库里生成并登记一张全新的“待审批工单”。
         它会随机生成一个唯一的审批单号，把会话 ID、运行 ID、想跑的工具名字、传给工具的参数、当前的聊天上下文历史和执行步骤索引通通记录在案，状态标记为“等待审批（pending）”。
@@ -63,7 +64,7 @@ class SqliteApprovalStore:
         会给出来的结果：
         - PendingApproval: 刚在数据库里建好的审批记录对象。
         """
-        record=PendingApproval(
+        record = PendingApproval(
             id=uuid.uuid4().hex,
             session_id=session_id,
             run_id=run_id,
@@ -71,14 +72,16 @@ class SqliteApprovalStore:
             tool_call_id=tool_call_id,
             arguments=arguments,
             status="pending",
-            saved_messages=[saved_message.model_dump(exclude_none=True) for saved_message in saved_messages],
+            saved_messages=[
+                saved_message.model_dump(exclude_none=True) for saved_message in saved_messages
+            ],
             event_index=event_index,
         )
 
         self.db.add(record)
 
         return record
-    
+
     def get(self, approval_id: str) -> Optional[PendingApproval]:
         """根据单号（ID）把对应的审批工单完整地从数据库里查出来。
 
@@ -88,8 +91,8 @@ class SqliteApprovalStore:
         会给出来的结果：
         - Optional[PendingApproval]: 对应的审批记录，如果找不到就返回 None。
         """
-        return (self.db.query(PendingApproval).filter(PendingApproval.id==approval_id).first())
-    
+        return self.db.query(PendingApproval).filter(PendingApproval.id == approval_id).first()
+
     def update_status(self, approval_id: str, status: str) -> Optional[PendingApproval]:
         """更改审批工单的状态（比如从“pending 待处理”变成“approved 已批准”或“rejected 已拒绝”）。
 
@@ -100,12 +103,12 @@ class SqliteApprovalStore:
         会给出来的结果：
         - Optional[PendingApproval]: 修改好状态后的审批记录，如果没查到这个单子就返回 None。
         """
-        record=self.get(approval_id)
+        record = self.get(approval_id)
         if record is None:
             return None
-        record.status=status
+        record.status = status
         return record
-    
+
     def restore_messages(self, approval: PendingApproval) -> list[ChatMessage]:
         """把审批工单里序列化保存的聊天历史消息还原出来，还原成 Python 能看懂的 `ChatMessage` 列表，方便系统拿着它继续往下执行对话。
 

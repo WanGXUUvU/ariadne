@@ -7,14 +7,19 @@
 import json
 import unittest
 
-from agent_prototype.core.types import ToolResult, ToolError, RiskLevel
-from agent_prototype.security.policy import ApprovalPolicy
-from agent_prototype.security.middleware.base import BaseMiddleware, MiddlewarePipeline, ToolCallContext
+from agent_prototype.tools.types import RiskLevel
+from agent_prototype.security.middleware.base import (
+    BaseMiddleware,
+    MiddlewarePipeline,
+    ToolCallContext,
+)
 from agent_prototype.tools.types import ToolDefinition
 from agent_prototype.tools.registry import ToolRegistry
+from agent_prototype.tools.result_types import ToolResult, ToolError
 
 
 # ── Stub 工具 ──────────────────────────────────────────────────────────────────
+
 
 def _safe_handler(message: str = "hello") -> ToolResult:
     return ToolResult(ok=True, content=f"echo:{message}")
@@ -32,6 +37,7 @@ def _failing_handler() -> ToolResult:
 
 
 # ── 哑中间件 ──────────────────────────────────────────────────────────────────
+
 
 class TraceMiddleware(BaseMiddleware):
     """记录每次经过的工具名，用于断言执行顺序。"""
@@ -64,6 +70,7 @@ class BlockDangerMiddleware(BaseMiddleware):
 
 
 # ── 测试类 ────────────────────────────────────────────────────────────────────
+
 
 class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
     """工具调用管道行为测试。"""
@@ -101,18 +108,30 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
         }
 
         self.registry = ToolRegistry()
-        self.registry.register(ToolDefinition(
-            name="safe_tool", schema=safe_schema,
-            handler=_safe_handler, risk_level=RiskLevel.SAFE,
-        ))
-        self.registry.register(ToolDefinition(
-            name="danger_tool", schema=danger_schema,
-            handler=_danger_handler, risk_level=RiskLevel.DANGER,
-        ))
-        self.registry.register(ToolDefinition(
-            name="failing_tool", schema=fail_schema,
-            handler=_failing_handler, risk_level=RiskLevel.SAFE,
-        ))
+        self.registry.register(
+            ToolDefinition(
+                name="safe_tool",
+                schema=safe_schema,
+                handler=_safe_handler,
+                risk_level=RiskLevel.SAFE,
+            )
+        )
+        self.registry.register(
+            ToolDefinition(
+                name="danger_tool",
+                schema=danger_schema,
+                handler=_danger_handler,
+                risk_level=RiskLevel.DANGER,
+            )
+        )
+        self.registry.register(
+            ToolDefinition(
+                name="failing_tool",
+                schema=fail_schema,
+                handler=_failing_handler,
+                risk_level=RiskLevel.SAFE,
+            )
+        )
 
     # ── 直接执行（不经过管道）─────────────────────────────────────────────────
 
@@ -159,15 +178,15 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
 
     async def test_pipeline_blocks_dangerous_tool(self):
         """危险工具被 BlockDangerMiddleware 拦截，不到达 terminal。"""
-        result = await self._run_pipeline("danger_tool", {"path": "/etc"}, [BlockDangerMiddleware()])
+        result = await self._run_pipeline(
+            "danger_tool", {"path": "/etc"}, [BlockDangerMiddleware()]
+        )
         self.assertFalse(result.ok)
         self.assertEqual(result.error.code, "BLOCKED")
 
     async def test_pipeline_onion_order_with_multiple_middleware(self):
         """多层中间件洋葱圈顺序：outer → inner → terminal → inner → outer。"""
         log: list[str] = []
-        outer = TraceMiddleware(log)
-        inner = TraceMiddleware(log)
 
         # 覆盖名字区分 outer / inner
         async def outer_call(ctx, nxt):
@@ -185,6 +204,7 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
         class NamedMiddleware(BaseMiddleware):
             def __init__(self, fn):
                 self._fn = fn
+
             async def call(self, ctx, nxt):
                 return await self._fn(ctx, nxt)
 
@@ -198,7 +218,9 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
             tool_name="safe_tool", tool_args="{}", tool_call_id="x", session_id="s"
         )
         await pipeline.execute(context, terminal)
-        self.assertEqual(log, ["enter:outer", "enter:inner", "terminal", "exit:inner", "exit:outer"])
+        self.assertEqual(
+            log, ["enter:outer", "enter:inner", "terminal", "exit:inner", "exit:outer"]
+        )
 
     async def test_empty_pipeline_goes_straight_to_terminal(self):
         """空管道直接执行 terminal。"""

@@ -1,29 +1,40 @@
 """Session 存储访问层。
 
 职责：
-- session 快照的读取与更新
-- session 列表、详情查询
-- session 的重命名与删除
+- 维护 session 快照和主记录。
+- 提供 session 列表、详情、重命名和删除能力。
 
-Run/Trace 相关操作请直接使用 run_store.py（SqliteRunStore）。
+上游：
+- RunService
+- CompactService
+- API routes
+
+下游：
+- SessionRecord / SessionRunRecord 等 ORM 模型
+
+不负责：
+- 不管理 run trace 事件内容。
+- 不负责业务层校验和 HTTP 语义。
 """
 
 import json
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from agent_prototype.core.types import AgentEvent, AgentState
-from agent_prototype.infra.db.orm_models import SessionRecord, SessionRunRecord, SessionRunEventRecord, ToolCallRecord
+from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.infra.db.orm_models import (
+    SessionRecord,
+    SessionRunRecord,
+    SessionRunEventRecord,
+    ToolCallRecord,
+)
 
 _UNSET = object()
 
 
 class SqliteSessionStore:
-    """围绕 session 相关数据的 SQLite store。
-    
-    这个类是"会话数据仓库"。它就像是直接在数据库里干脏活累活的底层工人，专门负责会话数据的读取和写入。
-    """
+    """围绕 session 相关数据的 SQLite store。"""
 
     def __init__(self, db: Session):
         self.db = db
@@ -47,7 +58,7 @@ class SqliteSessionStore:
         workspace_name=_UNSET,
         session_type=_UNSET,
     ) -> SessionRecord:
-        """保存或更新会话的"快照"。"""
+        """保存或更新一个 session 的状态快照。"""
         state_json = json.dumps(state.model_dump(), ensure_ascii=False)
         message_count = len(state.messages)
         record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
@@ -96,7 +107,7 @@ class SqliteSessionStore:
     # ── Session CRUD ───────────────────────────────────────────────────────
 
     def rename_session(self, session_id, new_name: str) -> bool:
-        """在数据库里给指定会话改名。"""
+        """重命名指定 session。"""
         record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
         if not record:
             return False
@@ -104,23 +115,27 @@ class SqliteSessionStore:
         return True
 
     def delete_session(self, session_id: str) -> bool:
-        """在数据库里彻底把一个会话连根拔除。"""
+        """删除指定 session 及其关联 run 数据。"""
         record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
         if not record:
             return False
-        run_id_subq = (
-            self.db.query(SessionRunRecord.run_id)
-            .filter(SessionRunRecord.session_id == session_id)
-            .subquery()
+        run_id_query = select(SessionRunRecord.run_id).where(
+            SessionRunRecord.session_id == session_id
         )
-        self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id.in_(run_id_subq)).delete(synchronize_session=False)
-        self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id.in_(run_id_subq)).delete(synchronize_session=False)
-        self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == session_id).delete(synchronize_session=False)
+        self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id.in_(run_id_query)).delete(
+            synchronize_session=False
+        )
+        self.db.query(SessionRunEventRecord).filter(
+            SessionRunEventRecord.run_id.in_(run_id_query)
+        ).delete(synchronize_session=False)
+        self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == session_id).delete(
+            synchronize_session=False
+        )
         self.db.delete(record)
         return True
 
     def list_sessions(self) -> list[SessionRecord]:
-        """获取数据库中所有的会话列表。"""
+        """返回所有 session，按更新时间倒序排列。"""
         return (
             self.db.query(SessionRecord)
             .order_by(SessionRecord.updated_at.desc(), SessionRecord.session_id.asc())
@@ -128,15 +143,11 @@ class SqliteSessionStore:
         )
 
     def read_session_record(self, session_id: str) -> Optional[SessionRecord]:
-        """根据会话 ID 查出它在数据库里的主记录对象。"""
-        return (
-            self.db.query(SessionRecord)
-            .filter(SessionRecord.session_id == session_id)
-            .first()
-        )
+        """读取 session 主记录。"""
+        return self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
 
     def read_session_state(self, session_id: str) -> Optional[AgentState]:
-        """读取并反序列化一个会话的完整聊天状态。"""
+        """读取并反序列化 session 状态快照。"""
         record = self.read_session_record(session_id)
         if not record:
             return None
@@ -145,8 +156,7 @@ class SqliteSessionStore:
     # ── Run 重置 ───────────────────────────────────────────────────────────
 
     def reset_session_runs(self, session_id: str) -> None:
-        """把某个会话下的所有核心运行记录标记为"非活跃"。"""
+        """将某个 session 下的顶层 run 标记为非活跃。"""
         self.db.query(SessionRunRecord).filter(
-            SessionRunRecord.session_id == session_id,
-            SessionRunRecord.parent_run_id == None
+            SessionRunRecord.session_id == session_id, SessionRunRecord.parent_run_id.is_(None)
         ).update({"is_active": "0"}, synchronize_session=False)

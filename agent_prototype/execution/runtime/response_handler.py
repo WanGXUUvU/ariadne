@@ -15,10 +15,11 @@
 - 下游流向：提供给 Runtime 引擎进行会话状态追加。
 """
 
-from agent_prototype.core.types import AgentEvent
 from agent_prototype.core.types import ChatMessage
+from agent_prototype.execution.runtime.types import AgentEvent
 
-def build_final_turn(raw_reply:str,event_index:int)->tuple[str,AgentEvent,ChatMessage]:
+
+def build_final_turn(raw_reply: str, event_index: int) -> tuple[str, AgentEvent, ChatMessage]:
     """这是一个“最终回复打包机”。
     当大模型完成全部思考和对话，吐出它最终的回答文本时，这个打包机就会把这段原始回答进行精简修剪，
     并把它们变形成三个不同的零件，方便后面的运行逻辑直接拿去用。
@@ -35,10 +36,10 @@ def build_final_turn(raw_reply:str,event_index:int)->tuple[str,AgentEvent,ChatMe
     """
 
     reply = (raw_reply or "").strip()
-    event=AgentEvent(
+    event = AgentEvent(
         index=event_index,
         type="final_answer",
         content=reply,
     )
-    assistant_message = ChatMessage(role="assistant",content=raw_reply)
-    return reply,event,assistant_message
+    assistant_message = ChatMessage(role="assistant", content=raw_reply)
+    return reply, event, assistant_message

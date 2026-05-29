@@ -28,9 +28,10 @@ engine = create_engine(
     DATABASE_URL,
     connect_args={
         "check_same_thread": False,
-        "timeout": 30,          # 锁被占用时等待最多 30 秒
+        "timeout": 30,  # 锁被占用时等待最多 30 秒
     },
 )
+
 
 # WAL 模式：允许并发读写，多线程下不互相阻塞
 @event.listens_for(engine, "connect")
@@ -59,9 +60,10 @@ Base = declarative_base()
 
 # ── 依赖注入入口 ──────────────────────────────────────────────────────────────
 
+
 def get_db():
     """统一获取数据库会话入口，供 FastAPI 依赖注入使用。
-    
+
     这是一个“数据库钥匙借还处（Session 生成器函数）”。
     当网页接口（FastAPI 路由）或者业务服务需要读写数据库时，就可以从这里临时借一把打开数据库的“钥匙”（Session 实例）。当操作全部搞定、接口请求完成之后，这个函数还会非常严谨且礼貌地自动把这把钥匙“闭合关好（db.close()）”，防止数据库连接被占满。
 

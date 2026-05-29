@@ -3,80 +3,54 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from agent_prototype.agent.types import AgentDefinition
-from agent_prototype.core.types import AgentState
-from agent_prototype.core.types import ChatMessage, ToolCall, ToolCallFunction
-from agent_prototype.skills.types import SkillSummary
-from agent_prototype.core.types import ModelResponse
+from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.memory.session.store import SqliteSessionStore
 from agent_prototype.agent.definition import SqliteAgentDefinitionStore
 from agent_prototype.api.app import app
-from agent_prototype.skills.loader import list_skills
-from agent_prototype.tools.registry import build_default_tool_registry
-from agent_prototype.infra.db.engine import Base, get_db
-from agent_prototype.infra.db.orm_models import SessionRecord, SessionRunEventRecord, SessionRunRecord
+from agent_prototype.skills.types import SkillSummary
+from agent_prototype.infra.db.engine import get_db
+from agent_prototype.infra.db.orm_models import (
+    SessionRecord,
+    SessionRunEventRecord,
+    SessionRunRecord,
+)
+from agent_prototype.tests.helpers.db import (
+    build_test_client,
+    make_sqlite_test_db,
+    reset_skill_loader_cache,
+)
+from agent_prototype.tests.helpers.factories import build_assistant_response
 
 
 class TestAgentApi(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        db_path = Path(self.temp_dir.name) / "test_agent.db"
-        self.engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
-        Base.metadata.create_all(bind=self.engine)
+        self.engine, self.session_local = make_sqlite_test_db(
+            self.temp_dir.name,
+            "test_agent.db",
+        )
+        self.client = build_test_client(app, get_db, self.session_local)
+        reset_skill_loader_cache()
 
-        self.session_local = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-
-        def override_get_db():
-            db = self.session_local()
-            try:
-                yield db
-            finally:
-                db.close()
-
-        app.dependency_overrides[get_db] = override_get_db
-        self.client = TestClient(app)
-
-        # 每次测试前清空 skill 列表缓存，防止 TTL 30s 内缓存影响 mock 效果
-        import agent_prototype.skills.loader as _sl
-        _sl._list_skills_cache = None
-        _sl._list_skills_cache_ts = 0.0
-
-        # Mock RunContextBuilder._build_adapter 绕过物理数据库配置校验，直接返回一个 mock 好的 ChatCompletionsAdapter
-        from agent_prototype.execution.persistence.builder import RunContextBuilder
+        # Mock RuntimeContextFactory._build_adapter 绕过物理数据库配置校验，直接返回一个 mock 好的 ChatCompletionsAdapter
+        from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
         from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
+
         self.build_adapter_patcher = patch.object(
-            RunContextBuilder,
+            RuntimeContextFactory,
             "_build_adapter",
             return_value=ChatCompletionsAdapter(
                 api_key="mock-api-key",
                 base_url="mock-base-url",
                 model="mock-model",
-            )
+            ),
         )
         self.mock_build_adapter = self.build_adapter_patcher.start()
-
-        # Mock CompactService._build_session_adapter 同步绕过物理配置校验
-        from agent_prototype.memory.summary.service import CompactService
-        self.compact_build_adapter_patcher = patch.object(
-            CompactService,
-            "_build_session_adapter",
-            return_value=ChatCompletionsAdapter(
-                api_key="mock-api-key",
-                base_url="mock-base-url",
-                model="mock-model",
-            )
-        )
-        self.mock_compact_build_adapter = self.compact_build_adapter_patcher.start()
 
     def tearDown(self):
         if hasattr(self, "build_adapter_patcher"):
             self.build_adapter_patcher.stop()
-        if hasattr(self, "compact_build_adapter_patcher"):
-            self.compact_build_adapter_patcher.stop()
         app.dependency_overrides.clear()
         self.engine.dispose()
         self.temp_dir.cleanup()
@@ -87,13 +61,7 @@ class TestAgentApi(unittest.TestCase):
         (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
     def _assistant_response(self, content=None, tool_calls=None):
-        return ModelResponse(
-            assistant_message=ChatMessage(
-                role="assistant",
-                content=content,
-                tool_calls=tool_calls,
-            )
-        )
+        return build_assistant_response(content=content, tool_calls=tool_calls)
 
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_run_endpoint(self, mock_generate):
@@ -113,7 +81,12 @@ class TestAgentApi(unittest.TestCase):
             data["state"]["messages"],
             [
                 {"role": "user", "content": "你好", "tool_calls": None, "tool_call_id": None},
-                {"role": "assistant", "content": "mock reply", "tool_calls": None, "tool_call_id": None},
+                {
+                    "role": "assistant",
+                    "content": "mock reply",
+                    "tool_calls": None,
+                    "tool_call_id": None,
+                },
             ],
         )
         self.assertEqual(
@@ -149,19 +122,22 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-        with patch(
-            "agent_prototype.context.skill_context.skill_context.loader_list_skills",
-            return_value=[
-                SkillSummary(
-                    name="openai-docs",
-                    description="查 OpenAI 官方文档",
-                    path="user-codex/openai-docs/SKILL.md",
-                    enabled=True,
-                )
-            ],
-        ), patch(
-            "agent_prototype.context.skill_context.skill_context.loader_load_skill_content",
-            return_value="FULL SKILL BODY",
+        with (
+            patch(
+                "agent_prototype.context.skill_context.list_skills",
+                return_value=[
+                    SkillSummary(
+                        name="openai-docs",
+                        description="查 OpenAI 官方文档",
+                        path="user-codex/openai-docs/SKILL.md",
+                        enabled=True,
+                    )
+                ],
+            ),
+            patch(
+                "agent_prototype.context.skill_context.load_skill_content",
+                return_value="FULL SKILL BODY",
+            ),
         ):
             response = self.client.post(
                 "/run",
@@ -310,7 +286,9 @@ class TestAgentApi(unittest.TestCase):
         try:
             store = SqliteSessionStore(db)
             state = AgentState(messages=original_messages)
-            store.upsert_session_snapshot("auto-compact-fail-session", state=state, context_tokens=90000)
+            store.upsert_session_snapshot(
+                "auto-compact-fail-session", state=state, context_tokens=90000
+            )
             db.commit()
         finally:
             db.close()
@@ -351,7 +329,9 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-meta").first()
+            record = (
+                db.query(SessionRecord).filter(SessionRecord.session_id == "session-meta").first()
+            )
 
             self.assertIsNotNone(record)
             self.assertEqual(record.session_id, "session-meta")
@@ -389,8 +369,11 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.json()["state"]["messages"][0]["role"], "user")
         self.assertEqual(response.json()["state"]["messages"][1]["role"], "assistant")
 
-    @patch("agent_prototype.context.skill_context.skill_context.loader_load_skill_content", return_value="---\nname: openai-docs\ndescription: 查文档\n---\nFULL SKILL BODY")
-    @patch("agent_prototype.context.skill_context.skill_context.loader_list_skills")
+    @patch(
+        "agent_prototype.context.skill_context.load_skill_content",
+        return_value="---\nname: openai-docs\ndescription: 查文档\n---\nFULL SKILL BODY",
+    )
+    @patch("agent_prototype.context.skill_context.list_skills")
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_run_endpoint_loads_selected_skill_content_into_system_prompt(
         self,
@@ -430,8 +413,14 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-skill").first()
-            run_record = db.query(SessionRunRecord).filter(SessionRunRecord.session_id == "session-skill").first()
+            record = (
+                db.query(SessionRecord).filter(SessionRecord.session_id == "session-skill").first()
+            )
+            run_record = (
+                db.query(SessionRunRecord)
+                .filter(SessionRunRecord.session_id == "session-skill")
+                .first()
+            )
 
             self.assertIsNotNone(record)
             self.assertEqual(record.last_skill_name, "openai-docs")
@@ -440,8 +429,8 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.context.skill_context.skill_context.loader_load_skill_content")
-    @patch("agent_prototype.context.skill_context.skill_context.loader_list_skills")
+    @patch("agent_prototype.context.skill_context.load_skill_content")
+    @patch("agent_prototype.context.skill_context.list_skills")
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_run_endpoint_without_skill_name_only_includes_catalog_prompt(
         self,
@@ -480,8 +469,16 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-catalog-only").first()
-            run_record = db.query(SessionRunRecord).filter(SessionRunRecord.session_id == "session-catalog-only").first()
+            record = (
+                db.query(SessionRecord)
+                .filter(SessionRecord.session_id == "session-catalog-only")
+                .first()
+            )
+            run_record = (
+                db.query(SessionRunRecord)
+                .filter(SessionRunRecord.session_id == "session-catalog-only")
+                .first()
+            )
 
             self.assertIsNotNone(record)
             self.assertIsNone(record.last_skill_name)
@@ -490,8 +487,8 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.context.skill_context.skill_context.loader_load_skill_content")
-    @patch("agent_prototype.context.skill_context.skill_context.loader_list_skills")
+    @patch("agent_prototype.context.skill_context.load_skill_content")
+    @patch("agent_prototype.context.skill_context.list_skills")
     def test_run_endpoint_rejects_disabled_skill_before_loading_content(
         self,
         mock_list_skills,
@@ -520,7 +517,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.json()["error"]["message"], "Skill is disabled: openai-docs")
         mock_load_skill_content.assert_not_called()
 
-    @patch("agent_prototype.context.skill_context.skill_context.loader_list_skills", return_value=[])
+    @patch("agent_prototype.context.skill_context.list_skills", return_value=[])
     def test_run_endpoint_returns_structured_error_when_skill_not_found(self, mock_list_skills):
         response = self.client.post(
             "/run",
@@ -569,7 +566,11 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            record = db.query(SessionRecord).filter(SessionRecord.session_id == data["session_id"]).first()
+            record = (
+                db.query(SessionRecord)
+                .filter(SessionRecord.session_id == data["session_id"])
+                .first()
+            )
             self.assertIsNotNone(record)
             self.assertEqual(record.session_name, "新会话")
             self.assertEqual(record.message_count, 0)
@@ -611,7 +612,9 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-reset").first()
+            record = (
+                db.query(SessionRecord).filter(SessionRecord.session_id == "session-reset").first()
+            )
             self.assertIsNotNone(record)
             self.assertEqual(record.session_name, "session-reset")
             self.assertEqual(record.message_count, 0)
@@ -656,7 +659,9 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            record = db.query(SessionRecord).filter(SessionRecord.session_id == "session-delete").first()
+            record = (
+                db.query(SessionRecord).filter(SessionRecord.session_id == "session-delete").first()
+            )
             self.assertIsNone(record)
         finally:
             db.close()
@@ -675,6 +680,7 @@ class TestAgentApi(unittest.TestCase):
         self.client.post("/run", json={"session_id": "session-b", "user_input": "你好"})
         self.client.post("/run", json={"session_id": "session-a", "user_input": "你好"})
         import time
+
         time.sleep(1)
         self.client.post("/run", json={"session_id": "session-b", "user_input": "再来一次"})
 
@@ -709,7 +715,12 @@ class TestAgentApi(unittest.TestCase):
             data["state"]["messages"],
             [
                 {"role": "user", "content": "你好", "tool_calls": None, "tool_call_id": None},
-                {"role": "assistant", "content": "detail reply", "tool_calls": None, "tool_call_id": None},
+                {
+                    "role": "assistant",
+                    "content": "detail reply",
+                    "tool_calls": None,
+                    "tool_call_id": None,
+                },
             ],
         )
 
@@ -787,7 +798,9 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(disable_response.status_code, 200)
         self.assertFalse(disable_response.json()["enabled"])
-        self.assertEqual(config_path.read_text(encoding="utf-8"), '{\n  "disabled": [\n    "Alpha Skill"\n  ]\n}')
+        self.assertEqual(
+            config_path.read_text(encoding="utf-8"), '{\n  "disabled": [\n    "Alpha Skill"\n  ]\n}'
+        )
 
         list_response = self.client.get("/skills")
 
@@ -803,8 +816,12 @@ class TestAgentApi(unittest.TestCase):
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_trace_endpoint_returns_runs_in_order(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="trace reply")
-        first_response = self.client.post("/run", json={"session_id": "trace-session", "user_input": "第一轮"})
-        second_response = self.client.post("/run", json={"session_id": "trace-session", "user_input": "第二轮"})
+        first_response = self.client.post(
+            "/run", json={"session_id": "trace-session", "user_input": "第一轮"}
+        )
+        second_response = self.client.post(
+            "/run", json={"session_id": "trace-session", "user_input": "第二轮"}
+        )
 
         response = self.client.get("/sessions/trace-session/trace")
 
@@ -813,7 +830,10 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["session_id"], "trace-session")
         self.assertEqual(
             [run["run_id"] for run in data["runs"]],
-            [first_response.json()["metadata"]["run_id"], second_response.json()["metadata"]["run_id"]],
+            [
+                first_response.json()["metadata"]["run_id"],
+                second_response.json()["metadata"]["run_id"],
+            ],
         )
         self.assertEqual([run["user_input"] for run in data["runs"]], ["第一轮", "第二轮"])
         self.assertEqual(data["runs"][0]["event_count"], 1)
@@ -832,7 +852,9 @@ class TestAgentApi(unittest.TestCase):
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_trace_endpoint_supports_run_id_filter(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="filtered trace reply")
-        first_response = self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第一轮"})
+        first_response = self.client.post(
+            "/run", json={"session_id": "trace-filter", "user_input": "第一轮"}
+        )
         self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第二轮"})
 
         response = self.client.get(

@@ -1,10 +1,10 @@
 import unittest
 
 from agent_prototype.agent.types import AgentDefinition
-from agent_prototype.core.types import AgentInput
-from agent_prototype.core.types import ChatMessage, ToolCall, ToolCallFunction
-from agent_prototype.core.types import ModelResponse
+from agent_prototype.execution.persistence.types import AgentInput
+from agent_prototype.core.types import ToolCall, ToolCallFunction
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.tests.helpers.factories import build_assistant_response
 
 
 class FakeModelAdapter:
@@ -17,16 +17,6 @@ class FakeModelAdapter:
         return self.responses.pop(0)
 
 
-def build_assistant_response(content=None, tool_calls=None):
-    return ModelResponse(
-        assistant_message=ChatMessage(
-            role="assistant",
-            content=content,
-            tool_calls=tool_calls,
-        )
-    )
-
-
 class TestAgent(unittest.TestCase):
     def test_run_uses_definition_system_prompt(self):
         custom_definition = AgentDefinition(
@@ -36,9 +26,11 @@ class TestAgent(unittest.TestCase):
             description="test definition",
             tool_names=[],
         )
-        fake_adapter = FakeModelAdapter([
-            build_assistant_response(content="mock reply"),
-        ])
+        fake_adapter = FakeModelAdapter(
+            [
+                build_assistant_response(content="mock reply"),
+            ]
+        )
 
         agent = AgentRunner(definition=custom_definition, model_adapter=fake_adapter)
         output = agent.run(AgentInput(session_id="session-a", user_input="你好"))
@@ -49,9 +41,11 @@ class TestAgent(unittest.TestCase):
         self.assertEqual(request.messages[0].content, "你是一个严格的代码审查助手")
 
     def test_run_updates_state_and_returns_reply(self):
-        fake_adapter = FakeModelAdapter([
-            build_assistant_response(content="mock reply"),
-        ])
+        fake_adapter = FakeModelAdapter(
+            [
+                build_assistant_response(content="mock reply"),
+            ]
+        )
 
         agent = AgentRunner(model_adapter=fake_adapter)
         output = agent.run(AgentInput(session_id="session-a", user_input="你好"))

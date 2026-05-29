@@ -10,15 +10,17 @@
 """
 
 from datetime import datetime
-from typing import Any, Optional
-from pydantic import BaseModel, Field
+from typing import Optional
+from pydantic import BaseModel
 
-from agent_prototype.core.types import AgentEvent, AgentState, SessionSummary
+from agent_prototype.execution.runtime.types import AgentEvent, AgentState
+from agent_prototype.memory.session.types import SessionSummary
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 工具调用摘要 — Tool Call Summary
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class ToolCallSummary(BaseModel):
     """单次工具调用的详情（持久化读取用）。"""
@@ -46,9 +48,11 @@ class RunDetailResponse(BaseModel):
     created_at: datetime
     tool_calls: list[ToolCallSummary]
 
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Session 详情 — Session Detail (HTTP 专属扩展)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class SessionDetail(SessionSummary):
     """session 详情，继承摘要信息并补上完整 state。"""
@@ -59,9 +63,11 @@ class SessionDetail(SessionSummary):
     thinking_enabled: bool = False
     thinking_effort: str = "medium"
 
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Trace 回放 — Trace
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TraceRunSummary(BaseModel):
     """单次 run 的回放数据。"""
@@ -77,35 +83,42 @@ class TraceRunSummary(BaseModel):
     finished_at: datetime
     events: list[AgentEvent]
 
+
 class TraceResponse(BaseModel):
     """`/sessions/{session_id}/trace` 的响应体。"""
 
     session_id: str
     runs: list[TraceRunSummary]
 
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 统一错误响应 — Error
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class ApiError(BaseModel):
     """统一的业务错误内容。"""  # 这个模型只负责描述"错误本身长什么样"
 
-    code: str    # 错误代码，给前端和测试一个稳定的机器可读标识
+    code: str  # 错误代码，给前端和测试一个稳定的机器可读标识
     message: str  # 错误信息，给用户界面直接展示的可读文本
+
 
 class ErrorResponse(BaseModel):
     """统一的错误响应体。"""  # 这个模型表示 HTTP 错误返回时，整个 JSON 的外层结构
 
     error: ApiError  # 把具体错误信息统一收进 error 对象里，避免继续散在顶层
 
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 设置 — Settings (HTTP 专属输入形状)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class CreateProviderInput(BaseModel):
     name: str
     base_url: str
     api_key: str
+
 
 class PatchProviderInput(BaseModel):
     name: Optional[str] = None
@@ -113,13 +126,16 @@ class PatchProviderInput(BaseModel):
     api_key: Optional[str] = None
     is_default: Optional[bool] = None
 
+
 class PatchModelInput(BaseModel):
     enabled: Optional[bool] = None
     display_name: Optional[str] = None
 
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 工作区管理 — Workspace
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class WorkspaceSummary(BaseModel):
     """已注册工作区的摘要响应体。"""

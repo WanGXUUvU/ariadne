@@ -17,7 +17,7 @@
 
 from fastapi import APIRouter, Depends, status
 
-from agent_prototype.core.types import CompactInput, CompactOutput
+from agent_prototype.memory.summary.types import CompactInput, CompactOutput
 from agent_prototype.memory.summary.service import CompactService
 from agent_prototype.api.routes.dependencies import error_response, get_compact_service
 
@@ -25,15 +25,18 @@ router = APIRouter()
 
 
 @router.post("/compact", response_model=CompactOutput)
-def compact_session_api(payload: CompactInput, service: CompactService = Depends(get_compact_service)) -> CompactOutput:
+def compact_session_api(
+    payload: CompactInput,
+    service: CompactService = Depends(get_compact_service),
+) -> CompactOutput:
     """这个函数是用来手动触发会话历史消息压缩（瘦身）的。
-    
+
     当聊天记录太长、太占内存或者容易超出大模型 Token 限制时，调用这个接口可以把老的消息进行摘要压缩，只留下关键信息。
-    
+
     Need 拿到的东西：
     - payload: CompactInput 对象，里面包含了要压缩哪一个会话（session_id）以及具体的压缩策略和参数。
     - service: CompactService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - CompactOutput 对象，里面会告诉你压缩是否成功，以及压缩后的摘要内容或者精简后的状态。
     """

@@ -1,5 +1,7 @@
 """基础设施层 (Infrastructure Layer) - Tavily 网络搜索工具
 
+from agent_prototype.tools.result_types import ToolResult
+from agent_prototype.tools.types import RiskLevel
 职责：
 1. 调用 Tavily HTTP API 发起外部互联网的资料检索。
 2. 获取搜索到的核心网页内容及参考链接。
@@ -14,9 +16,11 @@
 - 下游流向：外部互联网 Tavily 物理 API。
 """
 
-import os,httpx,json
-from agent_prototype.tools.types import ToolDefinition,RiskLevel
-from agent_prototype.core.types import ToolResult
+import os, httpx, json
+from agent_prototype.tools.types import ToolDefinition
+from agent_prototype.tools.result_types import ToolResult
+from agent_prototype.tools.types import RiskLevel
+
 
 def web_search(query: str, num_results: int = 5) -> ToolResult:
     """这是“网页搜索引擎”的具体执行函数。
@@ -29,12 +33,13 @@ def web_search(query: str, num_results: int = 5) -> ToolResult:
     会给出来的结果：
     - ToolResult: 一个搜索结果包裹。如果成功，`content` 里就是一串 JSON 文本，包含查到的所有网页标题、正文片段和 URL；如果失败了（比如你忘了在环境变量里配 API Key 或者网络断了），它会返回 False 并给出原因。
     """
-    
-    api_key=os.environ.get("WEB_SEARCH_API_KEY")
+
+    api_key = os.environ.get("WEB_SEARCH_API_KEY")
 
     if not api_key:
-        return ToolResult(ok=False,content="WEB_SEARCH_API_KEY 未配置",metadata={"tool_name":"web_search"})
-
+        return ToolResult(
+            ok=False, content="WEB_SEARCH_API_KEY 未配置", metadata={"tool_name": "web_search"}
+        )
 
     try:
         response = httpx.post(
@@ -49,10 +54,16 @@ def web_search(query: str, num_results: int = 5) -> ToolResult:
         response.raise_for_status()
         data = response.json()
         results = data.get("results", [])
-        return ToolResult(ok=True,content = json.dumps(results, ensure_ascii=False),metadata={"tool_name":"web_search"})
+        return ToolResult(
+            ok=True,
+            content=json.dumps(results, ensure_ascii=False),
+            metadata={"tool_name": "web_search"},
+        )
     except Exception as exc:
-        return ToolResult(ok=False, content=f"搜索失败: {exc}", metadata={"tool_name": "web_search"})
-    
+        return ToolResult(
+            ok=False, content=f"搜索失败: {exc}", metadata={"tool_name": "web_search"}
+        )
+
 
 WEB_SEARCH_TOOL_SCHEMA = {
     "type": "function",
@@ -78,6 +89,7 @@ WEB_SEARCH_TOOL_SCHEMA = {
         },
     },
 }
+
 
 def build_web_search_tool_definition() -> ToolDefinition:
     """把上面的“网页搜索引擎”工具打包加工，返回一个可供 AI 直接调用和注册的工具定义对象。

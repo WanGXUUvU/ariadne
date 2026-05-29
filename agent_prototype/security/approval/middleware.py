@@ -8,18 +8,17 @@
 import logging
 from typing import Awaitable, Callable
 
-from agent_prototype.core.types import ToolResult
-from agent_prototype.security.policy import ApprovalPolicy
+from agent_prototype.security.policy.types import ApprovalPolicy
 from agent_prototype.security.approval.checker import needs_approval
-from agent_prototype.security.middleware.base import BaseMiddleware
-from agent_prototype.security.types import ToolCallContext
+from agent_prototype.security.middleware.base import BaseMiddleware, ToolCallContext
+from agent_prototype.tools.result_types import ToolResult
 
 logger = logging.getLogger(__name__)
 
 
 class ApprovalRequiredException(Exception):
     """当工具调用需要审批拦截时抛出的特定控制流中断异常。
-    
+
     这是一个“审批拉闸异常”。
     当 AI 想要调用的某个工具有点危险（比如删库、发邮件等敏感写操作），而且安全策略规定必须经过人工同意时，系统就会故意扔出这个“异常”，像拉电闸一样瞬间暂停正在执行的代码，把 AI 定在那里，等待人类管理员点下“同意”或“拒绝”。
     """
@@ -36,7 +35,7 @@ class ApprovalRequiredException(Exception):
 
 class ApprovalMiddleware(BaseMiddleware):
     """人工审批中间件。
-    
+
     这个类是一个“安全安检站（审批中间件）”。
     当 AI 尝试运行任何工具时，都必须经过这个安检站。它会检查这个工具的风险级别，如果属于危险操作（比如写磁盘），且系统当前的安全策略不是“完全信任”，它就会在数据库里生成一张“待审批单”（pending_approval），然后无情地抛出 `ApprovalRequiredException` 异常，把当前的执行流程强行挂起，等管理员审批。
     """
@@ -57,17 +56,19 @@ class ApprovalMiddleware(BaseMiddleware):
         - ToolResult: 工具最终运行的结果（如果没有被拦截且顺利跑完的话）。如果中途触发审批被拦截了，它会抛出 `ApprovalRequiredException` 异常，根本不会有返回值。
         """
         logger.info(f"[ApprovalMiddleware] 正在校验工具 {context.tool_name} 是否需要触发审批...")
-        
+
         # 1. 从小推车上下文读取元数据
         approval_policy = context.extra.get("approval_policy", ApprovalPolicy.NEVER)
-        risk_level      = context.extra.get("risk_level")
+        risk_level = context.extra.get("risk_level")
         on_approval_required = context.extra.get("on_approval_required")
-        
+
         # 2. 判断是否触发拦截
         if risk_level is not None and needs_approval(approval_policy, risk_level):
-            logger.warning(f"[ApprovalMiddleware] 工具 {context.tool_name} 触发审批拦截策略: {approval_policy}")
+            logger.warning(
+                f"[ApprovalMiddleware] 工具 {context.tool_name} 触发审批拦截策略: {approval_policy}"
+            )
             approval_id = None
-            
+
             if on_approval_required:
                 # 触发外部传入的回调函数，物理入库 pending_approvals 并获取审批单号
                 approval_id = on_approval_required(
@@ -77,7 +78,7 @@ class ApprovalMiddleware(BaseMiddleware):
                     context.extra.get("saved_messages"),
                     context.extra.get("current_index", 0),
                 )
-            
+
             id_val = approval_id or context.tool_args
             # 抛出特定异常，断流管道并挂起执行
             raise ApprovalRequiredException(id_val)

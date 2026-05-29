@@ -17,14 +17,13 @@ logger = logging.getLogger(__name__)
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
 from agent_prototype.core.types import ModelStreamEvent
-from agent_prototype.core.types import (
-    AgentEvent, AgentInput, AgentOutput, RunMetadata,
-)
+from agent_prototype.execution.runtime.types import AgentEvent
+from agent_prototype.execution.persistence.types import AgentInput, AgentOutput, RunMetadata
 from agent_prototype.execution.streaming.types import StreamFrame
 from agent_prototype.execution.streaming.sse import _sse_frame
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
 from agent_prototype.observation.tool_run_observer import ToolRunObserver
-from agent_prototype.execution.persistence.builder import RunContext
+from agent_prototype.execution.persistence.types import RunContext
 from agent_prototype.execution.persistence.service import RunPersistenceService
 
 
@@ -55,12 +54,12 @@ class StreamRunSession:
         - agent_input: 用户的输入参数。
         - persist: 用于最终落库的持久化服务。
         """
-        self.ctx         = ctx
-        self.observer    = observer
-        self.agent       = agent
-        self.run_id      = run_id
+        self.ctx = ctx
+        self.observer = observer
+        self.agent = agent
+        self.run_id = run_id
         self.agent_input = agent_input
-        self.persist     = persist
+        self.persist = persist
 
     async def run(self) -> AsyncIterator[str]:
         """流式大戏开演！这是最核心的方法，会按顺序不断吐出 SSE 数据帧。
@@ -71,9 +70,9 @@ class StreamRunSession:
         会给出来的结果：
         - 一个异步生成器迭代器，实时 yield 符合 SSE 协议的纯文本帧。
         """
-        completed       = False
-        partial_reply   = ""
-        thinking_buf    = ""   # 当前轮次的 thinking 内容，遇到 AgentEvent 时 flush 进 events
+        completed = False
+        partial_reply = ""
+        thinking_buf = ""  # 当前轮次的 thinking 内容，遇到 AgentEvent 时 flush 进 events
         events: list[AgentEvent] = []
 
         def _flush_thinking() -> None:
@@ -81,11 +80,13 @@ class StreamRunSession:
             在每个 AgentEvent（工具调用/结果）入队前调用，保证 thinking 位于对应工具调用之前。"""
             nonlocal thinking_buf
             if thinking_buf:
-                events.append(AgentEvent(
-                    index=len(events),
-                    type="thinking",
-                    content=thinking_buf,
-                ))
+                events.append(
+                    AgentEvent(
+                        index=len(events),
+                        type="thinking",
+                        content=thinking_buf,
+                    )
+                )
                 thinking_buf = ""
 
         try:
@@ -96,14 +97,18 @@ class StreamRunSession:
                 on_tool_finish=self.observer.on_tool_finish,
                 on_approval_required=self.observer.on_approval_required,
                 run_id=self.run_id,
-                workspace_path=self.ctx.workspace_path
+                workspace_path=self.ctx.workspace_path,
             ):
                 if isinstance(item, str):
                     partial_reply += item
                     yield _sse_frame(StreamFrame(type="delta", data={"content": item}))
                 elif isinstance(item, ModelStreamEvent) and item.type == "thinking_delta":
                     thinking_buf += item.thinking_delta or ""
-                    yield _sse_frame(StreamFrame(type="thinking_delta", data={"content": item.thinking_delta or ""}))
+                    yield _sse_frame(
+                        StreamFrame(
+                            type="thinking_delta", data={"content": item.thinking_delta or ""}
+                        )
+                    )
                 elif isinstance(item, AgentEvent):
                     # 先 flush 当前 thinking，保证 thinking 排在此事件之前
                     _flush_thinking()
@@ -150,15 +155,17 @@ class StreamRunSession:
         会给出来的结果：
         - 一个以 `data: ` 开头并以双换行符结尾的 start 帧字符串。
         """
-        return _sse_frame(StreamFrame(
-            type="start",
-            data={
-                "session_id": self.agent_input.session_id,
-                "run_id":     self.run_id,
-                "agent_name": self.ctx.effective_agent_name,
-                "skill_name": self.agent_input.skill_name,
-            }
-        ))
+        return _sse_frame(
+            StreamFrame(
+                type="start",
+                data={
+                    "session_id": self.agent_input.session_id,
+                    "run_id": self.run_id,
+                    "agent_name": self.ctx.effective_agent_name,
+                    "skill_name": self.agent_input.skill_name,
+                },
+            )
+        )
 
     def _handle_paused(self, events: List[AgentEvent], partial_reply: str) -> str:
         """内部方法：当运行因为工具需要人工审批而暂停时，紧急通过 observer 观察者进行中间态快照落库，并生产一个“暂停（paused）”帧。
@@ -192,7 +199,7 @@ class StreamRunSession:
                 run_id=self.run_id,
                 agent_name=self.ctx.effective_agent_name,
                 skill_name=self.agent_input.skill_name,
-            )
+            ),
         )
         output.state.agent_name = self.ctx.effective_agent_name
         self.persist.save_completed(
@@ -203,11 +210,13 @@ class StreamRunSession:
             usage=self.agent.last_usage,
             session_type=self.ctx.session_type,
         )
-        return _sse_frame(StreamFrame(
-            type="end",
-            data={
-                "reply":    partial_reply,
-                "state":    self.agent.state.model_dump(),
-                "metadata": output.metadata.model_dump(),
-            }
-        ))
+        return _sse_frame(
+            StreamFrame(
+                type="end",
+                data={
+                    "reply": partial_reply,
+                    "state": self.agent.state.model_dump(),
+                    "metadata": output.metadata.model_dump(),
+                },
+            )
+        )

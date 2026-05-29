@@ -14,8 +14,14 @@ from typing import Optional
 
 from sqlalchemy import func as sqlfunc
 from sqlalchemy.orm import Session
-from agent_prototype.core.types import AgentEvent
-from agent_prototype.infra.db.orm_models import SessionRunEventRecord, SessionRunRecord, ToolCallRecord
+from agent_prototype.core.types import ChatMessage
+from agent_prototype.execution.runtime.types import AgentEvent
+from agent_prototype.infra.db.orm_models import (
+    SessionRecord,
+    SessionRunEventRecord,
+    SessionRunRecord,
+    ToolCallRecord,
+)
 
 
 class SqliteRunStore:
@@ -87,19 +93,19 @@ class SqliteRunStore:
         return run_record
 
     def save_partial_run(
-            self,
-            *,
-            session_id: str,
-            run_id: str,
-            agent_name: Optional[str],
-            skill_name: Optional[str],
-            user_input: str,
-            partial_reply: str,
-            state,
-            events: list = [],
+        self,
+        *,
+        session_id: str,
+        run_id: str,
+        agent_name: Optional[str],
+        skill_name: Optional[str],
+        user_input: str,
+        partial_reply: str,
+        state,
+        events: Optional[list] = None,
     ) -> SessionRunRecord:
         """保存"部分/未完成"的运行记录（流式输出或者中间被掐断时的保存操作）。"""
-        from agent_prototype.core.types import ChatMessage
+        events = events or []
 
         existing = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
         if existing:
@@ -116,7 +122,8 @@ class SqliteRunStore:
                             tool_call_id=event_dict.get("tool_call_id"),
                             tool_result_json=(
                                 json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
-                                if event_dict.get("tool_result") else None
+                                if event_dict.get("tool_result")
+                                else None
                             ),
                         )
                     )
@@ -150,18 +157,20 @@ class SqliteRunStore:
                     tool_call_id=event_dict.get("tool_call_id"),
                     tool_result_json=(
                         json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
-                        if event_dict.get("tool_result") else None
+                        if event_dict.get("tool_result")
+                        else None
                     ),
                 )
             )
 
         if partial_reply.strip() or events:
-            state.messages.append(ChatMessage(
-                role="assistant",
-                content=partial_reply or None,
-            ))
+            state.messages.append(
+                ChatMessage(
+                    role="assistant",
+                    content=partial_reply or None,
+                )
+            )
 
-        from agent_prototype.infra.db.orm_models import SessionRecord
         record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
         if record:
             record.state_json = json.dumps(state.model_dump(), ensure_ascii=False)
@@ -169,7 +178,9 @@ class SqliteRunStore:
         self.db.flush()
         return run_record
 
-    def list_run_records(self, session_id: str, run_id: Optional[str] = None) -> list[SessionRunRecord]:
+    def list_run_records(
+        self, session_id: str, run_id: Optional[str] = None
+    ) -> list[SessionRunRecord]:
         """列出某个会话的所有运行记录。"""
         query = self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == session_id)
         if run_id is not None:
@@ -187,10 +198,16 @@ class SqliteRunStore:
 
     def append_run_events(self, *, run_id, new_events: list[AgentEvent], final_reply: str) -> None:
         """给一次运行追加新的步骤事件，并更新它的最终答复。"""
-        run_record = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        run_record = (
+            self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        )
         if not run_record:
             raise ValueError(f"run_id{run_id} not found")
-        max_index = self.db.query(sqlfunc.max(SessionRunEventRecord.event_index)).filter(SessionRunEventRecord.run_id == run_id).scalar()
+        max_index = (
+            self.db.query(sqlfunc.max(SessionRunEventRecord.event_index))
+            .filter(SessionRunEventRecord.run_id == run_id)
+            .scalar()
+        )
         next_index = (max_index + 1) if max_index is not None else 0
         for event in new_events:
             event_dict = event.model_dump(exclude_none=True)
@@ -216,7 +233,9 @@ class SqliteRunStore:
         run_record.run_status = "completed"
         run_record.finished_at = sqlfunc.now()
 
-    def create_tool_call(self, *, run_id: str, tool_name: str, tool_call_id: Optional[str], input_json: Optional[str]) -> int:
+    def create_tool_call(
+        self, *, run_id: str, tool_name: str, tool_call_id: Optional[str], input_json: Optional[str]
+    ) -> int:
         """工具开始运行之前，创建一条工具调用记录。"""
         record = ToolCallRecord(
             run_id=run_id,
@@ -232,6 +251,7 @@ class SqliteRunStore:
     def finish_tool_call(self, *, record_id: int, status: str, result_json: Optional[str]) -> None:
         """当一个工具跑完了，更新对应的工具调用记录。"""
         from sqlalchemy import func
+
         record = self.db.query(ToolCallRecord).filter(ToolCallRecord.id == record_id).first()
         if record:
             record.status = status
@@ -241,6 +261,7 @@ class SqliteRunStore:
     def update_run_status(self, *, run_id: str, status: str) -> None:
         """更新一次运行的当前状态。"""
         from sqlalchemy import func
+
         self.db.flush()
         record = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
         if record:
@@ -269,15 +290,15 @@ class SqliteRunStore:
         return run, tool_calls
 
     def create_child_run(
-            self,
-            *,
-            parent_run_id: str,
-            session_id: str,
-            run_id: str,
-            agent_name: Optional[str],
-            user_input: str,
-            reply: str,
-            events: list[AgentEvent],
+        self,
+        *,
+        parent_run_id: str,
+        session_id: str,
+        run_id: str,
+        agent_name: Optional[str],
+        user_input: str,
+        reply: str,
+        events: list[AgentEvent],
     ) -> SessionRunRecord:
         """为子 Agent 创建一条关联的子运行记录。"""
         run_record = SessionRunRecord(
@@ -295,19 +316,21 @@ class SqliteRunStore:
 
         for index, event in enumerate(events):
             event_dict = event.model_dump(exclude_none=True)
-            self.db.add(SessionRunEventRecord(
-                run_id=run_id,
-                event_index=index,
-                type=event_dict["type"],
-                content=event_dict.get("content") or "",
-                tool_name=event_dict.get("tool_name"),
-                tool_call_id=event_dict.get("tool_call_id"),
-                tool_result_json=(
-                    json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
-                    if event_dict.get("tool_result")
-                    else None
-                ),
-            ))
+            self.db.add(
+                SessionRunEventRecord(
+                    run_id=run_id,
+                    event_index=index,
+                    type=event_dict["type"],
+                    content=event_dict.get("content") or "",
+                    tool_name=event_dict.get("tool_name"),
+                    tool_call_id=event_dict.get("tool_call_id"),
+                    tool_result_json=(
+                        json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
+                        if event_dict.get("tool_result")
+                        else None
+                    ),
+                )
+            )
         return run_record
 
     def get_children_runs(self, parent_run_id: str) -> list[SessionRunRecord]:

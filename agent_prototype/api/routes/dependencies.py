@@ -50,11 +50,12 @@ def error_response(status_code: int, code: str, message: str) -> JSONResponse:
                 code=code,
                 message=message,
             )
-        ).model_dump()
+        ).model_dump(),
     )
 
 
 # ── Service Provider 工厂（供路由层 Depends 注入）─────────────────────────────
+
 
 def get_run_service(db: Session = Depends(get_db)) -> RunService:
     """提供 RunService 实例（含运行时编排、trace 查询、子 Agent 调度）。"""
@@ -71,9 +72,9 @@ def get_compact_service(db: Session = Depends(get_db)) -> CompactService:
     return CompactService(db)
 
 
-def get_skill_service(db: Session = Depends(get_db)) -> SkillService:
+def get_skill_service() -> SkillService:
     """提供 SkillService 实例（含技能列表、启用/禁用）。"""
-    return SkillService(db)
+    return SkillService()
 
 
 def get_approval_service(db: Session = Depends(get_db)) -> ApprovalService:

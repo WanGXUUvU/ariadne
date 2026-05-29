@@ -17,15 +17,17 @@
 
 # ── 标准库 ────────────────────────────────────────────────────────────────────
 import uuid
-from typing import Optional
 
 # ── 第三方库 ──────────────────────────────────────────────────────────────────
 from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.security.policy import PROFILES
-from agent_prototype.core.types import (
-    AgentState, CreateSessionInput, RenameSessionInput, ResetInput, SessionSummary,
+from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.memory.session.types import (
+    CreateSessionInput,
+    RenameSessionInput,
+    ResetInput,
+    SessionSummary,
 )
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig
 from agent_prototype.memory.session.store import SqliteSessionStore
@@ -33,17 +35,17 @@ from agent_prototype.memory.session.store import SqliteSessionStore
 
 class SessionService:
     """会话生命周期管理服务类 (OOP)
-    
+
     这个类是一个“会话大管家”。它主要用来打理跟“聊天会话”（Session）有关的所有核心业务，比如：创建一个新会话、把会话重置清空、给会话改名字、彻底删除会话，或者更新会话里绑定的模型和安全策略等。它不直接和数据库打交道，而是指挥底下的 store 模块去干活，并且负责管好“事务”（就是保证一连串数据库操作要么全成功，要么有一步失败了就全部退回原样，防止数据搞乱）。
     """
-    
+
     def __init__(self, db: Session):
         """大管家初始化。把数据库连接和底下的数据仓库（Store）都准备好，方便后面随时读写数据。
 
         需要拿到的东西：
         - db (Session): 数据库会话连接，也就是操作数据库的“钥匙”。
         """
-        self.db    = db
+        self.db = db
         self.store = SqliteSessionStore(db)
 
     # ── 会话生命周期 ────────────────────────────────────────────────────────────
@@ -62,15 +64,21 @@ class SessionService:
         state = AgentState()
 
         # 尝试填入默认提供商与启用模型
-        default_provider = self.db.query(ProviderConfig).filter(ProviderConfig.is_default == 1).first()
+        default_provider = (
+            self.db.query(ProviderConfig).filter(ProviderConfig.is_default == 1).first()
+        )
         default_provider_id = None
         default_model_id = None
-        
+
         if default_provider:
-            default_model = self.db.query(ModelSetting).filter(
-                ModelSetting.provider_id == default_provider.id,
-                ModelSetting.enabled == 1,
-            ).first()
+            default_model = (
+                self.db.query(ModelSetting)
+                .filter(
+                    ModelSetting.provider_id == default_provider.id,
+                    ModelSetting.enabled == 1,
+                )
+                .first()
+            )
             default_provider_id = default_provider.id
             default_model_id = default_model.model_id if default_model else None
 
@@ -121,7 +129,7 @@ class SessionService:
         record = self.store.read_session_record(payload.session_id)
         if not record:
             raise ValueError("Session not found")
-        
+
         empty_state = AgentState()
         try:
             self.store.upsert_session_snapshot(
@@ -152,7 +160,7 @@ class SessionService:
         record = self.store.read_session_record(session_id)
         if record is None:
             raise ValueError("Session not found")
-        
+
         try:
             self.store.delete_session(session_id)
             self.db.commit()
@@ -173,11 +181,11 @@ class SessionService:
         """
         if not new_name or not new_name.strip():
             raise ValueError("Session name cannot be empty")
-        
+
         record = self.store.read_session_record(session_id)
         if record is None:
             raise ValueError("Session not found")
-        
+
         try:
             self.store.rename_session(session_id, new_name)
             self.db.commit()
@@ -263,4 +271,3 @@ class SessionService:
             return None, None
         state = self.store.read_session_state(session_id)
         return record, state
-

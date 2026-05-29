@@ -38,13 +38,17 @@ class TestToolRegistry(unittest.TestCase):
         folder_path.mkdir()
         target_file = folder_path / "sample.txt"
         target_file.write_text("hello world\nsearch me here\nbye", encoding="utf-8")
-        result = self.registry.execute_tool_call("search_text", f'{{"query":"search me","path":"{folder_path}"}}')
+        result = self.registry.execute_tool_call(
+            "search_text", f'{{"query":"search me","path":"{folder_path}"}}'
+        )
         self.assertTrue(result.ok)
         self.assertIn("sample.txt", result.content)
 
     def test_execute_write_file_tool_call(self):
         file_path = Path(self.temp_dir.name) / "written.txt"
-        result = self.registry.execute_tool_call("write_file", f'{{"path":"{file_path}","content":"hello write"}}')
+        result = self.registry.execute_tool_call(
+            "write_file", f'{{"path":"{file_path}","content":"hello write"}}'
+        )
         self.assertTrue(result.ok)
         self.assertTrue(file_path.exists())
         self.assertEqual(file_path.read_text(encoding="utf-8"), "hello write")

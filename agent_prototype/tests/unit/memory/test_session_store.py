@@ -1,22 +1,18 @@
 import tempfile
 import unittest
-from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from agent_prototype.core.types import AgentState
-from agent_prototype.infra.db.engine import Base
+from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.tests.helpers.db import make_sqlite_test_db
 
 
 class TestSessionStore(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        db_path = Path(self.temp_dir.name) / "test_session_store.db"
-        self.engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
-        Base.metadata.create_all(bind=self.engine)
-        self.session_local = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.engine, self.session_local = make_sqlite_test_db(
+            self.temp_dir.name,
+            "test_session_store.db",
+        )
 
     def tearDown(self):
         self.engine.dispose()

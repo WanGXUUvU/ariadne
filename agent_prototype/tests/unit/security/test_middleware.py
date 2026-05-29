@@ -2,10 +2,14 @@ import json
 import unittest
 from typing import Any, Awaitable, Callable
 
-from agent_prototype.core.types import ToolResult, ToolError, RiskLevel
+from agent_prototype.tools.result_types import ToolResult, ToolError
+from agent_prototype.tools.types import RiskLevel
 from agent_prototype.security.policy import ApprovalPolicy
-from agent_prototype.security.middleware.base import BaseMiddleware, MiddlewarePipeline
-from agent_prototype.security.types import ToolCallContext
+from agent_prototype.security.middleware.base import (
+    BaseMiddleware,
+    MiddlewarePipeline,
+    ToolCallContext,
+)
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.security.approval.middleware import ApprovalMiddleware
 from agent_prototype.security.approval.middleware import ApprovalRequiredException
@@ -25,7 +29,7 @@ class DummyMiddleware(BaseMiddleware):
         next_call: Callable[[], Awaitable[Any]],
     ) -> Any:
         self.trace_list.append(f"enter:{self.name}")
-        
+
         if isinstance(context, ToolCallContext):
             context.extra[f"passed_{self.name}"] = True
 
@@ -130,7 +134,7 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(RuntimeError) as ctx:
             await pipeline.execute(self.context, terminal)
-        
+
         self.assertEqual(str(ctx.exception), "Middleware crashed on purpose")
 
     async def test_sandbox_relative_path_rewrite(self):
@@ -141,7 +145,7 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
             tool_args='{"path": "src/App.vue", "content": "<template></template>"}',
             tool_call_id="call_456",
             session_id="session_xyz",
-            extra={"workspace_path": "/fake/workspace/root"}
+            extra={"workspace_path": "/fake/workspace/root"},
         )
 
         async def terminal():
@@ -161,7 +165,7 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
             tool_args='{"path": "/package.json"}',
             tool_call_id="call_789",
             session_id="session_xyz",
-            extra={"workspace_path": "/fake/workspace/root"}
+            extra={"workspace_path": "/fake/workspace/root"},
         )
 
         async def terminal():
@@ -181,7 +185,7 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
             tool_args='{"path": "../../../etc/passwd"}',
             tool_call_id="call_000",
             session_id="session_xyz",
-            extra={"workspace_path": "/fake/workspace/root"}
+            extra={"workspace_path": "/fake/workspace/root"},
         )
 
         async def terminal():
@@ -195,8 +199,9 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
     async def test_approval_middleware_danger_blocks(self):
         """测试 ApprovalMiddleware 对 DANGER 级工具在指定策略下抛出控制流中断异常。"""
         approval = ApprovalMiddleware()
-        
+
         callback_called = False
+
         def fake_on_approval_required(*args):
             nonlocal callback_called
             callback_called = True
@@ -211,17 +216,17 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
                 "approval_policy": ApprovalPolicy.ON_REQUEST,
                 "risk_level": RiskLevel.DANGER,
                 "on_approval_required": fake_on_approval_required,
-            }
+            },
         )
 
         async def terminal():
             self.fail("Terminal should not be called due to approval interception")
 
         pipeline = MiddlewarePipeline([approval])
-        
+
         with self.assertRaises(ApprovalRequiredException) as ctx:
             await pipeline.execute(context, terminal)
-            
+
         self.assertEqual(ctx.exception.approval_id, "approval-uid")
         self.assertTrue(callback_called)
 
@@ -230,10 +235,10 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
         sandbox = SandboxMiddleware()
         context = ToolCallContext(
             tool_name="unauthorized_tool",
-            tool_args='{}',
+            tool_args="{}",
             tool_call_id="call_999",
             session_id="session_xyz",
-            extra={"allow_tool_names": ["write_file", "read_file"]}
+            extra={"allow_tool_names": ["write_file", "read_file"]},
         )
 
         async def terminal():
@@ -241,6 +246,6 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
 
         pipeline = MiddlewarePipeline([sandbox])
         result = await pipeline.execute(context, terminal)
-        
+
         self.assertFalse(result.ok)
         self.assertEqual(result.error.code, "TOOL_NOT_ALLOWED")

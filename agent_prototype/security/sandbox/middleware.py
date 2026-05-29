@@ -5,16 +5,15 @@ import logging
 from pathlib import Path
 from typing import Awaitable, Callable
 
-from agent_prototype.core.types import ToolResult, ToolError
-from agent_prototype.security.middleware.base import BaseMiddleware
-from agent_prototype.security.types import ToolCallContext
+from agent_prototype.security.middleware.base import BaseMiddleware, ToolCallContext
+from agent_prototype.tools.result_types import ToolResult, ToolError
 
 logger = logging.getLogger(__name__)
 
 
 class SandboxMiddleware(BaseMiddleware):
     """沙箱与工作区虚拟投影中间件。
-    
+
     这个类是一个“路径沙箱安检站（沙箱隔离中间件）”。
     它主要有两个非常硬核的任务：
     1. 【工具准入校验】：检查 AI 调用的工具，是不是当前 Agent 获准使用的白名单工具。如果 AI 偷偷用了不该用的工具，直接拦截并报错“TOOL_NOT_ALLOWED”。
@@ -37,7 +36,7 @@ class SandboxMiddleware(BaseMiddleware):
         - ToolResult: 工具的运行结果。如果在准入检查或沙箱路径防逃逸检查中露出了马脚，它会直接返回一个 ok=False 且包含具体安全违规错误码的结果包，不再继续往下走。
         """
         logger.info(f"[SandboxMiddleware] 正在执行工具白名单与路径沙箱校验: {context.tool_name}...")
-        
+
         # 1. ：工具名称准入校验 (AOP Tool Restriction)
         allow_tool_names = context.extra.get("allow_tool_names")
         if allow_tool_names is not None and context.tool_name not in allow_tool_names:
@@ -48,8 +47,8 @@ class SandboxMiddleware(BaseMiddleware):
                 error=ToolError(
                     code="TOOL_NOT_ALLOWED",
                     tool_name=context.tool_name,
-                    message=f"Tool '{context.tool_name}' is not allowed by this agent."
-                )
+                    message=f"Tool '{context.tool_name}' is not allowed by this agent.",
+                ),
             )
 
         # 2. 读取物理工作区路径
@@ -70,7 +69,7 @@ class SandboxMiddleware(BaseMiddleware):
         for k, v in args.items():
             if k in path_keys and isinstance(v, str):
                 p_str = v.strip()
-                
+
                 # 路径解析：绝对路径直接 resolve，相对路径拼接工作区根再 resolve
                 p_path = Path(p_str)
                 if p_path.is_absolute():
@@ -83,15 +82,17 @@ class SandboxMiddleware(BaseMiddleware):
                 # 物理路径防越界逃逸 (使用 parents 关系判断，防止前缀相似漏洞)
                 is_inside = (sandbox_root in resolved_p.parents) or (resolved_p == sandbox_root)
                 if not is_inside:
-                    logger.error(f"[SandboxMiddleware] 沙箱安全拦截！路径越界逃逸: {v} -> {resolved_p}")
+                    logger.error(
+                        f"[SandboxMiddleware] 沙箱安全拦截！路径越界逃逸: {v} -> {resolved_p}"
+                    )
                     return ToolResult(
                         ok=False,
                         content=None,
                         error=ToolError(
                             code="SANDBOX_VIOLATION",
                             tool_name=context.tool_name,
-                            message=f"Sandbox Violation: Path '{v}' resolves outside the workspace '{sandbox_root}'."
-                        )
+                            message=f"Sandbox Violation: Path '{v}' resolves outside the workspace '{sandbox_root}'.",
+                        ),
                     )
 
                 args[k] = str(resolved_p)

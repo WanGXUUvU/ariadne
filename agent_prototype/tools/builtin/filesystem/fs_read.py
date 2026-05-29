@@ -1,5 +1,6 @@
 """基础设施层 (Infrastructure Layer) - 文件系统物理读取工具
 
+from agent_prototype.tools.types import RiskLevel
 职责：
 1. 执行具体的本地磁盘文件读取操作，获取全部文本内容。
 
@@ -14,7 +15,8 @@
 """
 
 from pathlib import Path  # 方便处理文件路径
-from agent_prototype.tools.types import ToolDefinition,RiskLevel  # 导入工具定义
+from agent_prototype.tools.types import ToolDefinition  # 导入工具定义
+from agent_prototype.tools.types import RiskLevel
 
 
 def read_file(path: str) -> str:  # 真正读文件的函数

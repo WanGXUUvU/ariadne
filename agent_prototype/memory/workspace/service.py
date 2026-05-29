@@ -16,15 +16,16 @@
 """
 
 import os
-from typing import List, Optional
+from typing import Optional
 from sqlalchemy.orm import Session
 from agent_prototype.infra.db.orm_models import WorkspaceRecord
 from agent_prototype.memory.workspace.store import SqliteWorkspaceStore
-from agent_prototype.tools.builtin.system.apple_script import open_folder_dialog
+from agent_prototype.infra.os_proxy.apple_script import open_folder_dialog
+
 
 class WorkspaceService:
     """工作空间服务类 (OOP)
-    
+
     这个类是“工作空间管理器”。它主要用来打理你在本地电脑里的开发文件夹（也就是“工作区” Workspace）。比如：列出所有注册过的工作区目录、注册一个新的物理文件夹作为工作区，或者弹出一个苹果系统原生的“文件夹选择框”让你挑个目录注册进来。
     """
 
@@ -44,7 +45,7 @@ class WorkspaceService:
         - list[WorkspaceRecord]: 已经在数据库里保存过的所有工作区记录列表。
         """
         return self.store.list_all()
-    
+
     def register_workspace(self, path: str) -> WorkspaceRecord:
         """把电脑上的一个文件夹路径注册到我们的系统里，做成一个工作空间。
         它会自动把路径转换成绝对路径（比如去掉多余的相对符号），自动截取文件夹的名字作为工作区的名称，然后保存到数据库里。如果这个文件夹之前已经注册过了，就会直接把原先的记录找出来返回。
@@ -61,7 +62,7 @@ class WorkspaceService:
         existing = self.store.get_by_path(abs_path)
         if existing:
             return existing
-        
+
         workspace_record = WorkspaceRecord(name=name, path=path)
         self.store.save(workspace_record)
 
@@ -69,7 +70,7 @@ class WorkspaceService:
         self.db.refresh(workspace_record)
 
         return workspace_record
-    
+
     def select_dialog(self) -> Optional[WorkspaceRecord]:
         """弹出一个苹果系统风格的“选择文件夹”对话框。
         当你在弹窗里选中了某个文件夹并点击“确定”后，这个函数会自动把该文件夹路径注册为工作空间并返回；如果你直接点“取消”没选任何文件夹，它就会识趣地返回 None。
@@ -81,5 +82,5 @@ class WorkspaceService:
 
         if not selected_path:
             return None
-        
+
         return self.register_workspace(selected_path)

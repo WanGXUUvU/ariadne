@@ -1,5 +1,6 @@
 """基础设施层 (Infrastructure Layer) - 文件系统物理目录列表工具
 
+from agent_prototype.tools.types import RiskLevel
 职责：
 1. 执行具体的本地磁盘文件夹目录列表遍历，列出子目录和文件属性。
 
@@ -13,8 +14,10 @@
 - 下游流向：操作系统本地文件系统。
 """
 
-from agent_prototype.tools.types import ToolDefinition,RiskLevel
+from agent_prototype.tools.types import ToolDefinition
+from agent_prototype.tools.types import RiskLevel
 from pathlib import Path
+
 
 def list_dir(path: str) -> str:
     """这是“列出文件夹内容”的具体执行函数。
@@ -26,15 +29,16 @@ def list_dir(path: str) -> str:
     会给出来的结果：
     - str: 包含该目录下所有子文件和子文件夹名称的换行文本。如果路径找不到或者它根本不是一个文件夹，就会气呼呼地抛出报错。
     """
-    target=Path(path)
+    target = Path(path)
 
     if not target.exists():
         raise ValueError(f"Directory not found :{path}")
-    
+
     if not target.is_dir():
         raise ValueError(f"Not a directory: {path}")
     items = sorted(child.name for child in target.iterdir())
     return "\n".join(items)
+
 
 LIST_DIR_SCHEMA = {  # 给模型看的工具说明
     "type": "function",

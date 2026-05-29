@@ -9,9 +9,9 @@
 import asyncio
 import unittest
 from unittest.mock import MagicMock
-from typing import Callable
 
-from agent_prototype.core.types import RiskLevel, ToolCall, ToolCallFunction
+from agent_prototype.tools.types import RiskLevel
+from agent_prototype.core.types import ToolCall, ToolCallFunction
 from agent_prototype.security.policy import ApprovalPolicy
 from agent_prototype.security.approval.checker import needs_approval
 from agent_prototype.execution.runtime.tool_runner import async_handle_tool_calls
@@ -21,17 +21,26 @@ from agent_prototype.tools.types import ToolDefinition
 
 # ── 辅助：构造一个 fake ToolRegistry，只返回指定的 risk_level ──────────────
 
+
 def make_registry(risk_level: RiskLevel) -> ToolRegistry:
     """构造只有一个 fake 工具的 ToolRegistry。"""
     registry = ToolRegistry()
+
     def fake_handler(**kwargs):
         return "ok"
-    registry.register(ToolDefinition(
-        name="fake_tool",
-        schema={"name": "fake_tool", "description": "", "parameters": {"type": "object", "properties": {}}},
-        handler=fake_handler,
-        risk_level=risk_level,
-    ))
+
+    registry.register(
+        ToolDefinition(
+            name="fake_tool",
+            schema={
+                "name": "fake_tool",
+                "description": "",
+                "parameters": {"type": "object", "properties": {}},
+            },
+            handler=fake_handler,
+            risk_level=risk_level,
+        )
+    )
     return registry
 
 
@@ -44,7 +53,8 @@ def make_tool_call(name: str = "fake_tool") -> ToolCall:
 
 async def collect_events(registry, tool_calls, policy, on_approval_required=None):
     """运行 async_handle_tool_calls，收集所有 AgentEvent，返回事件列表。"""
-    from agent_prototype.core.types import AgentEvent
+    from agent_prototype.execution.runtime.types import AgentEvent
+
     events = []
     async for item in async_handle_tool_calls(
         tool_registry=registry,
@@ -56,13 +66,13 @@ async def collect_events(registry, tool_calls, policy, on_approval_required=None
         approval_policy=policy,
         on_approval_required=on_approval_required,
     ):
-        from agent_prototype.execution.runtime.tool_runner import ToolTurnResult
         if isinstance(item, AgentEvent):
             events.append(item)
     return events
 
 
 # ── needs_approval 单元测试 ──────────────────────────────────────────────────
+
 
 class TestNeedsApproval(unittest.TestCase):
 
@@ -85,6 +95,7 @@ class TestNeedsApproval(unittest.TestCase):
 
 # ── async_handle_tool_calls 集成测试 ─────────────────────────────────────────
 
+
 class TestAsyncHandleToolCallsApproval(unittest.TestCase):
 
     def _run(self, coro):
@@ -93,9 +104,7 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_never_policy_executes_write_tool_directly(self):
         """NEVER policy：WRITE 工具直接执行，不产生 approval_required 事件。"""
         registry = make_registry(RiskLevel.WRITE)
-        events = self._run(collect_events(
-            registry, [make_tool_call()], ApprovalPolicy.NEVER
-        ))
+        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.NEVER))
         types = [e.type for e in events]
         self.assertNotIn("approval_required", types)
         self.assertIn("tool_result", types)
@@ -103,9 +112,7 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_untrusted_policy_blocks_write_tool(self):
         """UNTRUSTED policy：WRITE 工具被拦截，产生 approval_required，不产生 tool_result。"""
         registry = make_registry(RiskLevel.WRITE)
-        events = self._run(collect_events(
-            registry, [make_tool_call()], ApprovalPolicy.UNTRUSTED
-        ))
+        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.UNTRUSTED))
         types = [e.type for e in events]
         self.assertIn("approval_required", types)
         self.assertNotIn("tool_result", types)
@@ -113,9 +120,7 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_on_request_policy_allows_write_tool(self):
         """ON_REQUEST policy：WRITE 工具直接执行，不产生 approval_required 事件。"""
         registry = make_registry(RiskLevel.WRITE)
-        events = self._run(collect_events(
-            registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST
-        ))
+        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST))
         types = [e.type for e in events]
         self.assertNotIn("approval_required", types)
         self.assertIn("tool_result", types)
@@ -123,9 +128,7 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_on_request_policy_blocks_danger_tool(self):
         """ON_REQUEST policy：DANGER 工具被拦截，产生 approval_required。"""
         registry = make_registry(RiskLevel.DANGER)
-        events = self._run(collect_events(
-            registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST
-        ))
+        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST))
         types = [e.type for e in events]
         self.assertIn("approval_required", types)
         self.assertNotIn("tool_result", types)
@@ -134,20 +137,28 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
         """UNTRUSTED policy 拦截时，on_approval_required 回调被调用一次。"""
         registry = make_registry(RiskLevel.WRITE)
         callback = MagicMock(return_value="approval-123")
-        self._run(collect_events(
-            registry, [make_tool_call()], ApprovalPolicy.UNTRUSTED,
-            on_approval_required=callback,
-        ))
+        self._run(
+            collect_events(
+                registry,
+                [make_tool_call()],
+                ApprovalPolicy.UNTRUSTED,
+                on_approval_required=callback,
+            )
+        )
         callback.assert_called_once_with("call_001", "fake_tool", "{}", None, 1)
 
     def test_approval_required_event_content_is_approval_id(self):
         """approval_required 事件的 content 包含回调返回的 approval_id。"""
         registry = make_registry(RiskLevel.WRITE)
         callback = MagicMock(return_value="approval-abc")
-        events = self._run(collect_events(
-            registry, [make_tool_call()], ApprovalPolicy.UNTRUSTED,
-            on_approval_required=callback,
-        ))
+        events = self._run(
+            collect_events(
+                registry,
+                [make_tool_call()],
+                ApprovalPolicy.UNTRUSTED,
+                on_approval_required=callback,
+            )
+        )
         approval_event = next(e for e in events if e.type == "approval_required")
         self.assertEqual(approval_event.content, "approval-abc")
 

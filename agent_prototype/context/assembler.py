@@ -1,42 +1,54 @@
-"""
-[九层模型 - L6 上下文装配层 (Context Assembly Layer)]
+"""工作区上下文装配器。
 
-文件职责：
-- 作为系统首个集中式的物理文件读取与规约注入总调度器（ContextAssembler）。
-- 集中处理工作区磁盘文件（AGENTS.md, SOUL.md, USER.md）的物理读取和容错保护。
-- 调用 SkillContextService 组装技能描述并交付 L2 纯内存提示词合成。
+职责：
+- 读取工作区中的 AGENTS.md / SOUL.md / USER.md。
+- 将本地规则、用户画像和技能上下文交给 SkillContextService。
+- 产出一次运行所需的系统提示词和工作区元信息。
 
-上游依赖：L8 执行层 (RunContextBuilder)。
-下游依赖：L6 技能上下文服务 (SkillContextService)、L2 提示词层 (builder.py)。
+上游：
+- RuntimeContextFactory
+
+下游：
+- SkillContextService
+
+不负责：
+- 不直接驱动模型。
+- 不感知数据库持久化。
 """
+
+import agent_prototype.context.skill_context as skill_context_module
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
+
 from sqlalchemy.orm import Session
 
-from agent_prototype.core.types import AgentDefinition
-from agent_prototype.core.types import AgentInput
-from agent_prototype.context.skill_context import SkillContextService
-
-
+from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.context.types import AssembledContext
+from agent_prototype.context.skill_context import SkillContextService
+from agent_prototype.execution.persistence.types import AgentInput
 
 
 class ContextAssembler:
-    """这是一个"大掌柜"角色，专门负责把智能体运行需要的所有背景资料（也就是上下文）给拼装齐全。
-    它的主要工作是：去硬盘里读取一些写好的规则文件（比如 AGENTS.md, SOUL.md, USER.md），
-    然后结合智能体本身的技能设定，把这些杂七杂八的信息揉成一段完整的系统提示词，装进一个小篮子里吐出来。
-    """
+    """负责拼装运行期工作区上下文。"""
 
-    def __init__(self, db: Session):
-        """初始化这个大掌柜，给他指派好数据库连接，方便他去找技能数据。
-
-        需要拿到的东西：
-        - db: 数据库会话对象，用来连数据库查东西。
-        """
+    def __init__(
+        self,
+        db: Session,
+        list_skills: Optional[Callable] = None,
+        load_skill_content: Optional[Callable[[str], Optional[str]]] = None,
+        build_skill_catalog_prompt: Optional[Callable] = None,
+        build_runtime_system_prompt: Optional[Callable] = None,
+    ):
+        """使用技能加载器和 prompt 构建器装配 SkillContextService。"""
         self.db = db
-        self.skill_service = SkillContextService(db)
+        self.skill_service = SkillContextService(
+            list_skills=list_skills or skill_context_module.list_skills,
+            load_skill_content=load_skill_content or skill_context_module.load_skill_content,
+            build_skill_catalog_prompt=build_skill_catalog_prompt,
+            build_runtime_system_prompt=build_runtime_system_prompt,
+        )
 
     def assemble(
         self,
@@ -45,62 +57,12 @@ class ContextAssembler:
         workspace_path: Optional[str],
         definition: AgentDefinition,
     ) -> AssembledContext:
-        """开始热火朝天地拼装上下文！它会跑到工作区路径下去读那些本地规则文件，
-        如果是助理模式还会去读灵魂和用户信息，再配合上技能，打包弄出一个完美的系统提示词。
+        """读取工作区文本上下文并产出运行期系统提示词。"""
+        local_rules_text, agent_soul_text, user_profile_text = self._load_workspace_context(
+            workspace_path,
+            session_type,
+        )
 
-        需要拿到的东西：
-        - agent_input: 用户传过来的输入参数（比如希望带上的临时提示词等）。
-        - session_type: 会话类型（是助理模式 'assistant' 还是其他模式）。
-        - workspace_path: 工作区在电脑里的具体文件夹路径。如果传了，大掌柜就会进去翻文件。
-        - definition: 智能体本尊的定义信息（包含它自带的一些基础提示词设定）。
-
-        会给出来的结果：
-        - 一个 AssembledContext 对象，里面包含了最终揉好的 system_prompt（系统提示词）和工作区路径。
-        """
-        local_rules_text = None
-        agent_soul_text = None
-        user_profile_text = None
-
-        if workspace_path and os.path.exists(workspace_path):
-            root = Path(workspace_path).resolve()
-            
-            # A. 加载 AGENTS.md（在两种会话类型中都作为最高规约注入）
-            agents_path = root / "AGENTS.md"
-            if agents_path.exists():
-                try:
-                    content = agents_path.read_text(encoding="utf-8").strip()
-                    if content:
-                        local_rules_text = content
-                except Exception:
-                    logging.getLogger(__name__).warning(
-                        "Failed to read AGENTS.md from %s", agents_path, exc_info=True
-                    )
-
-            # B. 助理会话特有：加载 SOUL.md 与 USER.md
-            if session_type == "assistant":
-                soul_path = root / "SOUL.md"
-                if soul_path.exists():
-                    try:
-                        content = soul_path.read_text(encoding="utf-8").strip()
-                        if content:
-                            agent_soul_text = content
-                    except Exception:
-                        logging.getLogger(__name__).warning(
-                            "Failed to read SOUL.md from %s", soul_path, exc_info=True
-                        )
-
-                user_path = root / "USER.md"
-                if user_path.exists():
-                    try:
-                        content = user_path.read_text(encoding="utf-8").strip()
-                        if content:
-                            user_profile_text = content
-                    except Exception:
-                        logging.getLogger(__name__).warning(
-                            "Failed to read USER.md from %s", user_path, exc_info=True
-                        )
-
-        # 调用 SkillContextService 完成纯内存的技能和提示词装配
         runtime_definition = self.skill_service.build_runtime_definition_with_skills(
             definition=definition,
             agent_input=agent_input,
@@ -114,3 +76,34 @@ class ContextAssembler:
             system_prompt=runtime_definition.system_prompt,
             workspace_path=workspace_path,
         )
+
+    def _load_workspace_context(
+        self,
+        workspace_path: Optional[str],
+        session_type: str,
+    ) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """读取工作区规则、灵魂和用户画像文本。"""
+        if not workspace_path or not os.path.exists(workspace_path):
+            return None, None, None
+
+        root = Path(workspace_path).resolve()
+        local_rules_text = self._read_optional_text(root / "AGENTS.md")
+        agent_soul_text = None
+        user_profile_text = None
+
+        if session_type == "assistant":
+            agent_soul_text = self._read_optional_text(root / "SOUL.md")
+            user_profile_text = self._read_optional_text(root / "USER.md")
+
+        return local_rules_text, agent_soul_text, user_profile_text
+
+    def _read_optional_text(self, path: Path) -> Optional[str]:
+        """读取一个可选文本文件；不存在或为空时返回 None。"""
+        if not path.exists():
+            return None
+        try:
+            content = path.read_text(encoding="utf-8").strip()
+        except Exception:
+            logging.getLogger(__name__).warning("Failed to read %s", path, exc_info=True)
+            return None
+        return content or None

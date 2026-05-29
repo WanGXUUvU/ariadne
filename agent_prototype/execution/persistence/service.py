@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from agent_prototype.memory.session.store import SqliteSessionStore
 from agent_prototype.memory.run.store import SqliteRunStore
-from agent_prototype.core.types import ModelUsage
-from agent_prototype.core.types import AgentInput, AgentOutput, AgentState, RunMetadata
-from agent_prototype.core.types import ChatMessage
+from agent_prototype.core.types import ModelUsage, ChatMessage
+from agent_prototype.execution.persistence.types import AgentInput, AgentOutput, RunMetadata
+from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.execution.streaming.sse import build_reply_preview
 
 
@@ -120,7 +120,11 @@ class RunPersistenceService:
         state = self.store.get(session_id) or AgentState()
         # 用户消息在运行时只存在于内存 agent.state 里，stop 时尚未落库。
         # 若当前 state 最后一条不是本轮的 user 消息，则补入，避免刷新后对话消失。
-        if user_input and (not state.messages or state.messages[-1].role != "user" or state.messages[-1].content != user_input):
+        if user_input and (
+            not state.messages
+            or state.messages[-1].role != "user"
+            or state.messages[-1].content != user_input
+        ):
             state.messages.append(ChatMessage(role="user", content=user_input))
         try:
             self._run_store.save_partial_run(

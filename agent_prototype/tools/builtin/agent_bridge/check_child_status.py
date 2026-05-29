@@ -1,4 +1,6 @@
 """
+from agent_prototype.tools.result_types import ToolResult
+from agent_prototype.tools.types import RiskLevel
 [九层模型 - L3 工具层 (Tools Layer)]
 
 文件职责：
@@ -9,10 +11,13 @@
 上游依赖：L8 执行层通过 build_run_registry 进行闭包回调注入。
 下游依赖：纯无状态 Callable 接口。
 """
+
 from typing import Callable
 from agent_prototype.tools.types import ToolDefinition
-from agent_prototype.core.types import ToolResult, RiskLevel
+from agent_prototype.tools.result_types import ToolResult
+from agent_prototype.tools.types import RiskLevel
 import json
+
 
 def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -> ToolDefinition:
     """这是一个“子智能体状态查询工具的加工厂（构建函数）”。
@@ -39,7 +44,7 @@ def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -
             ids = json.loads(child_run_ids)  # "[\"aaa\",\"bbb\"]" → ["aaa", "bbb"]
         except json.JSONDecodeError as exc:
             return ToolResult(ok=False, content=f"Invalid JSON: {exc}")
-        
+
         try:
             result = status_checker(ids)
             return ToolResult(ok=True, content=json.dumps(result, ensure_ascii=False))
@@ -61,7 +66,7 @@ def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -
                 "properties": {
                     "child_run_ids": {
                         "type": "string",
-                        "description": "要查询的子 Agent ID 列表，JSON 数组格式，如 [\"id1\", \"id2\"]",
+                        "description": '要查询的子 Agent ID 列表，JSON 数组格式，如 ["id1", "id2"]',
                     },
                 },
                 "required": ["child_run_ids"],

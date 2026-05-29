@@ -9,11 +9,13 @@
 上游依赖：L8 执行层 (RunService)。
 下游依赖：L3 各项内置工具文件定义。
 """
+
 import json  # 解析工具参数 JSON
 from typing import Optional, Callable  # 类型标注
 
-from agent_prototype.core.types import ToolError, ToolResult
-from agent_prototype.tools.types import ToolDefinition, RiskLevel
+from agent_prototype.tools.types import RiskLevel
+from agent_prototype.tools.types import ToolDefinition
+from agent_prototype.tools.result_types import ToolError, ToolResult
 from .builtin.util.echo import build_echo_tool_definition
 from .builtin.filesystem.fs_read import build_read_file_tool_definition
 from .builtin.filesystem.fs_list import build_list_dir_definition
@@ -21,18 +23,19 @@ from .builtin.filesystem.fs_write import build_write_file_tool_definition
 from .builtin.filesystem.fs_search import build_search_text_definition
 from .builtin.search.web_search import build_web_search_tool_definition
 from .builtin.agent_bridge.check_child_status import build_check_child_status_tool
+from .builtin.agent_bridge.spawn_child_agent import build_spawn_child_agent_tool
 from .builtin.agent_bridge.wait_child_agent import build_wait_child_agent_tool
 
 
 class ToolRegistry:  # 工具注册中心
     """工具注册管理中心类 (OOP)
-    
+
     这个类是一个“工具百宝箱/工具柜”。
     用来统一保管系统里所有大大小小的工具（比如读文件、写文件、网络搜索、召唤子智能体等）。它不仅负责把新工具贴好标签收纳起来（register），还能把工具的说明书拿给 AI 看（get_tool_schemas），以及当 AI 决定调用某个工具时，负责把参数解析好，启动真正的工具代码并安全地把执行结果拿回来（execute_tool_call）。
     """
+
     def __init__(self) -> None:
-        """工具百宝箱初始化，准备好一个空的收纳架。
-        """
+        """工具百宝箱初始化，准备好一个空的收纳架。"""
         self._tools: dict[str, ToolDefinition] = {}  # 用名字保存所有工具
 
     def clone(self) -> "ToolRegistry":
@@ -44,7 +47,7 @@ class ToolRegistry:  # 工具注册中心
         new = ToolRegistry()
         new._tools = dict(self._tools)
         return new
-    
+
     # 注册时会把完整的 ToolDefinition 注册进去
     def register(self, tool: ToolDefinition) -> None:
         """往百宝箱里登记并收纳一个新工具。
@@ -67,7 +70,9 @@ class ToolRegistry:  # 工具注册中心
         if tool_names is None:
             tools = self._tools.values()  # 返回全部工具
         else:
-            tools = [self._tools[name] for name in tool_names if name in self._tools]  # 只取存在的工具
+            tools = [
+                self._tools[name] for name in tool_names if name in self._tools
+            ]  # 只取存在的工具
 
         return [tool.schema for tool in tools]  # 只返回 schema 列表
 
@@ -113,7 +118,9 @@ class ToolRegistry:  # 工具注册中心
         except json.JSONDecodeError as exc:  # 参数不是合法 json
             return ToolResult(
                 ok=False,
-                error=ToolError(code="invalid_arguments", tool_name=name, message="Invalid JSON arguments"),
+                error=ToolError(
+                    code="invalid_arguments", tool_name=name, message="Invalid JSON arguments"
+                ),
                 metadata={"tool_name": name, "raw_arguments": arguments, "debug": str(exc)},
             )
         try:  # 尝试执行工具
@@ -130,10 +137,10 @@ class ToolRegistry:  # 工具注册中心
                 error=ToolError(code="tool_runtime_error", tool_name=name, message=str(exc)),
                 metadata={"tool_name": name},
             )
-        
+
         if isinstance(result, ToolResult):  # 如果 handler 已经返回 ToolResult
             return result
-        
+
         return ToolResult(
             ok=True,
             content=str(result),
@@ -174,10 +181,6 @@ def build_run_registry(
     会给出来的结果：
     - ToolRegistry: 装载了所有普通工具和专属小助手调度桥接工具的完整版百宝箱。
     """
-    from .builtin.agent_bridge.spawn_child_agent import build_spawn_child_agent_tool
-    from .builtin.agent_bridge.check_child_status import build_check_child_status_tool
-    from .builtin.agent_bridge.wait_child_agent import build_wait_child_agent_tool
-
     registry = DEFAULT_TOOL_REGISTRY.clone()
     registry.register(build_spawn_child_agent_tool(child_dispatcher))
     registry.register(build_check_child_status_tool(status_checker))

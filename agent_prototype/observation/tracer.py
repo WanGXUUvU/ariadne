@@ -14,4 +14,3 @@
 - 上游来源：Runtime 引擎、拦截器中间件等。
 - 下游流向：提供给 PersistenceService 进行落库，或 StreamSession 进行 SSE 发送。
 """
-

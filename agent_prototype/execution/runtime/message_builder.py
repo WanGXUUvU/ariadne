@@ -17,10 +17,9 @@
 
 from typing import Optional
 
-from agent_prototype.core.types import AgentDefinition
-from agent_prototype.core.types import AgentState
-from agent_prototype.core.types import ChatMessage
-from agent_prototype.core.types import ModelConfig, ModelRequest
+from agent_prototype.agent.types import AgentDefinition
+from agent_prototype.core.types import ChatMessage, ModelConfig, ModelRequest
+from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.tools.registry import ToolRegistry
 
 

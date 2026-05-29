@@ -37,7 +37,7 @@ class SkillConfig:
 
 def get_default_skill_config_path() -> Path:
     """输入：无。输出：默认 skill 配置文件路径。"""
-    repo_root = Path(__file__).resolve().parents[3]  # 反推至仓库根目录 (infra/ → skills/ → agent_prototype/ → repo)
+    repo_root = Path(__file__).resolve().parents[2]  # 反推至仓库根目录 (parents[2])
     return repo_root / ".agent" / SKILL_CONFIG_FILENAME
 
 
@@ -58,7 +58,9 @@ def load_skill_config(config_path: Optional[Path] = None) -> SkillConfig:
     try:
         raw_data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        logger.warning("Failed to parse skill config at %s, falling back to empty", path, exc_info=True)
+        logger.warning(
+            "Failed to parse skill config at %s, falling back to empty", path, exc_info=True
+        )
         return SkillConfig(disabled=set())
 
     disabled_names = _normalize_name_set(raw_data.get("disabled"))
@@ -77,9 +79,7 @@ def save_skill_config(config: SkillConfig, config_path: Optional[Path] = None) -
 
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    payload = {
-        "disabled": sorted(config.disabled)
-    }
+    payload = {"disabled": sorted(config.disabled)}
 
     path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -92,10 +92,11 @@ def save_skill_config(config: SkillConfig, config_path: Optional[Path] = None) -
 
 # --- 2. 动态技能文件扫描与解析基础设施 ---
 
+
 def get_default_skill_roots() -> list[tuple[str, Path]]:
     """输入：无。输出：默认 skill 根目录列表。"""
-    repo_root = Path(__file__).resolve().parents[3]  # 从当前文件反推至仓库根目录
-    package_root = Path(__file__).resolve().parents[2]  # 反推至 agent_prototype 根目录
+    repo_root = Path(__file__).resolve().parents[2]  # 从当前文件反推至仓库根目录 (parents[2])
+    package_root = Path(__file__).resolve().parents[1]  # 反推至 agent_prototype 根目录 (parents[1])
     home_root = Path.home()
     return [
         ("opencode", repo_root / ".opencode" / "skills"),
@@ -191,7 +192,9 @@ def _parse_frontmatter(content: str) -> dict[str, str]:
     raise ValueError("Frontmatter not closed")
 
 
-def load_skill_content(skill_name: str, skill_roots: Optional[list[tuple[str, Path]]] = None) -> str:
+def load_skill_content(
+    skill_name: str, skill_roots: Optional[list[tuple[str, Path]]] = None
+) -> str:
     """输入：skill 名称、可选的 skill 根目录列表。输出：目标 skill 的完整 SKILL.md 文本。"""
     roots = skill_roots or get_default_skill_roots()
 

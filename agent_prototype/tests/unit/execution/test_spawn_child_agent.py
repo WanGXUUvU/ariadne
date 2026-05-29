@@ -9,26 +9,16 @@
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig
-from agent_prototype.core.types import AgentOutput, AgentState, AgentEvent, RunMetadata
-from agent_prototype.infra.db.engine import Base
+from agent_prototype.execution.runtime.types import AgentState, AgentEvent
 from agent_prototype.memory.session.store import SqliteSessionStore
 from agent_prototype.memory.run.store import SqliteRunStore
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.service import RunService
-
-
-def _make_db(temp_dir):
-    db_path = Path(temp_dir) / "test_spawn.db"
-    engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
-    Base.metadata.create_all(bind=engine)
-    return engine, sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from agent_prototype.tests.helpers.db import make_sqlite_test_db
+from agent_prototype.tests.helpers.factories import build_agent_output
 
 
 def _seed_session_model(session_local, session_id: str, model_id: str = "test-model") -> None:
@@ -83,6 +73,7 @@ class TestBuildRunRegistry(unittest.TestCase):
     def test_spawn_child_agent_not_in_default_registry(self):
         """默认 registry 没有 spawn_child_agent，确保它是动态注册的。"""
         from agent_prototype.tools.registry import build_default_tool_registry
+
         registry = build_default_tool_registry()
         tool_names = [s["function"]["name"] for s in registry.get_tool_schemas()]
         self.assertNotIn("spawn_child_agent", tool_names)
@@ -93,7 +84,10 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.engine, self.session_local = _make_db(self.temp.name)
+        self.engine, self.session_local = make_sqlite_test_db(
+            self.temp.name,
+            "test_spawn.db",
+        )
         self.executor = ThreadPoolExecutor(max_workers=2)
         self.futures = {}
 
@@ -106,30 +100,34 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         parent_run_id = "parent-run-abc"
         session_id = "session-with-model"
         _seed_session_model(self.session_local, session_id)
-        fake_output = AgentOutput(
-            reply="子任务完成",
-            state=AgentState(),
+        fake_output = build_agent_output(
+            "子任务完成",
             events=[AgentEvent(index=0, type="final_answer", content="子任务完成")],
-            metadata=RunMetadata(session_id="child-session", run_id="child-run"),
         )
 
         db = self.session_local()
         run_service = RunService(db)
 
         # 核心修复：通过 patch "run_service.AgentRunner" 来正确 mock 线程中实例化的类，并重定向 DB 操作为测试内存库
-        with patch("agent_prototype.execution.service._executor", self.executor), \
-             patch("agent_prototype.execution.service._global_futures", self.futures), \
-             patch("agent_prototype.execution.service.AgentRunner") as MockAgent, \
-             patch("agent_prototype.infra.db.engine.SessionLocal", self.session_local):
-            
+        with (
+            patch("agent_prototype.execution.child_agent_dispatcher._executor", self.executor),
+            patch("agent_prototype.execution.child_agent_dispatcher._global_futures", self.futures),
+            patch("agent_prototype.execution.child_agent_dispatcher.AgentRunner") as MockAgent,
+            patch(
+                "agent_prototype.execution.child_agent_dispatcher.SessionLocal", self.session_local
+            ),
+        ):
+
             mock_instance = MagicMock()
             mock_instance.run.return_value = fake_output
             MockAgent.return_value = mock_instance
 
             registry = build_run_registry(
-                child_dispatcher=run_service._make_child_dispatcher(parent_run_id, session_id),
-                status_checker=run_service._make_status_checker(),
-                child_waiter=run_service._make_child_waiter(),
+                child_dispatcher=run_service.child_dispatcher.make_child_dispatcher(
+                    parent_run_id, session_id
+                ),
+                status_checker=run_service.child_dispatcher.make_status_checker(),
+                child_waiter=run_service.child_dispatcher.make_child_waiter(),
             )
             result = registry.execute_tool_call(
                 "spawn_child_agent",
@@ -158,34 +156,34 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         parent_run_id = "parent-run-multi"
         session_id = "session-with-model-multi"
         _seed_session_model(self.session_local, session_id)
-        fake_output = AgentOutput(
-            reply="完成",
-            state=AgentState(),
-            events=[],
-            metadata=RunMetadata(session_id="child-session", run_id="child-run"),
-        )
+        fake_output = build_agent_output("完成")
 
         db = self.session_local()
         run_service = RunService(db)
 
-        with patch("agent_prototype.execution.service._executor", self.executor), \
-             patch("agent_prototype.execution.service._global_futures", self.futures), \
-             patch("agent_prototype.execution.service.AgentRunner") as MockAgent, \
-             patch("agent_prototype.infra.db.engine.SessionLocal", self.session_local):
-            
+        with (
+            patch("agent_prototype.execution.child_agent_dispatcher._executor", self.executor),
+            patch("agent_prototype.execution.child_agent_dispatcher._global_futures", self.futures),
+            patch("agent_prototype.execution.child_agent_dispatcher.AgentRunner") as MockAgent,
+            patch(
+                "agent_prototype.execution.child_agent_dispatcher.SessionLocal", self.session_local
+            ),
+        ):
+
             mock_instance = MagicMock()
             mock_instance.run.return_value = fake_output
             MockAgent.return_value = mock_instance
 
             registry = build_run_registry(
-                child_dispatcher=run_service._make_child_dispatcher(parent_run_id, session_id),
-                status_checker=run_service._make_status_checker(),
-                child_waiter=run_service._make_child_waiter(),
+                child_dispatcher=run_service.child_dispatcher.make_child_dispatcher(
+                    parent_run_id, session_id
+                ),
+                status_checker=run_service.child_dispatcher.make_status_checker(),
+                child_waiter=run_service.child_dispatcher.make_child_waiter(),
             )
             r1 = registry.execute_tool_call("spawn_child_agent", '{"task": "任务一"}')
             r2 = registry.execute_tool_call("spawn_child_agent", '{"task": "任务二"}')
 
-            # 等待两个子线程都完成
             self.futures[r1.content].result(timeout=10)
             self.futures[r2.content].result(timeout=10)
 
@@ -205,7 +203,10 @@ class TestGetChildrenRuns(unittest.TestCase):
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.engine, self.session_local = _make_db(self.temp.name)
+        self.engine, self.session_local = make_sqlite_test_db(
+            self.temp.name,
+            "test_children.db",
+        )
 
     def tearDown(self):
         self.engine.dispose()

@@ -13,9 +13,10 @@ from pydantic import BaseModel
 # 沙箱模式 — Sandbox Mode
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class SandboxMode(str, Enum):
-    READ_ONLY          = "read-only"
-    WORKSPACE_WRITE    = "workspace-write"
+    READ_ONLY = "read-only"
+    WORKSPACE_WRITE = "workspace-write"
     DANGER_FULL_ACCESS = "danger-full-access"
 
 
@@ -23,15 +24,17 @@ class SandboxMode(str, Enum):
 # 审批策略 — Approval Policy
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class ApprovalPolicy(str, Enum):
-    UNTRUSTED  = "untrusted"   # 所有工具都要问
+    UNTRUSTED = "untrusted"  # 所有工具都要问
     ON_REQUEST = "on-request"  # 危险操作才问
-    NEVER      = "never"       # 全放行
+    NEVER = "never"  # 全放行
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 权限档位 — Permission Profile
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class PermissionProfile(BaseModel):
     name: str

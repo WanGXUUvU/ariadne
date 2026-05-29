@@ -19,7 +19,7 @@ from agent_prototype.security.policy import (
     PROFILES,
     SandboxMode,
 )
-from agent_prototype.core.types import CreateSessionInput
+from agent_prototype.memory.session.types import CreateSessionInput
 from agent_prototype.memory.session.service import SessionService
 from agent_prototype.infra.db.engine import Base
 from agent_prototype.memory.session.store import SqliteSessionStore

@@ -22,8 +22,14 @@ class TestSkillLoader(unittest.TestCase):
         project_skills_root = self.root_path / "project-skills"
         user_skills_root = self.root_path / "user-skills"
 
-        self._write_skill(project_skills_root, "alpha-skill", "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n")
-        self._write_skill(user_skills_root, "broken-skill", "name: Broken Skill\n# Missing frontmatter\n")
+        self._write_skill(
+            project_skills_root,
+            "alpha-skill",
+            "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
+        )
+        self._write_skill(
+            user_skills_root, "broken-skill", "name: Broken Skill\n# Missing frontmatter\n"
+        )
 
         results = list_skills(
             [
@@ -41,7 +47,11 @@ class TestSkillLoader(unittest.TestCase):
         project_skills_root = self.root_path / "project-skills"
         config_path = self.root_path / "skill-config.json"
 
-        self._write_skill(project_skills_root, "alpha-skill", "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n")
+        self._write_skill(
+            project_skills_root,
+            "alpha-skill",
+            "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
+        )
         config_path.write_text('{"disabled": ["Alpha Skill"]}', encoding="utf-8")
 
         results = list_skills(

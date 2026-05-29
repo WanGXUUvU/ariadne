@@ -9,12 +9,11 @@
 上游依赖：L6 上下文装配层。
 下游依赖：无，纯无状态计算函数。
 """
-import os
-from pathlib import Path
-from typing import Optional
-from agent_prototype.skills.types import SkillSummary
 
-def build_skill_catalog_prompt(skills: list[SkillSummary]) -> str:  # 把 skill 摘要列表拼成给模型看的目录文本
+from typing import Optional
+
+
+def build_skill_catalog_prompt(skills: list) -> str:  # 把 skill 摘要列表拼成给模型看的目录文本
     """输入：SkillSummary 列表。输出：只包含启用 skill 摘要的目录文本。"""
     enabled_skills = [skill for skill in skills if skill.enabled]  # 只把启用中的 skill 放进 catalog
 
@@ -25,9 +24,12 @@ def build_skill_catalog_prompt(skills: list[SkillSummary]) -> str:  # 把 skill 
 
     for skill in enabled_skills:  # 逐个把启用中的 skill 摘要加到目录里
         description = skill.description or "No description"  # description 为空时给一个兜底文案
-        lines.append(f"- {skill.name}: {description}")  # 每行只放名字 and 摘要，不放完整 instructions
+        lines.append(
+            f"- {skill.name}: {description}"
+        )  # 每行只放名字 and 摘要，不放完整 instructions
 
     return "\n".join(lines)  # 用换行把多行目录拼成最终 prompt 文本
+
 
 def build_runtime_system_prompt(
     base_system_prompt: str,
@@ -39,7 +41,7 @@ def build_runtime_system_prompt(
     user_profile_text: Optional[str] = None,
 ) -> str:
     """双轨制 System Prompt 拼接拼装核心逻辑 (纯内存无状态函数)。
-        
+
     输入：
     - base_system_prompt: 基础定义人设提示词
     - skill_catalog_prompt: 已加载 skill 目录文本
@@ -48,7 +50,7 @@ def build_runtime_system_prompt(
     - local_rules_text: 外部读取的本地规约文本 (如原 AGENTS.md 内容)
     - agent_soul_text: 外部读取的助理灵魂文件 (如原 SOUL.md 内容)
     - user_profile_text: 外部读取的用户偏好文件 (如原 USER.md 内容)
-    
+
     输出：
     - 组合拼接后的最终系统运行提示词
     """
@@ -85,5 +87,5 @@ def build_runtime_system_prompt(
         # 用户画像/偏好注入
         if user_profile_text:
             sections.append(f"<USER_PROFILE>\n{user_profile_text}\n</USER_PROFILE>")
-            
+
     return "\n\n".join(sections)

@@ -1,7 +1,10 @@
-"""核心模块。
-
-统一导出核心领域类型，使得调用方可以：
-    from agent_prototype.core import ChatMessage, AgentState, ...
 """
+[核心层 - 跨层共享纯数据模型与模型适配器]
 
-from agent_prototype.core.types import *  # noqa: F401,F403
+职责：
+- 定义 LLM 通信协议原语（消息、工具调用、请求/响应/流式事件）
+- 定义运行时状态与事件（AgentState, AgentEvent）
+- 定义模型适配器协议与实现
+
+规则：仅依赖标准库 + pydantic + requests/httpx。本模块不依赖任何上层业务模块。
+"""

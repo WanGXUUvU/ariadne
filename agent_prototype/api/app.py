@@ -17,15 +17,20 @@
 - 下游流向：路由解析分发到 agent_prototype/api/routes/* 控制器。
 """
 
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - optional local dev dependency
+    load_dotenv = None
+
+if load_dotenv is not None:
+    load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
 
 
-app=FastAPI()
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,4 +41,3 @@ app.add_middleware(
 )
 
 app.include_router(router)
-

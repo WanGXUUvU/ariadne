@@ -17,7 +17,7 @@
 
 from fastapi import APIRouter, Depends
 
-from agent_prototype.core.types import AgentDefinition
+from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.agent.definition import AgentDefinitionService
 from agent_prototype.api.routes.dependencies import get_agent_definition_service
 
@@ -25,15 +25,17 @@ router = APIRouter()
 
 
 @router.get("/agents/{agent_id}")
-def load_agent_definition_api(agent_id: str, service: AgentDefinitionService = Depends(get_agent_definition_service)) -> AgentDefinition:
+def load_agent_definition_api(
+    agent_id: str, service: AgentDefinitionService = Depends(get_agent_definition_service)
+) -> AgentDefinition:
     """这个函数是用来加载指定 ID 的 Agent 模板定义的。
-    
+
     简单来说，你给它一个 Agent 的 ID，它就去数据库或系统里把这个 Agent 的所有配置（比如名字、描述、能用什么工具等）都找出来给你。
-    
+
     需要拿到的东西：
     - agent_id: 字符串类型，也就是你要找的那个 Agent 的唯一身份证。
     - service: AgentDefinitionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - AgentDefinition 对象，里面装着这个 Agent 的详细定义和配置信息。
     """
@@ -43,12 +45,12 @@ def load_agent_definition_api(agent_id: str, service: AgentDefinitionService = D
 @router.get("/agents")
 def list_agents_api(service: AgentDefinitionService = Depends(get_agent_definition_service)):
     """这个函数是用来列出系统里所有可用的 Agent 模板的。
-    
+
     就像去餐厅看菜单一样，它会把所有的 Agent 列表都拿出来展示给你。
-    
+
     需要拿到的东西：
     - service: AgentDefinitionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - 包含所有 Agent 模板的列表（List），每个元素都是一个 Agent 的定义信息。
     """
@@ -56,15 +58,18 @@ def list_agents_api(service: AgentDefinitionService = Depends(get_agent_definiti
 
 
 @router.post("/agents", response_model=AgentDefinition)
-def save_agent_api(definition: AgentDefinition, service: AgentDefinitionService = Depends(get_agent_definition_service)):
+def save_agent_api(
+    definition: AgentDefinition,
+    service: AgentDefinitionService = Depends(get_agent_definition_service),
+):
     """这个函数是用来保存或者创建一个 Agent 模板定义的。
-    
+
     如果你设计了一个新的 Agent，或者改了它的配置，调用这个接口就能把它存进系统里。
-    
+
     需要拿到的东西：
     - definition: AgentDefinition 对象，就是你要保存的那个 Agent 的完整配置和定义。
     - service: AgentDefinitionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - 保存成功后，会把这个存好的 Agent 模板定义原样或更新后返回给你，确认保存成功。
     """
@@ -72,15 +77,17 @@ def save_agent_api(definition: AgentDefinition, service: AgentDefinitionService 
 
 
 @router.delete("/agents/{agent_id}")
-def delete_agent_api(agent_id: str, service: AgentDefinitionService = Depends(get_agent_definition_service)):
+def delete_agent_api(
+    agent_id: str, service: AgentDefinitionService = Depends(get_agent_definition_service)
+):
     """这个函数是用来删除一个 Agent 模板定义的。
-    
+
     如果你不需要某个 Agent 了，用这个接口给它送走。
-    
+
     需要拿到的东西：
     - agent_id: 字符串类型，也就是你要删掉的那个 Agent 的唯一身份证。
     - service: AgentDefinitionService 实例，由依赖注入提供。
-    
+
     会给出来的结果：
     - 一个简单的字典信息，比如 {"status": "ok"}，告诉你已经成功删除了。
     """
