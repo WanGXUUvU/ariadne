@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: implementation
-- Task: TASK-076 concurrent tool execution and progress flow (并发工具执行与长耗时渐进进度流)
+- Task: TASK-077 agent cognitive and safety evolution (智能体认知与安全深度演进)
 - Gate: code / debug
 - Allowed Now: coach
 - Lane: Fast
 - Blocked: None
-- Next action: 已进入 Coach 模式开始教学 TASK-076。第一步拆解数据流向与边界，随后开始改造 DTO/Event 契约与 ToolCallContext 注入回调。
+- Next action: 已进入 Coach 模式开始教学 TASK-077。第一步对齐四大维度（自愈/安全围栏/MCP/情节长期记忆）的核心事实，随后展开切片 1 工具自愈中间件的设计对比与编码。
 
 ## 读取规则
 - `STATUS.md` 是当前唯一权威入口，先看这里再看路线图。
@@ -22,7 +22,8 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
-| 2026-05-30 | 已完成任务卡归档 | — | 将 TASK-073/074/075/078/079/080/081/082 移入 `specs/done/`。 |
+| 2026-05-30 | 已完成任务卡归档 | — | 将 TASK-073/074/075/076/078/079/080/081/082 移入 `specs/done/`。 |
+| 2026-05-30 | `TASK-076` 并发工具执行与流式进度流完美收口 | Verify / Review | 成功实现基于 `asyncio.gather` 与 `asyncio.Queue` 管道的流式进度并发广播，完成跨线程 `run_coroutine_threadsafe` 自愈通信，以及审批拦截时 Task 优雅 Cancel 安全手刹，前后端 Vue 3 呼吸动效完美打包编译，96 项单测全绿通过。 |
 | 2026-05-30 | `TASK-082` 后端核心及周边链路风格收敛完成 | Verify / Review | 完成两轮风格大扫除：统一 execution/context/memory 核心层及 api/settings/tools 主链路所有文件的模块头注释与 docstring 模板，替换所有的“教学散文”；`ContextAssembler` 抽出工作区文本读取 helper；`black`、`ruff check`、96 项 unit/integration tests 全绿通过。 |
 | 2026-05-30 | `TASK-081` 运行时边界拆解完成 | Verify / Review | 新增 RuntimeContextFactory / ChildAgentDispatcher / TraceQueryService，RunService 收窄为 façade；`core/types.py` 剥离运行时与工具结果类型；前端 `useWorkspace.ts` 拆为 5 个 workspace composable；`python3 -m unittest agent_prototype.tests.integration.test_agent_api`、unit tests、`python3 -m compileall agent_prototype`、`npm run build` 全通过。 |
 | 2026-05-28 | 领域类型归位完成，api/dto/schemas.py 精简为纯 HTTP I/O 文件 | Verify / Review | 新建 model/types/agent.py、skills/types.py、execution/streaming/types.py。22 处非 API 层文件的 `from api.dto.schemas import` 已全部迁至对应低层模块。api/routes 与测试同步迁移。删除 schemas.py 中的 re-export 块。96 项测试全绿。 |
