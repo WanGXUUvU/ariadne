@@ -62,6 +62,7 @@ class SessionDetail(SessionSummary):
     model_provider_id: Optional[int] = None
     thinking_enabled: bool = False
     thinking_effort: str = "medium"
+    workspace_exists: bool = True
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

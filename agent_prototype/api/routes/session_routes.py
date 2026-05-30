@@ -15,6 +15,8 @@
 - 下游流向：调用 agent_prototype/memory/session/service.py。
 """
 
+import os
+
 from fastapi import APIRouter, Depends, status
 
 from agent_prototype.memory.session.types import (
@@ -102,6 +104,10 @@ def read_session_api(
     if record is None or state is None:
         return error_response(status.HTTP_404_NOT_FOUND, "session_not_found", "Session not found")
 
+    workspace_exists = True
+    if record.workspace_path:
+        workspace_exists = os.path.exists(record.workspace_path)
+
     return SessionDetail(
         session_id=record.session_id,
         session_name=record.session_name,
@@ -120,6 +126,7 @@ def read_session_api(
         workspace_path=record.workspace_path,
         workspace_name=record.workspace_name,
         session_type=record.session_type,
+        workspace_exists=workspace_exists,
     )
 
 

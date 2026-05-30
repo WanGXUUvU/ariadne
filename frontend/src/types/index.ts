@@ -46,6 +46,7 @@ export interface SessionState {
 
 export interface SessionDetail extends SessionSummary {
   state: SessionState;
+  workspace_exists?: boolean;
 }
 
 export interface ApiError {

@@ -105,7 +105,12 @@ export function useSessionState(options: SessionStateOptions) {
       modelProviderId.value = (detail as any).model_provider_id ?? null;
       thinkingEnabled.value = (detail as any).thinking_enabled ?? false;
       thinkingEffort.value = (detail as any).thinking_effort ?? 'medium';
-      errorMsg.value = null;
+      if (detail.workspace_path && detail.workspace_exists === false) {
+        errorMsg.value =
+          `当前会话绑定的工作区目录已不存在：${detail.workspace_path}。请重新绑定文件夹后再继续。`;
+      } else {
+        errorMsg.value = null;
+      }
     } catch (err: any) {
       if (err.message.includes('not found') || err.message.includes('404')) {
         activeSessionId.value = null;
