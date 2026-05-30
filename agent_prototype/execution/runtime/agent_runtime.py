@@ -324,14 +324,13 @@ class AgentRunner:
                         yield item
                     else:
                         tool_turn = item
-
+                for tool_message in tool_turn.tool_messages:
+                    self.state.messages.append(tool_message)
                 if tool_turn.paused_for_approval:
                     break
                 if tool_turn.next_event_index is None:
                     raise RuntimeError("tool turn missing result")
                 event_index = tool_turn.next_event_index
-                for tool_message in tool_turn.tool_messages:
-                    self.state.messages.append(tool_message)
                 continue
 
             raw_reply = "".join(raw_reply_chunks)

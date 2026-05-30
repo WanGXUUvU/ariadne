@@ -3,16 +3,12 @@ import unittest
 from typing import Any, Awaitable, Callable
 
 from agent_prototype.tools.result_types import ToolResult, ToolError
-from agent_prototype.tools.types import RiskLevel
-from agent_prototype.security.policy import ApprovalPolicy
 from agent_prototype.security.middleware.base import (
     BaseMiddleware,
     MiddlewarePipeline,
     ToolCallContext,
 )
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
-from agent_prototype.security.approval.middleware import ApprovalMiddleware
-from agent_prototype.security.approval.middleware import ApprovalRequiredException
 
 
 class DummyMiddleware(BaseMiddleware):
@@ -195,40 +191,6 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
         result = await pipeline.execute(context, terminal)
         self.assertFalse(result.ok)
         self.assertEqual(result.error.code, "SANDBOX_VIOLATION")
-
-    async def test_approval_middleware_danger_blocks(self):
-        """测试 ApprovalMiddleware 对 DANGER 级工具在指定策略下抛出控制流中断异常。"""
-        approval = ApprovalMiddleware()
-
-        callback_called = False
-
-        def fake_on_approval_required(*args):
-            nonlocal callback_called
-            callback_called = True
-            return "approval-uid"
-
-        context = ToolCallContext(
-            tool_name="run_command",
-            tool_args='{"cmd": "rm -rf tmp"}',
-            tool_call_id="call_111",
-            session_id="session_xyz",
-            extra={
-                "approval_policy": ApprovalPolicy.ON_REQUEST,
-                "risk_level": RiskLevel.DANGER,
-                "on_approval_required": fake_on_approval_required,
-            },
-        )
-
-        async def terminal():
-            self.fail("Terminal should not be called due to approval interception")
-
-        pipeline = MiddlewarePipeline([approval])
-
-        with self.assertRaises(ApprovalRequiredException) as ctx:
-            await pipeline.execute(context, terminal)
-
-        self.assertEqual(ctx.exception.approval_id, "approval-uid")
-        self.assertTrue(callback_called)
 
     async def test_sandbox_tool_not_allowed_blocks(self):
         """测试 SandboxMiddleware 对不在 allow_tool_names 白名单里的工具执行优雅拦截。"""

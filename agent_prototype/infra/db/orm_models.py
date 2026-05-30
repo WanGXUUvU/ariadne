@@ -176,6 +176,7 @@ class PendingApproval(Base):
     id = Column(String, primary_key=True)  # UUID，审批单号
     session_id = Column(String, nullable=False, index=True)  # 关联 session
     run_id = Column(String, nullable=False)  # 关联 run
+    batch_id = Column(String, nullable=True, index=True)  # 关联同一批 tool_calls
     tool_name = Column(String, nullable=False)  # 要执行的工具
     tool_call_id = Column(String, nullable=True)
     arguments = Column(Text, nullable=False)  # 工具参数 JSON

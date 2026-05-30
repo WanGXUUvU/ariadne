@@ -145,7 +145,14 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
                 on_approval_required=callback,
             )
         )
-        callback.assert_called_once_with("call_001", "fake_tool", "{}", None, 1)
+        callback.assert_called_once_with(
+            "call_001",
+            "fake_tool",
+            "{}",
+            None,
+            0,
+            "mock_run:step:0",
+        )
 
     def test_approval_required_event_content_is_approval_id(self):
         """approval_required 事件的 content 包含回调返回的 approval_id。"""

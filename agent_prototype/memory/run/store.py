@@ -341,3 +341,40 @@ class SqliteRunStore:
             .order_by(SessionRunRecord.created_at.asc())
             .all()
         )
+    
+    def append_run_events_partial(self, *, run_id: str, new_events: list[AgentEvent]) -> None:
+        """给一次 run 追加事件，但不修改 completed 状态和最终 reply。"""
+        run_record = (
+            self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        )
+        if not run_record:
+            raise ValueError(f"run_id {run_id} not found")
+
+        max_index = (
+            self.db.query(sqlfunc.max(SessionRunEventRecord.event_index))
+            .filter(SessionRunEventRecord.run_id == run_id)
+            .scalar()
+        )
+        next_index = (max_index + 1) if max_index is not None else 0
+
+        for event in new_events:
+            event_dict = event.model_dump(exclude_none=True)
+            self.db.add(
+                SessionRunEventRecord(
+                    run_id=run_id,
+                    event_index=next_index,
+                    type=event_dict["type"],
+                    content=event_dict.get("content") or "",
+                    tool_name=event_dict.get("tool_name"),
+                    tool_call_id=event_dict.get("tool_call_id"),
+                    tool_result_json=(
+                        json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
+                        if event_dict.get("tool_result")
+                        else None
+                    ),
+                )
+            )
+            next_index += 1
+
+        run_record.event_count = (max_index + 1 if max_index is not None else 0) + len(new_events)
+        run_record.finished_at = sqlfunc.now()

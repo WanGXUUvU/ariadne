@@ -28,10 +28,8 @@ from agent_prototype.tools.registry import ToolRegistry
 from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.security.middleware.base import MiddlewarePipeline, ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
-from agent_prototype.security.approval.middleware import (
-    ApprovalMiddleware,
-    ApprovalRequiredException,
-)
+from agent_prototype.execution.runtime.tool_batch import build_tool_batch, ToolBatchItem
+from agent_prototype.security.approval.checker import needs_approval
 
 # ── 线程池 ────────────────────────────────────────────────────────────────────
 
@@ -163,20 +161,52 @@ async def async_handle_tool_calls(
     tool_messages: list[ChatMessage] = []
     current_index = event_index
 
+    def approval_checker(tool_name: str) -> bool:
+        risk = tool_registry.get_risk_level(tool_name)
+        return needs_approval(approval_policy, risk)
+
+    batch = build_tool_batch(
+        run_id=run_id,
+        batch_id=f"{run_id}:step:{event_index}",
+        tool_calls=tool_calls,
+        approval_checker=approval_checker,
+    )
+    ready_items = []
+    pending_items = []
+
+    for item in batch.items:
+        if item.status == "approval_pending":
+            pending_items.append(item)
+        else:
+            ready_items.append(item)
+
+    for item in pending_items:
+        approval_id = None
+        if on_approval_required:
+            approval_id = on_approval_required(
+                item.tool_call_id,
+                item.tool_name,
+                item.arguments,
+                saved_messages,
+                current_index,
+                batch.batch_id,
+            )
+
+        item.approval_id = approval_id or item.arguments
     # 1. 根据会话模式初始化安全中间件管道
     if session_type == "coding":
-        pipeline = MiddlewarePipeline([SandboxMiddleware(), ApprovalMiddleware()])
+        pipeline = MiddlewarePipeline([SandboxMiddleware()])
     else:
-        pipeline = MiddlewarePipeline([ApprovalMiddleware()])
+        pipeline = MiddlewarePipeline([])
 
     # 2. 播报工具启动通知事件
-    for tool_call in tool_calls:
+    for item in batch.items:
         yield AgentEvent(
             index=current_index,
             type="assistant_tool_call",
-            tool_name=tool_call.function.name,
-            tool_call_id=tool_call.id,
-            content=tool_call.function.arguments,
+            tool_name=item.tool_name,
+            tool_call_id=item.tool_call_id,
+            content=item.arguments,
         )
         current_index += 1
 
@@ -197,17 +227,17 @@ async def async_handle_tool_calls(
         return on_progress
 
     # 4. 定义单个工具的执行协程 Worker
-    async def run_single_tool(tc: ToolCall, idx_slot: list[int]):
-        if allow_tool_names is not None and tc.function.name not in allow_tool_names:
-            raise ValueError(f"Tool not allowed: {tc.function.name}")
+    async def run_single_tool(item: ToolBatchItem):
+        if allow_tool_names is not None and item.tool_name not in allow_tool_names:
+            raise ValueError(f"Tool not allowed: {item.tool_name}")
 
-        risk = tool_registry.get_risk_level(tc.function.name)
-        progress_cb = await make_progress_callback(tc.id, tc.function.name)
+        risk = tool_registry.get_risk_level(item.tool_name)
+        progress_cb = await make_progress_callback(item.tool_call_id, item.tool_name)
 
         context = ToolCallContext(
-            tool_name=tc.function.name,
-            tool_args=tc.function.arguments,
-            tool_call_id=tc.id,
+            tool_name=item.tool_name,
+            tool_args=item.arguments,
+            tool_call_id=item.tool_call_id,
             session_id=session_id,
             run_id=run_id,
             extra={
@@ -216,8 +246,8 @@ async def async_handle_tool_calls(
                 "risk_level": risk,
                 "on_approval_required": on_approval_required,
                 "saved_messages": saved_messages,
-                "current_index": idx_slot[0],
                 "approval_policy": approval_policy,
+                "batch_id": batch.batch_id,
             },
             on_progress=progress_cb,
             loop=asyncio.get_event_loop(),
@@ -226,7 +256,11 @@ async def async_handle_tool_calls(
         async def terminal_execute_call() -> ToolResult:
             record_id = None
             if on_tool_start:
-                record_id = on_tool_start(context.tool_name, context.tool_call_id, context.tool_args)
+                record_id = on_tool_start(
+                    context.tool_name,
+                    context.tool_call_id,
+                    context.tool_args,
+                )
 
             try:
                 loop = asyncio.get_event_loop()
@@ -236,6 +270,7 @@ async def async_handle_tool_calls(
                         tool_registry.execute_tool_call,
                         context.tool_name,
                         context.tool_args,
+                        context,
                     ),
                     timeout=TOOL_TIMEOUT,
                 )
@@ -249,15 +284,15 @@ async def async_handle_tool_calls(
 
             if on_tool_finish and record_id is not None:
                 on_tool_finish(record_id, finish_status, res.content if res else None)
+
             return res
 
         res = await pipeline.execute(context, terminal_execute_call)
-        return context, res
-
+        return item, context, res
     # 5. 封装并发 Task 集合并启动
     tasks = []
-    for tool_call in tool_calls:
-        task = asyncio.create_task(run_single_tool(tool_call, [current_index]))
+    for item in ready_items:
+        task = asyncio.create_task(run_single_tool(item))
         tasks.append(task)
 
     gather_task = asyncio.ensure_future(asyncio.gather(*tasks))
@@ -284,41 +319,8 @@ async def async_handle_tool_calls(
         if gather_task.done():
             try:
                 gather_task.result()
-            except ApprovalRequiredException as exc:
-                # 安全自愈：强行 cancel 其余尚在活跃状态的任务以阻断泄露
-                for t in tasks:
-                    if not t.done():
-                        t.cancel()
-
-                # 精准定位触发了审批拦截的具体工具及 ID
-                failed_tool_name = None
-                failed_tool_call_id = None
-                for t in tasks:
-                    if t.done() and not t.cancelled():
-                        e = t.exception()
-                        if isinstance(e, ApprovalRequiredException):
-                            idx = tasks.index(t)
-                            failed_tool_name = tool_calls[idx].function.name
-                            failed_tool_call_id = tool_calls[idx].id
-                            break
-
-                yield AgentEvent(
-                    index=current_index,
-                    type="approval_required",
-                    tool_name=failed_tool_name,
-                    tool_call_id=failed_tool_call_id,
-                    content=exc.approval_id,
-                )
-                current_index += 1
-                yield ToolTurnResult(
-                    events=[],
-                    tool_messages=[],
-                    next_event_index=current_index,
-                    paused_for_approval=True,
-                )
-                return
             except Exception as exc:
-                # 其它未知异常：强行 cancel 其余活跃任务并向上抛出
+                # 未知异常：强行 cancel 其余活跃任务并向上抛出
                 for t in tasks:
                     if not t.done():
                         t.cancel()
@@ -326,57 +328,79 @@ async def async_handle_tool_calls(
 
     # 7. 并发结束，按时序合并输出最终卡片
     results = gather_task.result()
-    for tool_call, (context, tool_result) in zip(tool_calls, results):
+    for item, context, tool_result in results:
         if tool_result is None:
             error_message = f"Tool timed out after {TOOL_TIMEOUT}s"
+            item.status = "failed"
             yield AgentEvent(
                 index=current_index,
                 type="tool_error",
-                tool_name=tool_call.function.name,
-                tool_call_id=tool_call.id,
+                tool_name=item.tool_name,
+                tool_call_id=item.tool_call_id,
                 content=error_message,
             )
-            tool_messages.append(
-                ChatMessage(
-                    role="tool",
-                    tool_call_id=tool_call.id,
-                    content=f"[TOOL_TIMEOUT] {error_message}",
-                )
+            tool_message = ChatMessage(
+                role="tool",
+                tool_call_id=item.tool_call_id,
+                content=f"[TOOL_TIMEOUT] {error_message}",
             )
+            item.result_message = tool_message
+            tool_messages.append(tool_message)
         elif tool_result.ok:
+            item.status = "completed"
             yield AgentEvent(
                 index=current_index,
                 type="tool_result",
-                tool_name=tool_call.function.name,
-                tool_call_id=tool_call.id,
+                tool_name=item.tool_name,
+                tool_call_id=item.tool_call_id,
                 content=tool_result.content,
                 tool_result=tool_result,
             )
-            tool_messages.append(
-                ChatMessage(
-                    role="tool",
-                    tool_call_id=tool_call.id,
-                    content=tool_result.content,
-                )
+            tool_message = ChatMessage(
+                role="tool",
+                tool_call_id=item.tool_call_id,
+                content=tool_result.content,
             )
+            item.result_message = tool_message
+            tool_messages.append(tool_message)
         else:
             error_message = tool_result.error.message if tool_result.error else "Tool failed"
+            item.status = "failed"
             yield AgentEvent(
                 index=current_index,
                 type="tool_error",
-                tool_name=tool_call.function.name,
-                tool_call_id=tool_call.id,
+                tool_name=item.tool_name,
+                tool_call_id=item.tool_call_id,
                 content=error_message,
                 tool_result=tool_result,
             )
-            tool_messages.append(
-                ChatMessage(
-                    role="tool",
-                    tool_call_id=tool_call.id,
-                    content=f"[TOOL_ERROR] {error_message}",
-                )
+            tool_message = ChatMessage(
+                role="tool",
+                tool_call_id=item.tool_call_id,
+                content=f"[TOOL_ERROR] {error_message}",
             )
+            item.result_message = tool_message
+            tool_messages.append(tool_message)
         current_index += 1
+
+    if pending_items:
+        for item in pending_items:
+            yield AgentEvent(
+                index=current_index,
+                type="approval_required",
+                tool_name=item.tool_name,
+                tool_call_id=item.tool_call_id,
+                content=item.approval_id,
+            )
+            current_index += 1
+
+        yield ToolTurnResult(
+            events=[],
+            tool_messages=tool_messages,  # 这里只含 ready items 的结果
+            next_event_index=current_index,
+            paused_for_approval=True,
+        )
+        return
 
     yield ToolTurnResult(
         events=[],

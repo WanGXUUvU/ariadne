@@ -12,6 +12,7 @@
 """
 
 # ── 标准库 ────────────────────────────────────────────────────────────────────
+import asyncio
 from typing import AsyncIterator
 
 # ── 第三方库 ──────────────────────────────────────────────────────────────────
@@ -26,6 +27,7 @@ from agent_prototype.execution.streaming.types import StreamFrame
 from agent_prototype.memory.session.store import SqliteSessionStore
 from agent_prototype.infra.db.orm_models import SessionRunRecord
 from agent_prototype.security.approval.store import SqliteApprovalStore
+from agent_prototype.security.middleware.base import ToolCallContext
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
 from agent_prototype.execution.streaming.sse import _sse_frame
@@ -69,6 +71,7 @@ class ResumeRunService:
         approval = self.approval_store.get(approval_id)
         messages = self.approval_store.restore_messages(approval)
         state = AgentState(messages=messages)
+        batch_id = approval.batch_id or approval.run_id
 
         # ── 加载 Agent 定义 ───────────────────────────────────────────────────
         run_record = (
@@ -88,11 +91,71 @@ class ResumeRunService:
         model_adapter = RuntimeContextFactory(self.db).build_adapter(approval.session_id)
 
         # ── 执行审批结果，构造工具结果事件 ────────────────────────────────────
+        event_index = approval.event_index
         if rejected:
             content = "[TOOL_REJECTED] 用户拒绝了此工具调用"
             tr = ToolResult(ok=False, content=content)
         else:
-            tool_result = tool_registry.execute_tool_call(approval.tool_name, approval.arguments)
+            loop = asyncio.get_event_loop()
+            workspace_path = self.session_store.read_session_record(
+                approval.session_id
+            ).workspace_path
+
+            progress_queue: asyncio.Queue[AgentEvent] = asyncio.Queue()
+
+            async def on_progress(text: str) -> None:
+                await progress_queue.put(
+                    AgentEvent(
+                        index=0,  # 占位，真正序号由恢复链主循环统一赋值
+                        type="tool_progress",
+                        content=text,
+                        tool_name=approval.tool_name,
+                        tool_call_id=approval.tool_call_id,
+                    )
+                )
+
+            context = ToolCallContext(
+                tool_name=approval.tool_name,
+                tool_args=approval.arguments,
+                tool_call_id=approval.tool_call_id,
+                session_id=approval.session_id,
+                run_id=approval.run_id,
+                extra={
+                    "workspace_path": workspace_path,
+                },
+                on_progress=on_progress,
+                loop=loop,
+            )
+
+            execute_task = loop.run_in_executor(
+                None,
+                tool_registry.execute_tool_call,
+                approval.tool_name,
+                approval.arguments,
+                context,
+            )
+
+            while True:
+                if execute_task.done() and progress_queue.empty():
+                    break
+
+                queue_get_task = asyncio.create_task(progress_queue.get())
+                done, pending = await asyncio.wait(
+                    [execute_task, queue_get_task],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+
+                if queue_get_task in done:
+                    progress_event = queue_get_task.result()
+                    progress_event.index = event_index
+                    event_index += 1
+                    yield _sse_frame(
+                        StreamFrame(type="agent_event", data=progress_event.model_dump())
+                    )
+                else:
+                    queue_get_task.cancel()
+
+            tool_result = execute_task.result()
             content = (
                 tool_result.content
                 if tool_result.ok
@@ -100,7 +163,6 @@ class ResumeRunService:
             )
             tr = ToolResult(ok=tool_result.ok, content=content)
 
-        event_index = approval.event_index
         tool_result_event = AgentEvent(
             index=event_index,
             type="tool_result",
@@ -113,6 +175,35 @@ class ResumeRunService:
         state.messages.append(
             ChatMessage(role="tool", tool_call_id=approval.tool_call_id, content=content)
         )
+        yield _sse_frame(StreamFrame(type="resume", data={"run_id": approval.run_id}))
+        yield _sse_frame(StreamFrame(type="agent_event", data=tool_result_event.model_dump()))
+
+        # ── 关键：刷新剩余 pending approvals 的 saved_messages ──────────────
+        self.approval_store.refresh_pending_saved_messages_for_batch(
+            batch_id=batch_id,
+            saved_messages=state.messages,
+            event_index=event_index,
+        )
+
+        # ── 关键：如果同 run 还有别的 pending approval，先别继续模型 ───────
+        if not self.approval_store.is_batch_fully_resolved(batch_id):
+            next_pending = self.approval_store.get_next_pending_for_batch(batch_id)
+            self.persist.save_resumed_partial(
+                run_id=approval.run_id,
+                session_id=approval.session_id,
+                events=[tool_result_event],
+                agent_state=state,
+            )
+            yield _sse_frame(
+                StreamFrame(
+                    type="paused",
+                    data={
+                        "run_id": approval.run_id,
+                        "approval_id": next_pending.id if next_pending else None,
+                    },
+                )
+            )
+            return
 
         # ── 构造 AgentRunner，继续流式运转 ────────────────────────────────────
         agent = AgentRunner(
@@ -128,10 +219,6 @@ class ResumeRunService:
             agent_name=None,
             skill_name=None,
         )
-
-        yield _sse_frame(StreamFrame(type="resume", data={"run_id": approval.run_id}))
-        yield _sse_frame(StreamFrame(type="agent_event", data=tool_result_event.model_dump()))
-
         partial_reply = ""
         events: list[AgentEvent] = [tool_result_event]
         workspace_path = self.session_store.read_session_record(approval.session_id).workspace_path

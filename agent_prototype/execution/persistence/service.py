@@ -193,3 +193,32 @@ class RunPersistenceService:
         if not run or run.session_id != session_id:
             return None, []
         return run, tool_calls
+    def save_resumed_partial(
+    self,
+    *,
+    run_id: str,
+    session_id: str,
+    events: list,
+    agent_state,
+) -> None:
+        """审批恢复后只完成了当前一个工具，但同 run 仍有其它 pending approval。
+
+        这时要：
+        1. 追加当前工具产生的事件
+        2. 更新 session snapshot
+        3. 保持 run_status = paused
+        """
+        try:
+            self._run_store.append_run_events_partial(
+                run_id=run_id,
+                new_events=events,
+            )
+            self.store.upsert_session_snapshot(
+                session_id=session_id,
+                state=agent_state,
+            )
+            self._run_store.update_run_status(run_id=run_id, status="paused")
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise

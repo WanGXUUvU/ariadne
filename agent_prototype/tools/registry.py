@@ -20,7 +20,7 @@
 """
 
 import json  # 解析工具参数 JSON
-from typing import Optional, Callable  # 类型标注
+from typing import Optional, Callable,Any  # 类型标注
 
 from agent_prototype.tools.types import RiskLevel
 from agent_prototype.tools.types import ToolDefinition
@@ -73,7 +73,7 @@ class ToolRegistry:  # 工具注册中心
             return RiskLevel.SAFE
         return tool.risk_level
 
-    def execute_tool_call(self, name: str, arguments: str) -> ToolResult:
+    def execute_tool_call(self, name: str, arguments: str,context:Optional[Any]=None) -> ToolResult:
         """安全解析入参并执行指定工具，拦截底层一切异常并包装为统一的 ToolResult。"""
         tool = self._tools.get(name)  # 按名字找工具
         if tool is None:
@@ -98,6 +98,10 @@ class ToolRegistry:  # 工具注册中心
                 metadata={"tool_name": name, "raw_arguments": arguments, "debug": str(exc)},
             )
         try:  # 尝试执行工具
+            import inspect
+            sig=inspect.signature(tool.handler)
+            if "__context__" in sig.parameters:
+                args["__context__"]=context
             result = tool.handler(**args)  # 调用 handler
         except TypeError as exc:
             return ToolResult(

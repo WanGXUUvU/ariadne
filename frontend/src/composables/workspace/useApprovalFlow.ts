@@ -56,6 +56,7 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
     streamingTimeline.value = [];
     errorMsg.value = null;
     let capturedRunId: string | null = null;
+    let stillAwaitingApproval = false;
 
     try {
       for await (const frame of streamFn()) {
@@ -85,6 +86,50 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
           }
           if (activeSessionId.value) {
             onLiveAgentEvent(activeSessionId.value, frame.data);
+          }
+        } else if (frame.type === 'paused') {
+          stillAwaitingApproval = true;
+          isAwaitingApproval.value = true;
+
+          const partialTimeline = [...initialTimeline, ...streamingTimeline.value];
+          if (capturedRunId) {
+            writeTimelineToStore(capturedRunId, partialTimeline);
+          }
+
+          const partialText = partialTimeline
+            .filter(i => i.kind === 'text')
+            .map(i => i.content)
+            .join('');
+          if (partialText) {
+            const newMsgs = [...currentMessages.value];
+            for (let i = newMsgs.length - 1; i >= 0; i--) {
+              if (newMsgs[i].role === 'assistant') {
+                newMsgs[i] = { ...newMsgs[i], timeline: partialTimeline };
+                break;
+              }
+            }
+            currentMessages.value = newMsgs;
+          }
+
+          const nextApprovalId = frame.data.approval_id;
+          if (nextApprovalId) {
+            pendingApprovalInfo.value = {
+              approval_id: nextApprovalId,
+              tool_name: '',
+              arguments: '',
+              run_id: capturedRunId ?? '',
+            };
+
+            api.getApproval(nextApprovalId).then(info => {
+              if (pendingApprovalInfo.value?.approval_id === nextApprovalId) {
+                pendingApprovalInfo.value = {
+                  approval_id: nextApprovalId,
+                  tool_name: info.tool_name,
+                  arguments: info.arguments,
+                  run_id: capturedRunId ?? '',
+                };
+              }
+            }).catch(() => {});
           }
         } else if (frame.type === 'end') {
           const frozenTimeline = [...initialTimeline, ...streamingTimeline.value];
@@ -116,8 +161,10 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
         errorMsg.value = 'Resume failed: ' + err.message;
       }
     } finally {
-      isAwaitingApproval.value = false;
-      pendingApprovalInfo.value = null;
+      isAwaitingApproval.value = stillAwaitingApproval;
+      if (!stillAwaitingApproval) {
+        pendingApprovalInfo.value = null;
+      }
       isStreaming.value = false;
       isChatLoading.value = false;
       streamingTimeline.value = [];

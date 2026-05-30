@@ -43,6 +43,7 @@ class SqliteApprovalStore:
         self,
         session_id: str,
         run_id: str,
+        batch_id: str,
         tool_name: str,
         tool_call_id: str,
         arguments: str,
@@ -68,6 +69,7 @@ class SqliteApprovalStore:
             id=uuid.uuid4().hex,
             session_id=session_id,
             run_id=run_id,
+            batch_id=batch_id,
             tool_name=tool_name,
             tool_call_id=tool_call_id,
             arguments=arguments,
@@ -119,3 +121,68 @@ class SqliteApprovalStore:
         - list[ChatMessage]: 还原后的聊天历史消息列表。
         """
         return [ChatMessage.model_validate(msg) for msg in approval.saved_messages]
+    
+    def is_batch_fully_resolved(self, batch_id: str) -> bool:
+        """检查某一批 tool_calls 关联的待审批项是否都已经处理完。"""
+        pending_count = (
+            self.db.query(PendingApproval)
+            .filter(PendingApproval.batch_id == batch_id)
+            .filter(PendingApproval.status == "pending")
+            .count()
+        )
+        return pending_count == 0
+    
+    def refresh_pending_saved_messages_for_batch(
+        self,
+        batch_id: str,
+        saved_messages: list[ChatMessage],
+        event_index: Optional[int] = None,
+    ) -> int:
+        """把某一批 pending 审批单的现场快照刷新为最新状态。
+
+        返回刷新了多少条记录。
+        """
+        records = (
+            self.db.query(PendingApproval)
+            .filter(
+                PendingApproval.batch_id == batch_id,
+                PendingApproval.status == "pending",
+            )
+            .all()
+        )
+
+        payload = [msg.model_dump(exclude_none=True) for msg in saved_messages]
+
+        for record in records:
+            record.saved_messages = payload
+            if event_index is not None:
+                record.event_index = event_index
+
+        return len(records)
+
+    def get_next_pending_for_batch(self, batch_id: str) -> Optional[PendingApproval]:
+        """返回同一批 tool_calls 里下一个待处理的审批单。"""
+        return (
+            self.db.query(PendingApproval)
+            .filter(
+                PendingApproval.batch_id == batch_id,
+                PendingApproval.status == "pending",
+            )
+            .order_by(PendingApproval.created_at.asc(), PendingApproval.id.asc())
+            .first()
+        )
+
+    def get_next_pending_for_run(self, run_id: str) -> Optional[PendingApproval]:
+        """返回同一 run 下下一个待处理的审批单。
+
+        仅用于从 run 里定位当前活跃 batch 的第一张 pending 单。
+        """
+        return (
+            self.db.query(PendingApproval)
+            .filter(
+                PendingApproval.run_id == run_id,
+                PendingApproval.status == "pending",
+            )
+            .order_by(PendingApproval.created_at.asc(), PendingApproval.id.asc())
+            .first()
+        )

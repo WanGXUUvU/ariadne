@@ -64,11 +64,13 @@ class ToolRunObserver:
         arguments: str,
         saved_messages: Optional[list],
         event_index: int,
+        batch_id: Optional[str] = None,
     ) -> str:
         """需要人工审批时，写入 approval 记录并返回记录 ID。"""
         record = self.approval_store.create(
             session_id=self.session_id,
             run_id=self.run_id,
+            batch_id=batch_id or self.run_id,
             tool_name=tool_name,
             tool_call_id=tool_call_id,
             arguments=arguments,
@@ -86,7 +88,13 @@ class ToolRunObserver:
         events: list[AgentEvent],
         partial_reply: str,
     ) -> None:
-        """审批暂停时，存储当前 run 的中间状态。"""
+        """审批暂停时，存储当前 run 的中间状态,并刷新状态快照"""
+        pending = self.approval_store.get_next_pending_for_run(self.run_id)
+        if pending is not None:
+            self.approval_store.refresh_pending_saved_messages_for_batch(
+                batch_id=pending.batch_id or pending.run_id,
+                saved_messages=state.messages,
+            )
         self.run_store.save_partial_run(
             session_id=self.session_id,
             run_id=self.run_id,
