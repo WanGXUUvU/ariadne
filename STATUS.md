@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: implementation
-- Task: TASK-077 agent cognitive and safety evolution (智能体认知与安全深度演进)
+- Task: TASK-083 tool batch approval and progress closure (工具批次审批状态机与并行进度闭环收口)
 - Gate: code / debug
 - Allowed Now: coach
 - Lane: Fast
 - Blocked: None
-- Next action: 已进入 Coach 模式开始教学 TASK-077。第一步对齐四大维度（自愈/安全围栏/MCP/情节长期记忆）的核心事实，随后展开切片 1 工具自愈中间件的设计对比与编码。
+- Next action: 已进入 Coach 模式开始教学 TASK-083。第一步对准切片 1 (Progress 真闭环接通) 的核心事实，随后展开 Before/After 核心伪代码对比。
 
 ## 读取规则
 - `STATUS.md` 是当前唯一权威入口，先看这里再看路线图。
