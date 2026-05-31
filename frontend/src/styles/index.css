@@ -740,15 +740,15 @@ body.theme-amber .blob-3 { background: radial-gradient(circle, rgba(220, 38, 38,
   opacity: 0.5;
 }
 
-/* Agent 消息：升级为浮空高端左置 Bento 气泡 */
+/* Agent 消息：升级为极简现代 distraction-free 纯净画布布局 (Direct Canvas) */
 .role-assistant {
-  background: transparent !important; /* 💡 移除了外层行的卡片背景，使其完全透明 */
-  border: none !important;            /* 移除了外层行的边框 */
-  box-shadow: none !important;        /* 移除了外层行的投影 */
-  backdrop-filter: none !important;   /* 移除了外层行的毛玻璃 */
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  margin: 12px auto !important;       /* 统一的行外间距 */
-  padding: 8px 24px !important;       /* 保持消息行标准内边距 */
+  margin: 16px auto !important; /* 统一的行外间距 */
+  padding: 12px 24px !important; /* 保持消息行标准内边距 */
 }
 
 .role-assistant .message-row-inner {
@@ -756,22 +756,22 @@ body.theme-amber .blob-3 { background: radial-gradient(circle, rgba(220, 38, 38,
 }
 
 .role-assistant .message-content {
-  /* 💡 将原属于外层行的毛玻璃卡片样式下沉到 content 气泡中 */
-  background: rgba(255, 255, 255, 0.012) !important;
-  border: 1px solid var(--border-dim) !important;
-  border-radius: 16px 16px 16px 4px !important; /* 不对称圆角（左下收紧，呼应头像） */
-  padding: 18px 22px !important;
-  max-width: 720px; /* AI 输出列稍微放宽，以便展示代码和表格 */
-  box-shadow: 0 6px 28px -2px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease !important;
+  /* 💡 完全砍掉外围硬卡片框线与背景，改用扁平 Canvas，消除卡片拉伸感 */
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 4px 0 !important; /* 清爽无气泡内衬 */
+  max-width: 720px; /* AI 输出列放宽，以便展示代码和表格 */
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: opacity 0.25s ease !important;
 }
 
 .role-assistant .message-content:hover {
-  border-color: color-mix(in srgb, var(--accent) 15%, var(--border-dim)) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 16px var(--accent-glow) !important;
-  transform: translateY(-1px); /* 💡 只有气泡本体产生微浮空动效 */
+  border-color: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 /* B. Spotlight 侧边栏搜索框重塑与全局 Spotlight 聚焦环 */

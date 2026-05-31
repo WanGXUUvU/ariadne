@@ -50,7 +50,6 @@ const formatJson = (val: any): string => {
 // Check if this specific tool card is currently waiting for approval
 const isThisWaitingApproval = computed(() => {
   if (props.exec.status === 'awaiting_approval') return true;
-  // Fallback check against pendingApprovalInfo
   if (props.isAwaitingApproval && props.pendingApprovalInfo) {
     const pInfo = props.pendingApprovalInfo;
     const cid = pInfo.tool_call_id;
@@ -59,6 +58,19 @@ const isThisWaitingApproval = computed(() => {
   }
   return false;
 });
+
+// Code block copy handling
+const copyState = ref<Record<string, boolean>>({});
+const handleCopy = (key: string, text: string) => {
+  navigator.clipboard.writeText(text).then(() => {
+    copyState.value = { ...copyState.value, [key]: true };
+    setTimeout(() => {
+      copyState.value = { ...copyState.value, [key]: false };
+    }, 2000);
+  }).catch(err => {
+    console.error('Copy failed:', err);
+  });
+};
 </script>
 
 <template>
@@ -86,6 +98,9 @@ const isThisWaitingApproval = computed(() => {
       'is-awaiting-approval': isThisWaitingApproval 
     }"
   >
+    <!-- 左侧发光状态条 -->
+    <div class="tool-status-bar" :class="`status-${isThisWaitingApproval ? 'running' : exec.status}`"></div>
+
     <!-- 工具头部 -->
     <div class="tool-exec-header" @click="toggleExpand">
       <span class="tool-exec-icon-box" :class="`status-${isThisWaitingApproval ? 'running' : exec.status}`">
@@ -120,20 +135,52 @@ const isThisWaitingApproval = computed(() => {
     <div class="tool-exec-body" v-if="isExpanded || isThisWaitingApproval">
       <!-- 参数 -->
       <div class="tool-exec-section" v-if="exec.args && Object.keys(exec.args).length > 0">
-        <div class="section-label">Parameters</div>
-        <pre class="json-code"><code>{{ formatJson(exec.args) }}</code></pre>
+        <div class="ide-code-container">
+          <div class="ide-code-header">
+            <div class="mac-control-dots">
+              <span class="dot close"></span>
+              <span class="dot minimize"></span>
+              <span class="dot expand"></span>
+            </div>
+            <span class="ide-tab-title">parameters.json</span>
+            <button class="ide-copy-btn" :class="{ copied: copyState['args'] }" @click="handleCopy('args', formatJson(exec.args))">
+              <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span class="copy-label">{{ copyState['args'] ? 'Copied' : 'Copy' }}</span>
+            </button>
+          </div>
+          <pre class="json-code"><code>{{ formatJson(exec.args) }}</code></pre>
+        </div>
       </div>
 
       <!-- 错误状态 -->
       <div class="tool-exec-section is-error" v-if="exec.status === 'error' && exec.error">
-        <div class="section-label">Error</div>
+        <div class="section-label">Error Output</div>
         <div class="error-text">{{ exec.error }}</div>
       </div>
 
       <!-- 正常返回结果 -->
       <div class="tool-exec-section" v-if="exec.status === 'success' && exec.result">
-        <div class="section-label">Response</div>
-        <pre class="json-code"><code>{{ formatJson(exec.result) }}</code></pre>
+        <div class="ide-code-container">
+          <div class="ide-code-header">
+            <div class="mac-control-dots">
+              <span class="dot close"></span>
+              <span class="dot minimize"></span>
+              <span class="dot expand"></span>
+            </div>
+            <span class="ide-tab-title">response.log</span>
+            <button class="ide-copy-btn" :class="{ copied: copyState['result'] }" @click="handleCopy('result', formatJson(exec.result))">
+              <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span class="copy-label">{{ copyState['result'] ? 'Copied' : 'Copy' }}</span>
+            </button>
+          </div>
+          <pre class="json-code"><code>{{ formatJson(exec.result) }}</code></pre>
+        </div>
       </div>
 
       <!-- 💡 顶奢级审批交互面板：磨砂拟态、渐变霓虹呼吸边框与对称排版 -->
@@ -186,7 +233,366 @@ const isThisWaitingApproval = computed(() => {
 </template>
 
 <style scoped>
-/* 💡 顶奢毛玻璃立体审批操作区样式 */
+/* ── 工具调用卡片样式 ── */
+.tool-exec-card {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-panel) 95%, var(--text-primary));
+  border: 1px solid var(--border-dim);
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 8px;
+  position: relative;
+  width: 100%;
+}
+
+body.theme-default .tool-exec-card,
+body.theme-cyberpunk .tool-exec-card,
+body.theme-emerald .tool-exec-card,
+body.theme-amber .tool-exec-card {
+  background: rgba(255, 255, 255, 0.015);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.tool-exec-card:hover {
+  background: color-mix(in srgb, var(--bg-panel) 92%, var(--text-primary));
+  border-color: var(--border-strong);
+}
+
+body.theme-default .tool-exec-card:hover,
+body.theme-cyberpunk .tool-exec-card:hover,
+body.theme-emerald .tool-exec-card:hover,
+body.theme-amber .tool-exec-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.tool-exec-card.is-expanded {
+  background: color-mix(in srgb, var(--bg-panel) 90%, var(--text-primary));
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+body.theme-default .tool-exec-card.is-expanded,
+body.theme-cyberpunk .tool-exec-card.is-expanded,
+body.theme-emerald .tool-exec-card.is-expanded,
+body.theme-amber .tool-exec-card.is-expanded {
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.tool-exec-card.has-error {
+  background: rgba(255, 69, 58, 0.02);
+  border-color: rgba(255, 69, 58, 0.18);
+}
+
+.tool-exec-card.has-error:hover {
+  border-color: rgba(255, 69, 58, 0.35);
+  background: rgba(255, 69, 58, 0.04);
+}
+
+.tool-exec-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+/* 左侧发光指示线 */
+.tool-status-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.tool-status-bar.status-success {
+  background: var(--accent-emerald, #34c759);
+  box-shadow: 0 0 6px var(--accent-emerald, #34c759);
+}
+
+.tool-status-bar.status-running {
+  background: var(--warning-amber, #FBBF24);
+  box-shadow: 0 0 6px var(--warning-amber, #FBBF24);
+}
+
+.tool-status-bar.status-error {
+  background: var(--danger, #ff453a);
+  box-shadow: 0 0 6px var(--danger, #ff453a);
+}
+
+.tool-exec-icon-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-dim);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.tool-exec-icon-box.status-success {
+  color: var(--accent-emerald, #34c759);
+  background: rgba(52, 199, 89, 0.06);
+  border-color: rgba(52, 199, 89, 0.15);
+}
+
+.tool-exec-icon-box.status-running {
+  color: var(--warning-amber, #FBBF24);
+  background: rgba(251, 191, 36, 0.06);
+  border-color: rgba(251, 191, 36, 0.15);
+}
+
+.tool-exec-icon-box.status-error {
+  color: var(--danger, #ff453a);
+  background: rgba(255, 69, 58, 0.06);
+  border-color: rgba(255, 69, 58, 0.15);
+}
+
+.tool-exec-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+  flex: 1;
+}
+
+.running-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-emerald, #34c759);
+  box-shadow: 0 0 8px var(--accent-emerald, #34c759);
+  animation: pulse 1.6s infinite ease-in-out;
+}
+
+.tool-exec-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.status-error-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--danger, #ff453a);
+  background: rgba(255, 69, 58, 0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+}
+
+.duration-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.header-chevron-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.header-chevron-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toggle-chevron {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toggle-chevron.open {
+  transform: rotate(180deg);
+}
+
+.tool-exec-body {
+  border-top: 1px solid var(--border-dim);
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+body.theme-default .tool-exec-body,
+body.theme-cyberpunk .tool-exec-body,
+body.theme-emerald .tool-exec-body,
+body.theme-amber .tool-exec-body {
+  background: rgba(0, 0, 0, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.04);
+}
+
+.tool-exec-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+/* --- 💻 HIGH-END macOS IDE CODE CONTAINER --- */
+.ide-code-container {
+  display: flex;
+  flex-direction: column;
+  background: #0b0b0e !important;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.ide-code-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #121217 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  user-select: none;
+}
+
+.mac-control-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-right: 14px;
+}
+
+.mac-control-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  opacity: 0.85;
+}
+
+.mac-control-dots .dot.close { background-color: #ff5f56; }
+.mac-control-dots .dot.minimize { background-color: #ffbd2e; }
+.mac-control-dots .dot.expand { background-color: #27c93f; }
+
+.ide-tab-title {
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--font-mono, monospace);
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.5px;
+  text-transform: lowercase;
+}
+
+.ide-copy-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.35);
+  transition: all 0.2s ease;
+  font-size: 10px;
+  font-family: var(--font-sans);
+  outline: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ide-copy-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ide-copy-btn.copied {
+  color: var(--accent-emerald, #34c759);
+}
+
+.json-code {
+  margin: 0;
+  padding: 12px 14px;
+  background: transparent !important;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #c9d1d9 !important; /* Elegant light text on obsidian backdrop */
+  font-family: var(--font-mono, monospace);
+  overflow-x: auto;
+  max-height: 320px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.json-code code {
+  color: inherit !important;
+  background: transparent !important;
+}
+
+.error-text {
+  padding: 10px 12px;
+  background: rgba(255, 69, 58, 0.06);
+  border: 1px solid rgba(255, 69, 58, 0.15);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #ff453a;
+  font-family: var(--font-mono, monospace);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.tool-exec-group-summary {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.tool-exec-group-summary .tool-exec-header {
+  cursor: default;
+}
+
+.group-count-badge {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+/* ── 顶奢毛玻璃立体审批操作区样式 ── */
 .approval-action-block {
   margin-top: 12px;
   padding: 16px;
@@ -272,7 +678,6 @@ const isThisWaitingApproval = computed(() => {
   cursor: not-allowed;
 }
 
-/* 按钮微动效与发光设计 */
 .btn-hover-glow {
   position: absolute;
   top: 0;
@@ -333,24 +738,6 @@ const isThisWaitingApproval = computed(() => {
   background: rgba(16, 185, 129, 0.25);
   box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
   border-color: rgba(16, 185, 129, 0.6);
-}
-
-.header-chevron-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  border-radius: 4px;
-  transition: all 0.15s ease;
-}
-
-.header-chevron-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
 @keyframes dotPulse {

@@ -308,7 +308,7 @@ const handleCodeBlockClick = (e: MouseEvent) => {
 }
 
 .role-assistant {
-  background: var(--bg-hover);
+  background: transparent;
 }
 
 .ai-avatar {
