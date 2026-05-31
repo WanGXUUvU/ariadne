@@ -54,8 +54,6 @@ const hasPendingApprovalInChunk = computed(() => {
 <template>
   <div v-if="chunk.type === 'thinking'" class="thinking-container">
     <button class="timeline-toggle" @click="emit('toggle')">
-      <!-- 激光呼吸心跳灯 -->
-      <span class="thinking-heartbeat"></span>
       <span class="toggle-verb thinking-verb">思考过程</span>
       
       <!-- 如果包含挂起审批，增加醒目的橙色指示器 -->

@@ -325,10 +325,6 @@ const handleCodeBlockClick = (e: MouseEvent) => {
         :class="{ 'has-error': hasError(chunk) }"
       >
         <button class="timeline-toggle" @click="toggleChunk(chunk.id)">
-          <div class="toggle-left-indicator" :class="hasError(chunk) ? 'status-error' : 'status-success'"></div>
-          <span class="evt-icon-box header-icon-box" :class="hasError(chunk) ? 'status-error' : 'status-success'">
-            <ToolIcons :type="hasError(chunk) ? 'tool_error' : 'assistant_tool_call'" :size="11" />
-          </span>
           <span class="toggle-verb">
             <template v-if="hasError(chunk)">调用失败: {{ getToolNamesList(chunk) }}</template>
             <template v-else>链式调用: {{ getToolNamesList(chunk) }}</template>
