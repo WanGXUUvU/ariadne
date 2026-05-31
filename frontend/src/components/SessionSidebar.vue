@@ -256,23 +256,6 @@ const confirmDeleteFolder = (path: string | null, name: string, sessionsList: Se
                 </div>
               </div>
 
-              <!-- Workspace List -->
-              <div v-if="workspaces && workspaces.length > 0" class="popover-section">
-                <div class="popover-section-title mono-label">Recent Project Folders</div>
-                <div 
-                  v-for="ws in workspaces" 
-                  :key="ws.id" 
-                  class="popover-item"
-                  @click="$emit('new', ws.path, ws.name); closePopover();"
-                >
-                  <span class="popover-icon">📁</span>
-                  <div class="popover-item-content">
-                    <div class="popover-item-name">{{ ws.name }}</div>
-                    <div class="popover-item-desc" :title="ws.path">{{ ws.path }}</div>
-                  </div>
-                </div>
-              </div>
-
               <div class="popover-divider"></div>
 
               <!-- Add Folder Button -->
