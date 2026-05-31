@@ -557,15 +557,113 @@ select.tech-btn option {
   display: block;
 }
 
-/* Premium Markdown Lists */
+/* Premium Markdown Lists with Custom Bento Counters & Emojis */
 .md-list {
-  padding-left: 20px;
-  margin: 10px 0;
+  counter-reset: md-counter;
+  padding-left: 0;
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
+
 .md-list li {
   position: relative;
-  margin-bottom: 6px;
-  line-height: 1.6;
+  padding-left: 32px;
+  line-height: 1.7;
+  list-style: none;
+  font-size: 13.5px;
+}
+
+ol.md-list {
+  counter-reset: ol-counter;
+}
+
+ol.md-list > li {
+  counter-increment: ol-counter;
+}
+
+ol.md-list > li::before {
+  content: counter(ol-counter);
+  position: absolute;
+  left: 0;
+  top: 3px;
+  width: 20px;
+  height: 20px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-hover));
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border-dim));
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+ol.md-list > li:hover::before {
+  background: var(--accent);
+  color: var(--bg-panel);
+  border-color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+ul.md-list > li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 3px;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 📄 Premium Translucent Asset Badges (文件自动包装组件) ── */
+.asset-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-hover));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border-dim));
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin: 0 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  vertical-align: middle;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.asset-badge:hover {
+  background: var(--accent);
+  color: var(--bg-panel) !important;
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.asset-badge:hover .asset-name {
+  color: var(--bg-panel) !important;
+}
+
+.asset-icon {
+  font-size: 11px;
+}
+
+.asset-name {
+  color: var(--accent);
+  transition: color 0.2s ease;
 }
 
 /* ==================== 🌌 赛博朋克深空环境流光系统 ==================== */

@@ -50,6 +50,11 @@ export function formatContent(text: string | null): string {
   });
 
   html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+
+  // Convert double-quoted filenames into luxurious Asset Badges
+  html = html.replace(/"([^"\s]+\.(?:txt|md|json|html|py|js|ts|css|scss|go|rs|sh|png|jpg|jpeg|gif|svg))"/g, 
+    '<span class="asset-badge"><span class="asset-icon">📄</span><span class="asset-name">$1</span></span>');
+
   html = html.replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid var(--border-dim);margin:12px 0;">');
   html = html.replace(/^### (.+)$/gm, '<div style="font-size:13px;font-weight:600;color:var(--text-primary);margin:10px 0 4px;">$1</div>');
   html = html.replace(/^## (.+)$/gm, '<div style="font-size:14px;font-weight:600;color:var(--text-primary);margin:12px 0 4px;">$1</div>');

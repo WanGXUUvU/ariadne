@@ -46,6 +46,26 @@ const formatJson = (val: any): string => {
   return String(val);
 };
 
+const highlightJson = (json: string): string => {
+  if (!json) return '';
+  // Highlight keys, values, numbers, booleans
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (match) => {
+    let cls = 'json-number';
+    if (/^"/.test(match)) {
+      if (/:$/.test(match)) {
+        cls = 'json-key';
+      } else {
+        cls = 'json-string';
+      }
+    } else if (/true|false/.test(match)) {
+      cls = 'json-boolean';
+    } else if (/null/.test(match)) {
+      cls = 'json-null';
+    }
+    return `<span class="${cls}">${match}</span>`;
+  });
+};
+
 // Check if this specific tool card is currently waiting for approval
 const isThisWaitingApproval = computed(() => {
   if (props.exec.status === 'awaiting_approval') return true;
@@ -396,7 +416,7 @@ const displayedAesthetic = computed(() => {
               <span class="copy-label">{{ copyState['args'] ? 'Copied' : 'Copy' }}</span>
             </button>
           </div>
-          <pre class="json-code"><code>{{ formatJson(exec.args) }}</code></pre>
+          <pre class="json-code"><code v-html="highlightJson(formatJson(exec.args))"></code></pre>
         </div>
       </div>
 
@@ -424,7 +444,7 @@ const displayedAesthetic = computed(() => {
               <span class="copy-label">{{ copyState['result'] ? 'Copied' : 'Copy' }}</span>
             </button>
           </div>
-          <pre class="json-code"><code>{{ formatJson(exec.result) }}</code></pre>
+          <pre class="json-code"><code v-html="highlightJson(formatJson(exec.result))"></code></pre>
         </div>
       </div>
 
@@ -823,6 +843,24 @@ body.theme-amber .tool-exec-body {
 .json-code code {
   color: inherit !important;
   background: transparent !important;
+}
+
+/* --- Soft high-fidelity syntax colors --- */
+.json-code :deep(.json-key) {
+  color: #82aaff !important; /* Soft Pale Blue */
+  font-weight: 500;
+}
+.json-code :deep(.json-string) {
+  color: #c3e88d !important; /* Soft Pastel Green */
+}
+.json-code :deep(.json-number) {
+  color: #f78c6c !important; /* Soft Pastel Orange */
+}
+.json-code :deep(.json-boolean) {
+  color: #ffcb6b !important; /* Soft Pale Yellow */
+}
+.json-code :deep(.json-null) {
+  color: #9CA3AF !important;
 }
 
 .error-text {
