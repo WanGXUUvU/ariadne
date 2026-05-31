@@ -291,37 +291,6 @@ const handleCodeBlockClick = (e: MouseEvent) => {
       console.error('📋 复制代码块失败:', err);
     });
 };
-// Check if the assistant message contains file-writing tool operations
-const hasWriteOperations = computed(() => {
-  const timeline = getSyntheticTimeline.value;
-  if (!timeline) return false;
-  return timeline.some(item => 
-    item.kind === 'event' && 
-    item.event.type === 'assistant_tool_call' && 
-    (item.event.tool_name === 'write_file' || 
-     item.event.tool_name === 'replace_file_content' || 
-     item.event.tool_name === 'multi_replace_file_content')
-  );
-});
-
-const handleDeploy = () => {
-  // Show an elegant status banner that says "Assets successfully staged and deployed to dev-sandbox!"
-  alert('🚀 资产部署成功！Staged and deployed to development sandbox!');
-};
-
-const handleDownload = () => {
-  // Simulate file download
-  alert('📥 打包下载成功！All files generated have been compressed into agent-workspace.zip!');
-};
-
-const handleRequestEdit = () => {
-  // Focus on the chat input box!
-  const inputEl = document.querySelector('.chat-input-textarea') as HTMLTextAreaElement | null;
-  if (inputEl) {
-    inputEl.focus();
-    inputEl.placeholder = '请输入您的修改建议...';
-  }
-};
 </script>
 
 <template>
@@ -385,23 +354,6 @@ const handleRequestEdit = () => {
         </div>
       </div>
     </template>
-    
-    <!-- 💡 Asset Action Bar (仅在有写文件操作且为最后一条消息时显示) -->
-    <div v-if="hasWriteOperations && isLast" class="asset-actions-bar stagger-anim">
-      <button class="action-btn deploy-btn" @click="handleDeploy">
-        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-        <span>一键部署 (Deploy Assets)</span>
-      </button>
-      <button class="action-btn download-btn" @click="handleDownload">
-        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        <span>打包下载 (Download Files)</span>
-      </button>
-      <button class="action-btn request-btn" @click="handleRequestEdit">
-        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-        <span>提出修改 (Request Edits)</span>
-      </button>
-    </div>
-
     <div v-if="message.stopped" class="stopped-label">⏹ Stopped</div>
   </div>
 </template>
@@ -612,100 +564,5 @@ const handleRequestEdit = () => {
   font-family: var(--font-mono, monospace);
   margin-top: 8px;
   text-transform: uppercase;
-}
-
-/* ── 📥 Asset Action Bar (一键部署/打包下载/提出修改) ── */
-.asset-actions-bar {
-  display: flex;
-  gap: 10px;
-  margin-top: 18px;
-  padding: 12px;
-  background: color-mix(in srgb, var(--bg-panel) 94%, var(--text-primary));
-  border: 1px solid var(--border-dim);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-  width: 100%;
-  animation: messageSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-body.theme-default .asset-actions-bar,
-body.theme-cyberpunk .asset-actions-bar,
-body.theme-emerald .asset-actions-bar,
-body.theme-amber .asset-actions-bar {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.action-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  outline: none;
-  font-family: var(--font-sans), sans-serif;
-  appearance: none;
-  -webkit-appearance: none;
-  border: none;
-}
-
-/* Deploy Button - Main Green Glow */
-.deploy-btn {
-  background: var(--accent-emerald, #34c759);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(52, 199, 89, 0.2);
-}
-
-.deploy-btn:hover {
-  background: color-mix(in srgb, var(--accent-emerald, #34c759) 85%, #000);
-  box-shadow: 0 4px 14px rgba(52, 199, 89, 0.4);
-  transform: translateY(-1px);
-}
-
-/* Download Button - Secondary Blue Accent */
-.download-btn {
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg-hover));
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border-dim));
-  color: var(--accent);
-}
-
-.download-btn:hover {
-  background: var(--accent);
-  color: var(--bg-panel);
-  border-color: var(--accent);
-  box-shadow: 0 4px 12px var(--accent-glow);
-  transform: translateY(-1px);
-}
-
-/* Request Button - Light Neutral Muted */
-.request-btn {
-  background: rgba(255, 255, 255, 0.015);
-  border: 1px solid var(--border-dim);
-  color: var(--text-secondary);
-}
-
-.request-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-}
-
-@keyframes messageSlideUp {
-  0% {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 </style>
