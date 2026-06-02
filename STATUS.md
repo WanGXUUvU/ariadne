@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: planning
-- Task: TASK-077 agent cognitive and safety evolution (智能体认知与安全深度演进)
-- Gate: design / code
+- Task: Brainstorming (脑暴新方向)
+- Gate: design / planning
 - Allowed Now: coach (Backend lane) / auto (Frontend lane)
 - Lane: Fast
 - Blocked: None
-- Next action: 按照黄金四步教学法推进 TASK-077 切片 1：工具自愈中间件的设计与落地。
+- Next action: 协助用户梳理网络故障自愈、历史修改重发、子智能体异步回调、多智能体通信等四项方案并确立下一步任务卡。
 
 ## 读取规则
 - `STATUS.md` 是当前唯一权威入口，先看这里再看路线图。
