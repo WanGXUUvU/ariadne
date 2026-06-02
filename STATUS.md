@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: planning
-- Task: Brainstorming (脑暴新方向)
-- Gate: design / planning
+- Phase: execution
+- Task: TASK-086 大模型网络与 API 错误弹性重试
+- Gate: coding / testing
 - Allowed Now: coach (Backend lane) / auto (Frontend lane)
 - Lane: Fast
 - Blocked: None
-- Next action: 协助用户梳理网络故障自愈、历史修改重发、子智能体异步回调、多智能体通信等四项方案并确立下一步任务卡。
+- Next action: 前端实现：在 `useRunStreaming.ts` 捕获连接异常并将状态置为 `network_error`，在 `MessageList.vue` / `ChatPanel.vue` 中渲染设计精美的网络错误卡片并提供“Retry”按钮支持断点继续。
 
 ## 读取规则
 - `STATUS.md` 是当前唯一权威入口，先看这里再看路线图。

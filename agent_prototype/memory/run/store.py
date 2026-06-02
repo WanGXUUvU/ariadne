@@ -341,7 +341,7 @@ class SqliteRunStore:
             .order_by(SessionRunRecord.created_at.asc())
             .all()
         )
-    
+
     def append_run_events_partial(self, *, run_id: str, new_events: list[AgentEvent]) -> None:
         """给一次 run 追加事件，但不修改 completed 状态和最终 reply。"""
         run_record = (

@@ -244,6 +244,7 @@ onMounted(() => {
               @update:model="(val: { modelId: string | null; providerId: number | null }) => workspace.updateModelConfig({ model_id: val.modelId, model_provider_id: val.providerId })"
               @update:thinkingEnabled="(val: boolean) => workspace.updateModelConfig({ thinking_enabled: val })"
               @update:thinkingEffort="(val: string) => workspace.updateModelConfig({ thinking_effort: val })"
+              @retry="workspace.retryLastRun"
             />
           </template>
 

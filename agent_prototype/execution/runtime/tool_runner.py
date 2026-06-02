@@ -154,7 +154,7 @@ async def async_handle_tool_calls(
     session_type: str = "coding",
 ) -> AsyncIterator[Union[AgentEvent, ToolTurnResult]]:
     """异步流式工具执行引擎。
-    
+
     支持多工具基于 asyncio.gather 并发调度、中间件链执行拦截、
     跨线程多生产者流式进度实时汇聚（asyncio.Queue）以及阻断性异常（如审批）时的并发安全生命周期回收。
     """
@@ -224,6 +224,7 @@ async def async_handle_tool_calls(
                     content=text,
                 )
             )
+
         return on_progress
 
     # 4. 定义单个工具的执行协程 Worker
@@ -289,6 +290,7 @@ async def async_handle_tool_calls(
 
         res = await pipeline.execute(context, terminal_execute_call)
         return item, context, res
+
     # 5. 封装并发 Task 集合并启动
     tasks = []
     for item in ready_items:
@@ -304,8 +306,7 @@ async def async_handle_tool_calls(
 
         queue_get_task = asyncio.create_task(event_queue.get())
         done, pending = await asyncio.wait(
-            [gather_task, queue_get_task],
-            return_when=asyncio.FIRST_COMPLETED
+            [gather_task, queue_get_task], return_when=asyncio.FIRST_COMPLETED
         )
 
         if queue_get_task in done:

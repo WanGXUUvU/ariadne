@@ -35,7 +35,7 @@ class ToolCallContext:
 
     def emit_progress(self, text: str) -> None:
         """物理工具在执行期间，通过此接口主动触发上报流式进度。
-        
+
         如果存在绑定的 on_progress 回调和活动事件循环，将以线程安全的方式提交给主线程执行。
         """
         if self.on_progress and self.loop:
@@ -53,7 +53,7 @@ class BaseMiddleware(ABC):
         next_call: Callable[[], Awaitable[Any]],
     ) -> Any:
         """中间件的核心拦截逻辑入口。
-        
+
         在内部可以通过检查 context 决定是否放行（调用 next_call）或阻断执行。
         """
         pass

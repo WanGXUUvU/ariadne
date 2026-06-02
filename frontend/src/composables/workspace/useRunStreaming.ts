@@ -28,6 +28,7 @@ interface RunStreamingOptions {
   pendingRunId: Ref<string | null>;
   pendingUserInput: Ref<string>;
   pendingAgentName: Ref<string | undefined>;
+  pendingSkillName: Ref<string | null>;
   streamAbortController: Ref<AbortController | null>;
   onLiveAgentEvent: (sessionId: string, ev: any) => void;
   extractChildAgents: (sessionId: string, msgs: AgentMessage[], traceRuns: TraceRunSummary[]) => void;
@@ -51,6 +52,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
     pendingRunId,
     pendingUserInput,
     pendingAgentName,
+    pendingSkillName,
     streamAbortController,
     onLiveAgentEvent,
     extractChildAgents,
@@ -72,6 +74,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
     streamAbortController.value = abortController;
     pendingUserInput.value = input;
     pendingAgentName.value = activeAgent.value?.id;
+    pendingSkillName.value = skillName ?? null;
 
     try {
       for await (const frame of api.streamRun(activeSessionId.value, input, activeAgent.value?.id, skillName, abortController.signal)) {
@@ -184,11 +187,43 @@ export function useRunStreaming(options: RunStreamingOptions) {
           }
         } else if (frame.type === 'error') {
           errorMsg.value = frame.data.message ?? 'Streaming error';
+          throw new Error(frame.data.message ?? 'Streaming error');
         }
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         errorMsg.value = 'Run failed: ' + err.message;
+        const frozenTimeline = [...streamingTimeline.value];
+        const partialReply = frozenTimeline
+          .filter(item => item.kind === 'text')
+          .map(item => item.content)
+          .join('');
+        if (partialReply.trim() || frozenTimeline.length > 0) {
+          let updated = false;
+          const newMsgs = [...currentMessages.value];
+          for (let i = newMsgs.length - 1; i >= 0; i--) {
+            const msg = newMsgs[i];
+            if (msg.role === 'assistant' && (msg.content === null || (capturedRunId && msg.run_id === capturedRunId))) {
+              newMsgs[i] = {
+                ...msg,
+                content: partialReply || null,
+                stopped: true,
+                timeline: frozenTimeline
+              };
+              updated = true;
+              break;
+            }
+          }
+          if (!updated) {
+            newMsgs.push({
+              role: 'assistant',
+              content: partialReply || null,
+              stopped: true,
+              timeline: frozenTimeline
+            });
+          }
+          currentMessages.value = newMsgs;
+        }
       }
     } finally {
       isChatLoading.value = false;
