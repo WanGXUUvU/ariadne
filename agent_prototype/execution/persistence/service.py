@@ -193,14 +193,15 @@ class RunPersistenceService:
         if not run or run.session_id != session_id:
             return None, []
         return run, tool_calls
+
     def save_resumed_partial(
-    self,
-    *,
-    run_id: str,
-    session_id: str,
-    events: list,
-    agent_state,
-) -> None:
+        self,
+        *,
+        run_id: str,
+        session_id: str,
+        events: list,
+        agent_state,
+    ) -> None:
         """审批恢复后只完成了当前一个工具，但同 run 仍有其它 pending approval。
 
         这时要：

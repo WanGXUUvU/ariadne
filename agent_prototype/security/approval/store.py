@@ -121,7 +121,7 @@ class SqliteApprovalStore:
         - list[ChatMessage]: 还原后的聊天历史消息列表。
         """
         return [ChatMessage.model_validate(msg) for msg in approval.saved_messages]
-    
+
     def is_batch_fully_resolved(self, batch_id: str) -> bool:
         """检查某一批 tool_calls 关联的待审批项是否都已经处理完。"""
         pending_count = (
@@ -131,7 +131,7 @@ class SqliteApprovalStore:
             .count()
         )
         return pending_count == 0
-    
+
     def refresh_pending_saved_messages_for_batch(
         self,
         batch_id: str,

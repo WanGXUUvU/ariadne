@@ -139,9 +139,7 @@ class ResumeRunService:
                     context,
                 )
 
-            execute_task = asyncio.create_task(
-                pipeline.execute(context, terminal_execute_call)
-            )
+            execute_task = asyncio.create_task(pipeline.execute(context, terminal_execute_call))
 
             while True:
                 if execute_task.done() and progress_queue.empty():

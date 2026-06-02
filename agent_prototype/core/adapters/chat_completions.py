@@ -11,7 +11,7 @@
 
 import os
 import json
-import time, httpx
+import time, httpx, asyncio
 from typing import Any, Optional, Iterator, AsyncIterator
 
 import requests
@@ -170,25 +170,38 @@ class ChatCompletionsAdapter(ModelAdapter):
         payload.update(request.config.provider_options)
         payload.update(self.extra_payload)
 
-        response = None
-        for attempt in range(2):
-            response = requests.post(url, headers=headers, json=payload, timeout=2100)
+        max_retries = 3
+        initial_delay = 1.0
+        backoff_factor = 2.0
 
+        response = None
+        for attempt in range(max_retries + 1):
             try:
+                response = requests.post(url, headers=headers, json=payload, timeout=2100)
                 response.raise_for_status()
                 break
-            except requests.HTTPError as exc:
-                retryable_engine_error = (
-                    response.status_code == 400
-                    and "engine is not available temporarily" in (response.text or "")
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                if attempt == max_retries:
+                    raise RuntimeError(
+                        f"LLM request failed due to network/timeout error after {max_retries} retries: {exc}"
+                    ) from exc
+            except requests.exceptions.HTTPError as exc:
+                status_code = response.status_code if response is not None else 500
+                text = response.text if response is not None else ""
+
+                is_retryable = (
+                    status_code == 429
+                    or (500 <= status_code < 600)
+                    or (status_code == 400 and "engine is not available temporarily" in text)
                 )
-                if attempt == 0 and retryable_engine_error:
-                    time.sleep(0.5)
-                    continue
-                raise RuntimeError(
-                    f"LLM request failed: url={url}, model={payload['model']}, "
-                    f"status={response.status_code}, body={response.text}"
-                ) from exc
+                if not is_retryable or attempt == max_retries:
+                    raise RuntimeError(
+                        f"LLM request failed: url={url}, model={payload['model']}, "
+                        f"status={status_code}, body={text}"
+                    ) from exc
+
+            delay = initial_delay * (backoff_factor**attempt)
+            time.sleep(delay)
 
         data = response.json()
         choices = data.get("choices")
@@ -253,30 +266,44 @@ class ChatCompletionsAdapter(ModelAdapter):
         payload.update(request.config.provider_options)
         payload.update(self.extra_payload)
         payload["stream_options"] = {"include_usage": True}
+        max_retries = 3
+        initial_delay = 1.0
+        backoff_factor = 2.0
+
         response = None
-        for attempt in range(2):
-            response = requests.post(url, headers=headers, json=payload, timeout=2100, stream=True)
+        for attempt in range(max_retries + 1):
             try:
+                response = requests.post(
+                    url, headers=headers, json=payload, timeout=2100, stream=True
+                )
                 response.raise_for_status()
                 break
-            except requests.HTTPError as exc:
-                retryable_engine_error = (
-                    response.status_code == 400
-                    and "engine is not available temporarily" in (response.text or "")
-                )
-                if attempt == 0 and retryable_engine_error:
-                    time.sleep(0.5)
-                    continue
-                err_body = ""
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                if attempt == max_retries:
+                    raise RuntimeError(
+                        f"LLM request failed due to network/timeout error after {max_retries} retries: {exc}"
+                    ) from exc
+            except requests.exceptions.HTTPError as exc:
+                status_code = response.status_code if response is not None else 500
+                text = response.text if response is not None else ""
                 try:
-                    err_body = response.json()
+                    err_body = response.json() if response is not None else {}
                 except Exception:
-                    err_body = response.text
+                    err_body = text
 
-                raise RuntimeError(
-                    f"LLM request failed: url={url}, model={payload['model']}, "
-                    f"status={response.status_code}, body={err_body}"
-                ) from exc
+                is_retryable = (
+                    status_code == 429
+                    or (500 <= status_code < 600)
+                    or (status_code == 400 and "engine is not available temporarily" in text)
+                )
+                if not is_retryable or attempt == max_retries:
+                    raise RuntimeError(
+                        f"LLM request failed: url={url}, model={payload['model']}, "
+                        f"status={status_code}, body={err_body}"
+                    ) from exc
+
+            delay = initial_delay * (backoff_factor**attempt)
+            time.sleep(delay)
 
         self._reset_think_state()
         for line in response.iter_lines():
@@ -342,10 +369,35 @@ class ChatCompletionsAdapter(ModelAdapter):
         payload.update(request.config.provider_options)
         payload.update(self.extra_payload)
         payload["stream_options"] = {"include_usage": True}
+
+        max_retries = 3  # 最大重试次数
+        initial_delay = 1.0  # 初始等待 1.0s
+        backoff_factor = 2.0  # 乘数因子
+
+        ctx = None  # 用来保存 httpx 的 Stream 上下文管理器
+        response = None  # 用来保存成功的响应对象
         self._reset_think_state()
+        # 异步地帮我创建一个网络客户端，并且无论如何，等我退出这段代码时，异步地帮我把连接池全部关闭
         async with httpx.AsyncClient(timeout=2100) as client:
-            async with client.stream("POST", url, headers=headers, json=payload) as response:
-                response.raise_for_status()
+            # 先和对方握个手，建立连接。数据你别急着下载，我后面自己一点点读
+            for attempt in range(max_retries + 1):
+                try:
+                    ctx = client.stream("POST", url, headers=headers, json=payload)
+                    response = await ctx.__aenter__()
+                    response.raise_for_status()
+                    break
+                except Exception as exc:
+                    if ctx is not None:
+                        await ctx.__aexit__(None, None, None)
+                        ctx = None
+                    if attempt == max_retries:
+                        raise RuntimeError(
+                            f"LLM stream request failed after {max_retries} retries: {exc}"
+                        ) from exc
+                    delay = initial_delay * (backoff_factor**attempt)
+                    await asyncio.sleep(delay)
+
+            try:
                 async for line in response.aiter_lines():
                     if not line:
                         continue
@@ -374,3 +426,7 @@ class ChatCompletionsAdapter(ModelAdapter):
                     finish_reason = choice.get("finish_reason")
                     for event in self._parse_delta(delta, finish_reason):
                         yield event
+
+            finally:
+                if ctx is not None:
+                    await ctx.__aexit__(None, None, None)

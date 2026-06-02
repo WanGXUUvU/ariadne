@@ -13,6 +13,7 @@ const props = defineProps<{
   streamingTimeline?: StreamingItem[];
   streamingPrefixTimeline?: StreamingItem[]; // 审批批准后的前缀 timeline（initialTimeline），与 streamingTimeline 合并渲染
   lastCompletedRun?: TraceRunSummary | null;
+  error?: string | null;
   
   // 审批相关
   isAwaitingApproval?: boolean;
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   (e: 'approve', approvalId?: string): void;
   (e: 'reject', approvalId?: string): void;
   (e: 'approve-all'): void;
+  (e: 'retry'): void;
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
@@ -237,6 +239,47 @@ const handleCopyMessage = (content: string, index: number) => {
         <div class="message-content">
           <div class="message-meta mono-label">AGENT <span class="blink">EXECUTING...</span></div>
           <div class="message-text loader-block"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 错误指示器与重试卡片 -->
+    <div v-if="error" class="message-row role-assistant error-row">
+      <div class="message-row-inner">
+        <div class="message-avatar">
+          <div class="error-avatar-wrapper">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="var(--danger, #ff453a)" stroke-width="2" fill="none" class="error-svg">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+        </div>
+        <div class="message-content">
+          <div class="message-meta mono-label text-danger">AGENT ERROR</div>
+          <div class="error-retry-card">
+            <div class="error-card-glow"></div>
+            <div class="error-card-body">
+              <div class="error-card-header">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" class="warning-icon">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span class="error-title">Execution Disrupted</span>
+              </div>
+              <p class="error-text">{{ error }}</p>
+              <div class="error-actions">
+                <button class="retry-action-btn" @click="emit('retry')">
+                  <span class="btn-glow-layer"></span>
+                  <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="retry-icon">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                  </svg>
+                  <span>Retry Connection</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -466,5 +509,137 @@ const handleCopyMessage = (content: string, index: number) => {
     opacity: 0;
     border-color: rgba(var(--accent-rgb, 99, 102, 241), 0);
   }
+}
+
+/* ── Premium Error Retry Card Styling ── */
+.role-assistant.error-row {
+  background: transparent;
+}
+
+.error-avatar-wrapper {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 69, 58, 0.1);
+  border: 1px solid rgba(255, 69, 58, 0.25);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255, 69, 58, 0.15);
+}
+
+.text-danger {
+  color: var(--danger, #ff453a) !important;
+}
+
+.error-retry-card {
+  position: relative;
+  margin-top: 8px;
+  max-width: 500px;
+  border-radius: 12px;
+  background: rgba(var(--bg-panel-rgb, 15, 10, 10), 0.55);
+  border: 1px solid rgba(255, 69, 58, 0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 16px rgba(255, 69, 58, 0.05);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.error-retry-card:hover {
+  border-color: rgba(255, 69, 58, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 20px rgba(255, 69, 58, 0.1);
+}
+
+.error-card-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 10% 10%, rgba(255, 69, 58, 0.08), transparent 60%);
+  pointer-events: none;
+}
+
+.error-card-body {
+  padding: 16px;
+}
+
+.error-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--danger, #ff453a);
+}
+
+.warning-icon {
+  flex-shrink: 0;
+}
+
+.error-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.error-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 14px 0;
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+}
+
+.retry-action-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff453a, #ff9f0a);
+  color: #ffffff;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 69, 58, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.retry-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(255, 69, 58, 0.3);
+}
+
+.retry-action-btn:active {
+  transform: translateY(0);
+}
+
+.retry-icon {
+  transition: transform 0.4s ease;
+}
+
+.retry-action-btn:hover .retry-icon {
+  transform: rotate(180deg);
+}
+
+.btn-glow-layer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transition: 0.5s;
+}
+
+.retry-action-btn:hover .btn-glow-layer {
+  left: 100%;
+  transition: 0.6s ease-in-out;
 }
 </style>

@@ -1,5 +1,5 @@
-from dataclasses import dataclass,field
-from typing import Literal,Optional
+from dataclasses import dataclass, field
+from typing import Literal, Optional
 
 from agent_prototype.core.types import ChatMessage, ToolCall
 from agent_prototype.execution.runtime.types import AgentEvent
@@ -12,14 +12,15 @@ ToolBatchStatus = Literal[
 ]
 
 ToolBatchItemStatus = Literal[
-    "ready",              # 无需审批，尚未开始执行
-    "running",            # 正在执行
-    "approval_pending",   # 等待人工审批
-    "approved",           # 用户已批准，尚未真正执行
-    "rejected",           # 用户拒绝，视为终态
-    "completed",          # 工具执行成功完成
-    "failed",             # 工具执行失败，视为终态
+    "ready",  # 无需审批，尚未开始执行
+    "running",  # 正在执行
+    "approval_pending",  # 等待人工审批
+    "approved",  # 用户已批准，尚未真正执行
+    "rejected",  # 用户拒绝，视为终态
+    "completed",  # 工具执行成功完成
+    "failed",  # 工具执行失败，视为终态
 ]
+
 
 @dataclass
 class ToolBatchItem:
@@ -39,6 +40,7 @@ class ToolBatchItem:
     def is_terminal(self) -> bool:
         """终态 = 已完成 / 已拒绝 / 已失败。"""
         return self.status in {"completed", "rejected", "failed"}
+
 
 @dataclass
 class ToolBatch:
@@ -63,6 +65,7 @@ class ToolBatch:
             if item.tool_call_id == tool_call_id:
                 return item
         raise KeyError(f"Tool batch item not found: {tool_call_id}")
+
 
 def build_tool_batch(
     run_id: str,
@@ -97,4 +100,3 @@ def build_tool_batch(
         status="waiting_approval" if any(i.requires_approval for i in items) else "running",
     )
     return batch
-

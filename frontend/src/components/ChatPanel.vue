@@ -55,6 +55,7 @@ const emit = defineEmits<{
   (e: 'update:model', val: { modelId: string | null; providerId: number | null }): void;
   (e: 'update:thinkingEnabled', val: boolean): void;
   (e: 'update:thinkingEffort', val: string): void;
+  (e: 'retry'): void;
 }>();
 
 const agentDropdownOpen = ref(false);
@@ -163,6 +164,7 @@ const handleReset = () => {
       :streamingTimeline="streamingTimeline"
       :streamingPrefixTimeline="streamingPrefixTimeline"
       :lastCompletedRun="lastCompletedRun"
+      :error="error"
       :isAwaitingApproval="isAwaitingApproval"
       :pendingApprovalInfo="pendingApprovalInfo"
       :pendingApprovalInfos="pendingApprovalInfos"
@@ -170,6 +172,7 @@ const handleReset = () => {
       @approve="$emit('approve', $event)"
       @reject="$emit('reject', $event)"
       @approve-all="$emit('approveAll')"
+      @retry="$emit('retry')"
     />
 
     <MessageComposer

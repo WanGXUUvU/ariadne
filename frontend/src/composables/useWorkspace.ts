@@ -49,6 +49,7 @@ export function useWorkspace() {
   const pendingRunId = ref<string | null>(null);
   const pendingUserInput = ref<string>('');
   const pendingAgentName = ref<string | undefined>(undefined);
+  const pendingSkillName = ref<string | null>(null);
 
   const { childAgentsBySession, onLiveAgentEvent, extractChildAgents, clearChildAgents } = useChildAgentTracker();
   const { workspaces, isWorkspacesLoading, loadWorkspaces, selectWorkspaceDialog } = useWorkspaceCatalog(errorMsg);
@@ -105,6 +106,7 @@ export function useWorkspace() {
     pendingRunId,
     pendingUserInput,
     pendingAgentName,
+    pendingSkillName,
     streamAbortController,
     onLiveAgentEvent,
     extractChildAgents,
@@ -195,6 +197,12 @@ export function useWorkspace() {
     }
   }, { deep: true, immediate: true });
 
+  const retryLastRun = () => {
+    if (pendingUserInput.value) {
+      runStreaming.sendMessage(pendingUserInput.value, pendingSkillName.value);
+    }
+  };
+
   return {
     activeView,
     sessions,
@@ -226,6 +234,7 @@ export function useWorkspace() {
     initializeWorkspace,
     createNewSession: sessionState.createNewSession,
     sendMessage: runStreaming.sendMessage,
+    retryLastRun,
     stopStreaming: runStreaming.stopStreaming,
     approveAction: approvalFlow.approveAction,
     rejectAction: approvalFlow.rejectAction,
