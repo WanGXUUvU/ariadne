@@ -55,3 +55,7 @@ class SessionSummary(BaseModel):
     workspace_path: Optional[str] = None
     workspace_name: Optional[str] = None
     session_type: Optional[str] = Field(default="coding")
+
+class TruncateSessionInput(BaseModel):
+    """截断 session 的领域输入结构体。"""
+    message_index: int = Field(ge=0)

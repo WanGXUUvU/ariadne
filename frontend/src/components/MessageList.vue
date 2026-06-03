@@ -27,9 +27,37 @@ const emit = defineEmits<{
   (e: 'reject', approvalId?: string): void;
   (e: 'approve-all'): void;
   (e: 'retry'): void;
+  (e: 'edit-submit', index: number, content: string): void;
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
+
+const editingIndex = ref<number | null>(null);
+const editingContent = ref<string>('');
+
+const startEdit = (content: string, index: number) => {
+  editingIndex.value = index;
+  editingContent.value = content;
+};
+
+const cancelEdit = () => {
+  editingIndex.value = null;
+  editingContent.value = '';
+};
+
+const submitEdit = (index: number) => {
+  if (!editingContent.value.trim()) return;
+  emit('edit-submit', index, editingContent.value);
+  editingIndex.value = null;
+  editingContent.value = '';
+};
+
+const handleEditSubmit = (m: AgentMessage) => {
+  const originalIndex = props.messages.indexOf(m);
+  if (originalIndex !== -1) {
+    submitEdit(originalIndex);
+  }
+};
 
 const visibleMessages = computed(() =>
   props.messages.filter((message) => 
@@ -155,11 +183,37 @@ const handleCopyMessage = (content: string, index: number) => {
                 <span class="msg-skill-icon">📚</span>
                 <span class="msg-skill-name">{{ m.skill_name }}</span>
               </div>
-              <div class="message-text" v-html="formatContent(m.content)" @click="handleCodeBlockClick"></div>
+              <!-- 编辑态 -->
+              <div v-if="editingIndex === idx" class="message-edit-block">
+                <textarea
+                  v-model="editingContent"
+                  class="edit-textarea"
+                  rows="3"
+                  placeholder="编辑你的消息..."
+                ></textarea>
+                <div class="edit-actions">
+                  <button class="edit-btn save" @click="handleEditSubmit(m)">保存并重发</button>
+                  <button class="edit-btn cancel" @click="cancelEdit">取消</button>
+                </div>
+              </div>
+              <!-- 展示态 -->
+              <div v-else class="message-text" v-html="formatContent(m.content)" @click="handleCodeBlockClick"></div>
             </template>
 
             <!-- Message Footer Action Row -->
             <div class="message-footer">
+              <!-- 编辑按钮 -->
+              <button
+                v-if="m.role === 'user' && editingIndex !== idx"
+                class="action-btn edit-action-btn"
+                title="编辑消息"
+                @click="startEdit(m.content || '', idx)"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.8" fill="none">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+              </button>
               <button 
                 class="action-btn copy-btn" 
                 :class="{ copied: copiedIndex === idx }"
@@ -641,5 +695,78 @@ const handleCopyMessage = (content: string, index: number) => {
 .retry-action-btn:hover .btn-glow-layer {
   left: 100%;
   transition: 0.6s ease-in-out;
+}
+/* ── Premium Inline Textarea Editor ── */
+.message-edit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.edit-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.edit-textarea:focus {
+  background: rgba(var(--accent-rgb, 99, 102, 241), 0.03);
+  border-color: rgba(var(--accent-rgb, 99, 102, 241), 0.4);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb, 99, 102, 241), 0.1);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.edit-btn {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.edit-btn.save {
+  background: linear-gradient(135deg, var(--accent, #6366f1), rgba(var(--accent-rgb, 99, 102, 241), 0.8));
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb, 99, 102, 241), 0.2);
+}
+
+.edit-btn.save:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(var(--accent-rgb, 99, 102, 241), 0.3);
+}
+
+.edit-btn.cancel {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.edit-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.edit-action-btn {
+  margin-right: 4px;
 }
 </style>

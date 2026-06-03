@@ -29,7 +29,8 @@ from agent_prototype.memory.session.types import (
     ResetInput,
     SessionSummary,
 )
-from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig
+
+from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig,PendingApproval,ToolCallRecord,SessionRunRecord,SessionRunEventRecord,SessionRecord
 from agent_prototype.memory.session.store import SqliteSessionStore
 
 
@@ -271,3 +272,52 @@ class SessionService:
             return None, None
         state = self.store.read_session_state(session_id)
         return record, state
+
+    def truncate_session(self,session_id:str,message_index:int)->dict[str,bool]:
+        """截断指定会话的历史。
+        根据message_index物理阶段后续所有消息，以及相关的所有表记录"""
+
+        record=self.store.read_session_record(session_id)
+        if record is None:
+            raise ValueError("Session not found")
+        
+        state=self.store.read_session_state(session_id)
+        if not state:
+            raise ValueError("Session state not found")
+        
+        if message_index <0 or message_index >=len(state.messages):
+            raise ValueError("Invalid message index")
+        
+        try:
+            state.messages=state.messages[:message_index]
+            self.store.upsert_session_snapshot(
+                session_id,
+                state=state,
+                session_name=record.session_name,
+            )
+
+            top_runs=(self.db.query(SessionRunRecord).filter(
+                SessionRunRecord.session_id==session_id,
+                SessionRunRecord.parent_run_id.is_(None)
+            ).order_by(SessionRunRecord.id.asc()).all())
+
+            k=sum(1 for msg in state.messages if msg.role=="user")
+
+            to_delete=top_runs[k:]
+
+            if to_delete:
+                run_ids=[r.run_id for r in to_delete]
+            
+                self.db.query(PendingApproval).filter(PendingApproval.run_id.in_(run_ids)).delete(synchronize_session=False)
+                self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id.in_(run_ids)).delete(synchronize_session=False)
+                self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id.in_(run_ids)).delete(synchronize_session=False)
+                
+                # 删除顶层运行本身，以及所有挂载其下的子智能体运行 (parent_run_id)
+                self.db.query(SessionRunRecord).filter(
+                    SessionRunRecord.run_id.in_(run_ids) | SessionRunRecord.parent_run_id.in_(run_ids)
+                ).delete(synchronize_session=False)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"ok": True}
