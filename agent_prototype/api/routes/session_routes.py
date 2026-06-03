@@ -23,6 +23,7 @@ from agent_prototype.memory.session.types import (
     CreateSessionInput,
     SessionSummary,
     RenameSessionInput,
+    TruncateSessionInput,
 )
 from agent_prototype.api.dto.schemas import SessionDetail
 from agent_prototype.memory.session.service import SessionService
@@ -47,6 +48,19 @@ def create_session_api(
     - SessionSummary 对象，也就是这个新会话的简要基本信息（比如 ID、名字、创建时间等）。
     """
     return service.create_session(payload)
+
+@router.post("/sessions/{session_id}/truncate")
+def truncate_session_api(
+    session_id: str,
+    payload: TruncateSessionInput,
+    service: SessionService = Depends(get_session_service),
+) -> dict[str, bool]:
+    """截断指定会话历史的 API 接口，物理级联清理其后的 traces 记录。"""
+    try:
+        return service.truncate_session(session_id, payload.message_index)
+    except ValueError as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
+
 
 
 @router.delete("/sessions/{session_id}")

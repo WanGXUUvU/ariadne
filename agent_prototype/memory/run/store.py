@@ -5,7 +5,7 @@
 - 工具调用记录的 CRUD
 - 子 Agent 运行记录的管理
 
-从 session/store.py 拆分而出，单一职责：Run 相关持久化操作。
+从 session/w 拆分而出，单一职责：Run 相关持久化操作。
 """
 
 import json

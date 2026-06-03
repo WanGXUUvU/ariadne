@@ -56,6 +56,7 @@ const emit = defineEmits<{
   (e: 'update:thinkingEnabled', val: boolean): void;
   (e: 'update:thinkingEffort', val: string): void;
   (e: 'retry'): void;
+  (e: 'editSubmit', index: number, content: string): void;
 }>();
 
 const agentDropdownOpen = ref(false);
@@ -173,6 +174,7 @@ const handleReset = () => {
       @reject="$emit('reject', $event)"
       @approve-all="$emit('approveAll')"
       @retry="$emit('retry')"
+      @edit-submit="(index, content) => $emit('editSubmit', index, content)"
     />
 
     <MessageComposer

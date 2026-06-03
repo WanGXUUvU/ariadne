@@ -203,6 +203,22 @@ export function useWorkspace() {
     }
   };
 
+  const editAndReRun = async (messageIndex: number, newContent: string) => {
+    if (!activeSessionId.value) return;
+    try {
+      isChatLoading.value = true;
+      errorMsg.value = null;
+      await api.truncateSession(activeSessionId.value, messageIndex);
+      await sessionState.loadSessionDetail(activeSessionId.value);
+      await sessionState.loadSessions(activeSessionId.value);
+      await runStreaming.sendMessage(newContent, null);
+    } catch (err: any) {
+      errorMsg.value = 'Failed to edit message: ' + err.message;
+    } finally {
+      isChatLoading.value = false;
+    }
+  };
+
   return {
     activeView,
     sessions,
@@ -235,6 +251,7 @@ export function useWorkspace() {
     createNewSession: sessionState.createNewSession,
     sendMessage: runStreaming.sendMessage,
     retryLastRun,
+    editAndReRun,
     stopStreaming: runStreaming.stopStreaming,
     approveAction: approvalFlow.approveAction,
     rejectAction: approvalFlow.rejectAction,

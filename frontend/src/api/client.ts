@@ -163,4 +163,10 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ permission_profile }),
     }),
+  // 截断 session 历史
+  truncateSession: (session_id: string, message_index: number) =>
+    fetchApi<{ ok: boolean }>(`/sessions/${session_id}/truncate`, {
+      method: 'POST',
+      body: JSON.stringify({ message_index }),
+    }),
 };
