@@ -101,6 +101,7 @@ class RunPersistenceService:
         agent_name: Optional[str],
         skill_name: Optional[str],
         events: Optional[list] = None,
+        state:Optional[AgentState]=None,
     ) -> dict:
         """当智能体运行被打断或取消时调用！作为一个兜底保护，它要把目前已经产生的半成品回复、
         当前最新的聊天状态和事件都给存下来，不让用户的聊天记录丢失，并且把这次运行的状态标记为“已取消（cancelled）”。
@@ -117,7 +118,8 @@ class RunPersistenceService:
         会给出来的结果：
         - 一个简单的成功标记字典，如 `{"ok": True}`。
         """
-        state = self.store.get(session_id) or AgentState()
+        if state is None:
+            state = self.store.get(session_id) or AgentState()
         # 用户消息在运行时只存在于内存 agent.state 里，stop 时尚未落库。
         # 若当前 state 最后一条不是本轮的 user 消息，则补入，避免刷新后对话消失。
         if user_input and (

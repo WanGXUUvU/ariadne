@@ -181,7 +181,7 @@ const clearSelectedSkill = () => {
 };
 
 const handleSend = () => {
-  if (!text.value.trim() || props.disabled) return;
+  if (!text.value.trim() || (props.disabled && !props.isStreaming)) return;
   emit('send', text.value.trim(), selectedSkillName.value);
   text.value = '';
   selectedSkillName.value = null;
@@ -263,6 +263,13 @@ const handleCompact = () => {
   emit('compact');
   showComposerCtx.value = false;
 };
+
+defineExpose({
+  setText(val: string) {
+    text.value = val;
+    nextTick(adjustHeight);
+  }
+});
 </script>
 
 <template>
@@ -357,7 +364,7 @@ const handleCompact = () => {
       />
     </div>
 
-    <div class="composer-wrapper" :class="{ 'is-disabled': disabled, 'is-focused': isFocused, 'is-streaming': isStreaming }">
+    <div class="composer-wrapper" :class="{ 'is-disabled': disabled && !isStreaming, 'is-focused': isFocused, 'is-streaming': isStreaming }">
       <span v-if="selectedSkillName" class="inline-skill-chip">
         /{{ selectedSkillName }}<button class="inline-skill-clear" @click="clearSelectedSkill" tabindex="-1">×</button>
       </span>
@@ -370,7 +377,7 @@ const handleCompact = () => {
         @focus="isFocused = true"
         @blur="isFocused = false"
         :placeholder="selectedSkillName ? '' : 'Ask anything or request a tool...'"
-        :disabled="disabled"
+        :disabled="disabled && !isStreaming"
         rows="1"
       ></textarea>
 
@@ -429,13 +436,13 @@ const handleCompact = () => {
 
       <button 
         class="send-btn"
-        :class="{ 'is-stop': isStreaming }"
-        @click="isStreaming ? emit('stop') : handleSend()"
+        :class="{ 'is-stop': isStreaming && !text.trim() }"
+        @click="(isStreaming && !text.trim()) ? emit('stop') : handleSend()"
         :disabled="!isStreaming && (disabled || !text.trim())"
-        :title="isStreaming ? 'Stop generation' : 'Send'"
+        :title="(isStreaming && !text.trim()) ? 'Stop generation' : 'Send'"
       >
         <!-- Stop 正方形图标 -->
-        <svg v-if="isStreaming" viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+        <svg v-if="isStreaming && !text.trim()" viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
           <rect x="4" y="4" width="16" height="16" rx="3"/>
         </svg>
         <!-- 发送箭头图标 -->

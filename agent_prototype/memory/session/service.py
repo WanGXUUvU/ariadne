@@ -258,6 +258,8 @@ class SessionService:
                 workspace_path=record.workspace_path,
                 workspace_name=record.workspace_name,
                 session_type=record.session_type,
+                parent_session_id=record.parent_session_id,
+                fork_message_index=record.fork_message_index,
             )
             for record in records
         ]

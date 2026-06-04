@@ -110,6 +110,29 @@ export function useRunStreaming(options: RunStreamingOptions) {
           if (frame.data.type !== 'final_answer') {
             state.streamingTimeline = [...state.streamingTimeline, { kind: 'event', event: frame.data }];
           }
+          if ((state as any).interruptionWaitForTool && (state as any).interruptionPendingMessage) {
+            let activeToolCallsCount = 0;
+            for (const item of state.streamingTimeline) {
+              if (item.kind === 'event') {
+                if (item.event.type === 'assistant_tool_call') {
+                  activeToolCallsCount++;
+                } else if (item.event.type === 'tool_result' || item.event.type === 'tool_error') {
+                  activeToolCallsCount--;
+                }
+              }
+            }
+            if (activeToolCallsCount === 0) {
+              const pendingMsg = (state as any).interruptionPendingMessage;
+              const pendingSkill = (state as any).interruptionPendingSkill;
+              (state as any).interruptionPendingMessage = null;
+              (state as any).interruptionPendingSkill = null;
+              (state as any).interruptionWaitForTool = false;
+              stopStreaming().then(() => {
+                sendMessage(pendingMsg, pendingSkill);
+              });
+              return;
+            }
+          }
           if (frame.data.type === 'approval_required' && frame.data.content) {
             const approvalId = frame.data.content;
             const pendingApproval = {

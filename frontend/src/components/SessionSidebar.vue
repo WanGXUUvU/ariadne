@@ -411,10 +411,9 @@ const confirmDeleteFolder = (path: string | null, name: string, sessionsList: Se
                 <div 
                   class="session-item"
                   :class="{ active: activeId === item.session.session_id, 'is-branch': item.depth > 0 }"
-                  :style="{ paddingLeft: `${16 + item.depth * 14}px`, animationDelay: `${idx * 20}ms` }"
+                  :style="{ '--depth': item.depth, animationDelay: `${idx * 20}ms` }"
                   @click="$emit('select', item.session.session_id)"
                 >
-                  <span v-if="item.depth > 0" class="branch-connector">└─</span>
                   <div class="session-info">
                     <div class="session-title">
                       <input
@@ -453,6 +452,7 @@ const confirmDeleteFolder = (path: string | null, name: string, sessionsList: Se
                     v-for="(child, cidx) in getChildrenForSession(item.session.session_id)"
                     :key="child.run_id"
                     class="child-agent-item"
+                    :style="{ paddingLeft: `${24 + item.depth * 16}px` }"
                     @click.stop="$emit('open-child-agent', child)"
                   >
                     <span class="child-connector">└</span>
@@ -898,7 +898,7 @@ const confirmDeleteFolder = (path: string | null, name: string, sessionsList: Se
 
 /* Slightly indent the sessions under their parent project folder name to match premium mock exactly */
 .workspace-group-body .session-item {
-  margin: 2px 12px 2px 24px !important;
+  margin: 2px 12px 2px calc(24px + var(--depth, 0) * 16px) !important;
   padding: 8px 12px !important;
 }
 
@@ -1063,13 +1063,37 @@ body.theme-light-openai .popover-action-item:hover {
 }
 
 /* ── Tree Branch Connectors & Badges ── */
-.branch-connector {
-  color: var(--text-muted);
-  opacity: 0.4;
-  font-family: monospace;
-  margin-right: 4px;
-  flex-shrink: 0;
-  font-weight: bold;
+.session-item.is-branch {
+  position: relative;
+}
+
+.session-item.is-branch::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: -12px;
+  width: 12px;
+  height: 26px;
+  border-left: 1.5px solid var(--border-strong, rgba(255, 255, 255, 0.15));
+  border-bottom: 1.5px solid var(--border-strong, rgba(255, 255, 255, 0.15));
+  border-bottom-left-radius: 6px;
+  pointer-events: none;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.session-item.is-branch:hover::before {
+  border-color: var(--accent, #7c8ff7);
+}
+
+.session-item.is-branch.active::before {
+  border-color: var(--accent, #7c8ff7);
+}
+
+/* Light theme specific connectors adjustment */
+body.theme-light-apple .session-item.is-branch::before,
+body.theme-light-openai .session-item.is-branch::before {
+  border-left-color: rgba(0, 0, 0, 0.08);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 
 .branch-badge {

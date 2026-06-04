@@ -10,6 +10,13 @@ import SettingsPanel from '../components/SettingsPanel.vue';
 import type { ChildAgentInfo } from '../types';
 
 const workspace = useWorkspace();
+const chatPanelRef = ref<any>(null);
+const handleWithdraw = () => {
+  const msg = workspace.withdrawInterruption();
+  if (msg && chatPanelRef.value) {
+    chatPanelRef.value.setComposerText(msg);
+  }
+};
 const showPluginsModal = ref(false);
 const showAgentsModal = ref(false);
 const showSettingsModal = ref(false);
@@ -202,6 +209,7 @@ onMounted(() => {
         <div class="chat-area-container">
           <template v-if="wActiveSessionId">
             <ChatPanel 
+              ref="chatPanelRef"
               :messages="wMessages"
               :isLoading="wIsChatLoading"
               :isCompacting="wIsCompacting"
@@ -230,6 +238,8 @@ onMounted(() => {
               :thinkingEffort="wThinkingEffort"
               :sessionLoading="wIsChatLoading"
               :skills="wSkills"
+              :interruptionPendingMessage="workspace.interruptionPendingMessage.value"
+              :interruptionWaitForTool="workspace.interruptionWaitForTool.value"
               @update:activeAgentId="(id: string) => workspace.activeAgentId.value = id"
               @send="(text: string, skillName?: string | null) => workspace.sendMessage(text, skillName)"
               @errorDismiss="wErrorMsg = null"
@@ -246,6 +256,9 @@ onMounted(() => {
               @update:thinkingEffort="(val: string) => workspace.updateModelConfig({ thinking_effort: val })"
               @retry="workspace.retryLastRun"
               @editSubmit="workspace.editAndReRun"
+              @forceSend="workspace.forceInterruptAndSend"
+              @withdraw="handleWithdraw"
+              @discard="workspace.discardInterruption"
             />
           </template>
 
