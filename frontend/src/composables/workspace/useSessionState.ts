@@ -81,11 +81,17 @@ export function useSessionState(options: SessionStateOptions) {
     isTraceLoading.value = true;
     try {
       const trace: TraceResponse = await api.getTrace(sessionId);
-      traceRuns.value = trace.runs || [];
+      if (activeSessionId.value === sessionId) {
+        traceRuns.value = trace.runs || [];
+      }
     } catch {
-      traceRuns.value = [];
+      if (activeSessionId.value === sessionId) {
+        traceRuns.value = [];
+      }
     } finally {
-      isTraceLoading.value = false;
+      if (activeSessionId.value === sessionId) {
+        isTraceLoading.value = false;
+      }
     }
   };
 
@@ -93,36 +99,46 @@ export function useSessionState(options: SessionStateOptions) {
     try {
       isChatLoading.value = true;
       isTraceLoading.value = true;
-      const detail = await api.getSessionDetail(id);
-      historyMessages.value = readSessionResetHistory(id);
-      const msgs = detail.state?.messages || [];
-      await loadTraceRuns(id);
+      
+      const [detail, trace] = await Promise.all([
+        api.getSessionDetail(id),
+        api.getTrace(id).catch(() => ({ runs: [] })),
+      ]);
 
-      currentMessages.value = reconstructUiMessages(traceRuns.value, msgs);
-      extractChildAgents(id, currentMessages.value, traceRuns.value);
-      permissionProfile.value = detail.permission_profile ?? 'conservative';
-      modelId.value = (detail as any).model_id ?? null;
-      modelProviderId.value = (detail as any).model_provider_id ?? null;
-      thinkingEnabled.value = (detail as any).thinking_enabled ?? false;
-      thinkingEffort.value = (detail as any).thinking_effort ?? 'medium';
-      if (detail.workspace_path && detail.workspace_exists === false) {
-        errorMsg.value =
-          `当前会话绑定的工作区目录已不存在：${detail.workspace_path}。请重新绑定文件夹后再继续。`;
-      } else {
-        errorMsg.value = null;
+      if (activeSessionId.value === id) {
+        historyMessages.value = readSessionResetHistory(id);
+        traceRuns.value = trace.runs || [];
+        const msgs = detail.state?.messages || [];
+        currentMessages.value = reconstructUiMessages(traceRuns.value, msgs);
+        extractChildAgents(id, currentMessages.value, traceRuns.value);
+        permissionProfile.value = detail.permission_profile ?? 'conservative';
+        modelId.value = (detail as any).model_id ?? null;
+        modelProviderId.value = (detail as any).model_provider_id ?? null;
+        thinkingEnabled.value = (detail as any).thinking_enabled ?? false;
+        thinkingEffort.value = (detail as any).thinking_effort ?? 'medium';
+        if (detail.workspace_path && detail.workspace_exists === false) {
+          errorMsg.value =
+            `当前会话绑定的工作区目录已不存在：${detail.workspace_path}。请重新绑定文件夹后再继续。`;
+        } else {
+          errorMsg.value = null;
+        }
       }
     } catch (err: any) {
-      if (err.message.includes('not found') || err.message.includes('404')) {
-        activeSessionId.value = null;
-        historyMessages.value = [];
-        currentMessages.value = [];
-        traceRuns.value = [];
-      } else {
-        errorMsg.value = 'Failed to load session details: ' + err.message;
+      if (activeSessionId.value === id) {
+        if (err.message.includes('not found') || err.message.includes('404')) {
+          activeSessionId.value = null;
+          historyMessages.value = [];
+          currentMessages.value = [];
+          traceRuns.value = [];
+        } else {
+          errorMsg.value = 'Failed to load session details: ' + err.message;
+        }
       }
     } finally {
-      isChatLoading.value = false;
-      isTraceLoading.value = false;
+      if (activeSessionId.value === id) {
+        isChatLoading.value = false;
+        isTraceLoading.value = false;
+      }
     }
   };
 
