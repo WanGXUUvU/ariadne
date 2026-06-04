@@ -168,8 +168,10 @@ export function useWorkspace() {
   };
 
   watch(activeSessionId, (newId) => {
-    if (isStreaming.value || isChatLoading.value) return;
     if (newId) {
+      if (isStreaming.value) {
+        runStreaming.stopStreaming();
+      }
       sessionState.loadSessionDetail(newId);
     } else {
       historyMessages.value = [];
