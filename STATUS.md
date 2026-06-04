@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: planning
-- Task: TASK-092 内存虚拟文件系统暂存与打断回滚机制 (In-Memory VFS Staging & Cancellation Rollback)
+- Task: TASK-092 内存虚拟文件系统暂存与打断回滚机制 (In-Memory VFS Staging & Cancellation Rollback) & TASK-093 统一工作区投影与沙箱安全校验 (Unified Workspace Staging & Sandbox Path Redirection)
 - Gate: design / planning
 - Allowed Now: review / plan
 - Lane: Fast
 - Blocked: None
-- Next action: 讨论并实现写文件工具在内存 VFS 中的暂存，并在 save_completed 时提交、在 save_cancelled 时回滚。
+- Next action: 讨论并实现写文件工具在内存 VFS 中的暂存与统一沙箱安全拦截（支持同步子 Agent 运行模式）。
 
 
 ## 读取规则
