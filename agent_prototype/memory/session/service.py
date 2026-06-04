@@ -426,7 +426,7 @@ class SessionService:
                         started_at=tc.started_at,
                         finished_at=tc.finished_at,
                     )
-                self.db.add(forked_tc)
+                    self.db.add(forked_tc)
                 # 5.4) 克隆关联的子智能体运行记录
                 child_runs = (
                     self.db.query(SessionRunRecord)
