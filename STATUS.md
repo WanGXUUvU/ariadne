@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: verification
-- Task: TASK-091 多会话并行流式执行与状态隔离 (Multi-Session Concurrent Streaming & State Isolation)
-- Gate: code-complete / verification
-- Allowed Now: review / verify
+- Phase: planning
+- Task: TASK-092 内存虚拟文件系统暂存与打断回滚机制 (In-Memory VFS Staging & Cancellation Rollback)
+- Gate: design / planning
+- Allowed Now: review / plan
 - Lane: Fast
 - Blocked: None
-- Next action: 部署并手动验证多会话后台并行运行及无缝切换效果。
+- Next action: 讨论并实现写文件工具在内存 VFS 中的暂存，并在 save_completed 时提交、在 save_cancelled 时回滚。
 
 
 ## 读取规则
@@ -23,6 +23,7 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
+| 2026-06-04 | 智能体被打断排队机制与工具实时自动展开完成 | Verify / Review | 成功实现流式打断消息排队（Up/Down/Trash三向选项），工具在运行时自动展开显示发光呼吸灯，修复了打断时工具回复在DB快照中丢失的Bug，后端单测与集成测试100%通过。 |
 | 2026-06-04 | TASK-091 归档 | Verify / Review | 成功实现多会话并行流式生成与状态隔离。重构 useWorkspace.ts 状态为 sessionStates 映射，利用 Vue Writable Computed 代理，在零改动 Vue 视图组件的前提下无缝支持并行；移除切换会话时的主动 stopStreaming 中止动作；重构 useRunStreaming.ts 使流式写入锁定目标会话数据桶，前端 Vite 编译 100% 成功。 |
 | 2026-06-04 | TASK-088 归档 | Verify / Review | 成功实现命令行 `/fork` 与 `/fork <提问>` 会话分支派生。后端深拷贝消息快照及 Trace 流水（Runs, Events, ToolCalls）；前端 useWorkspace 编排拦截命令；侧边栏实现 DFS 嵌套树状结构渲染及连接线、⌥ Branch 徽章，70项单测与32项集成测试全绿，前端打包编译成功。 |
 | 2026-06-03 | TASK-087 归档 | Verify / Review | 成功实现历史消息原地编辑与级联截断清理逻辑，包括后端 SessionService 级联物理删除、前端 MessageList inline Textarea 编辑器及流式重发，96项单测/32项集成测试全绿。 |
