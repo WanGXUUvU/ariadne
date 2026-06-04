@@ -39,6 +39,9 @@ interface SessionSpecificState {
   pendingUserInput: string;
   pendingAgentName: string | undefined;
   pendingSkillName: string | null;
+  interruptionPendingMessage: string | null;
+  interruptionPendingSkill: string | null;
+  interruptionWaitForTool: boolean;
 }
 
 const createDefaultSessionState = (): SessionSpecificState => ({
@@ -61,6 +64,9 @@ const createDefaultSessionState = (): SessionSpecificState => ({
   pendingUserInput: '',
   pendingAgentName: undefined,
   pendingSkillName: null,
+  interruptionPendingMessage: null,
+  interruptionPendingSkill: null,
+  interruptionWaitForTool: false,
 });
 
 export function useWorkspace() {
@@ -120,6 +126,34 @@ export function useWorkspace() {
   const streamingPrefixTimeline = computed({
     get: () => activeSessionId.value ? getSessionState(activeSessionId.value).streamingPrefixTimeline : [],
     set: (val) => { if (activeSessionId.value) getSessionState(activeSessionId.value).streamingPrefixTimeline = val; }
+  });
+
+  const interruptionPendingMessage = computed({
+    get: () => activeSessionId.value ? getSessionState(activeSessionId.value).interruptionPendingMessage : null,
+    set: (val) => { if (activeSessionId.value) getSessionState(activeSessionId.value).interruptionPendingMessage = val; }
+  });
+
+  const interruptionWaitForTool = computed({
+    get: () => activeSessionId.value ? getSessionState(activeSessionId.value).interruptionWaitForTool : false,
+    set: (val) => { if (activeSessionId.value) getSessionState(activeSessionId.value).interruptionWaitForTool = val; }
+  });
+
+  const isToolRunning = computed(() => {
+    if (!activeSessionId.value) return false;
+    const state = getSessionState(activeSessionId.value);
+    if (!state.isStreaming) return false;
+
+    let activeToolCallsCount = 0;
+    for (const item of state.streamingTimeline) {
+      if (item.kind === 'event') {
+        if (item.event.type === 'assistant_tool_call') {
+          activeToolCallsCount++;
+        } else if (item.event.type === 'tool_result' || item.event.type === 'tool_error') {
+          activeToolCallsCount--;
+        }
+      }
+    }
+    return activeToolCallsCount > 0;
   });
 
   const lastCompletedRun = computed({
@@ -352,8 +386,72 @@ export function useWorkspace() {
     }
   };
 
+  const forceInterruptAndSend = async () => {
+    if (!activeSessionId.value) return;
+    const state = getSessionState(activeSessionId.value);
+    const msg = state.interruptionPendingMessage;
+    const skill = state.interruptionPendingSkill;
+
+    state.interruptionPendingMessage = null;
+    state.interruptionPendingSkill = null;
+    state.interruptionWaitForTool = false;
+
+    await runStreaming.stopStreaming();
+    if (msg) {
+      await sendMessage(msg, skill);
+    }
+  };
+
+  const withdrawInterruption = () => {
+    if (!activeSessionId.value) return null;
+    const state = getSessionState(activeSessionId.value);
+    const msg = state.interruptionPendingMessage;
+
+    state.interruptionPendingMessage = null;
+    state.interruptionPendingSkill = null;
+    state.interruptionWaitForTool = false;
+
+    return msg;
+  };
+
+  const discardInterruption = () => {
+    if (!activeSessionId.value) return;
+    const state = getSessionState(activeSessionId.value);
+    state.interruptionPendingMessage = null;
+    state.interruptionPendingSkill = null;
+    state.interruptionWaitForTool = false;
+  };
+
   const sendMessage = async (input: string, skillName?: string | null) => {
     const trimmed = input.trim();
+    if (!trimmed) return;
+
+    if (isStreaming.value) {
+      const targetSessionId = activeSessionId.value;
+      if (targetSessionId) {
+        const state = getSessionState(targetSessionId);
+        let activeToolCallsCount = 0;
+        for (const item of state.streamingTimeline) {
+          if (item.kind === 'event') {
+            if (item.event.type === 'assistant_tool_call') {
+              activeToolCallsCount++;
+            } else if (item.event.type === 'tool_result' || item.event.type === 'tool_error') {
+              activeToolCallsCount--;
+            }
+          }
+        }
+        if (activeToolCallsCount > 0) {
+          state.interruptionPendingMessage = trimmed;
+          state.interruptionPendingSkill = skillName ?? null;
+          state.interruptionWaitForTool = true; // 默认自动排队等待
+          return;
+        }
+      }
+
+      // 如果当前没有运行的工具，直接瞬间打断
+      await runStreaming.stopStreaming();
+    }
+
     if (trimmed === '/fork' || trimmed.startsWith('/fork ')) {
       if (!activeSessionId.value) return;
 
@@ -443,6 +541,12 @@ export function useWorkspace() {
     retryLastRun,
     editAndReRun,
     stopStreaming: runStreaming.stopStreaming,
+    interruptionPendingMessage,
+    interruptionWaitForTool,
+    isToolRunning,
+    forceInterruptAndSend,
+    withdrawInterruption,
+    discardInterruption,
     approveAction: approvalFlow.approveAction,
     rejectAction: approvalFlow.rejectAction,
     approveAllAction: approvalFlow.approveAllAction,

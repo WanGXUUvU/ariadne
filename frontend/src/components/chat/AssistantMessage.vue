@@ -266,6 +266,48 @@ const hasPendingApprovalInChunk = (chunk: TimelineChunk): boolean => {
   return false;
 };
 
+const hasRunningToolInChunk = (chunk: TimelineChunk): boolean => {
+  const callIds = new Set<string>();
+  const finishedIds = new Set<string>();
+  
+  const checkEvent = (event: any) => {
+    if (event.type === 'assistant_tool_call' && event.tool_call_id) {
+      callIds.add(event.tool_call_id);
+    } else if ((event.type === 'tool_result' || event.type === 'tool_error') && event.tool_call_id) {
+      finishedIds.add(event.tool_call_id);
+    }
+  };
+
+  if (chunk.type === 'tools' && chunk.items) {
+    chunk.items.forEach((item: MergedTimelineItem) => {
+      if (item.kind === 'event') {
+        checkEvent(item.event);
+      } else if (item.kind === 'event_group') {
+        item.raw_events.forEach(checkEvent);
+      }
+    });
+  } else if (chunk.type === 'thinking' && chunk.segments) {
+    chunk.segments.forEach((seg: ThinkingSegment) => {
+      if (seg.kind === 'tools') {
+        seg.items.forEach((item: MergedTimelineItem) => {
+          if (item.kind === 'event') {
+            checkEvent(item.event);
+          } else if (item.kind === 'event_group') {
+            item.raw_events.forEach(checkEvent);
+          }
+        });
+      }
+    });
+  }
+
+  for (const cid of callIds) {
+    if (!finishedIds.has(cid)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const isChunkCollapsed = (chunk: TimelineChunk) => {
   const id = chunk.id;
   if (collapsedChunks.value[id] !== undefined) {
@@ -274,6 +316,16 @@ const isChunkCollapsed = (chunk: TimelineChunk) => {
   
   // If there's a pending approval in this chunk, auto-expand it!
   if (hasPendingApprovalInChunk(chunk)) {
+    return false;
+  }
+  
+  // If there's a running tool in this chunk, auto-expand it!
+  if (hasRunningToolInChunk(chunk)) {
+    return false;
+  }
+
+  // If this is the active streaming message, auto-expand it!
+  if (props.msgIndex === 9999) {
     return false;
   }
   

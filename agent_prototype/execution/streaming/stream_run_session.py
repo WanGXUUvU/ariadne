@@ -141,6 +141,7 @@ class StreamRunSession:
                         self.ctx.effective_agent_name,
                         self.agent_input.skill_name,
                         events=events,
+                        state=self.agent.state,
                     )
                 except Exception:
                     logger.exception(

@@ -38,6 +38,8 @@ const props = defineProps<{
   sessionLoading?: boolean;
   /** 已加载的 skill 列表，用于斜杠命令菜单 */
   skills?: SkillMetadata[];
+  interruptionPendingMessage?: string | null;
+  interruptionWaitForTool?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -57,6 +59,9 @@ const emit = defineEmits<{
   (e: 'update:thinkingEffort', val: string): void;
   (e: 'retry'): void;
   (e: 'editSubmit', index: number, content: string): void;
+  (e: 'forceSend'): void;
+  (e: 'withdraw'): void;
+  (e: 'discard'): void;
 }>();
 
 const agentDropdownOpen = ref(false);
@@ -81,6 +86,17 @@ const handleReset = () => {
     emit('reset');
   }
 };
+
+const composerRef = ref<any>(null);
+const setComposerText = (val: string) => {
+  if (composerRef.value) {
+    composerRef.value.setText(val);
+  }
+};
+
+defineExpose({
+  setComposerText,
+});
 </script>
 
 <template>
@@ -177,7 +193,47 @@ const handleReset = () => {
       @edit-submit="(index, content) => $emit('editSubmit', index, content)"
     />
 
+    <!-- 悬浮挂起排队提示横幅 (Premium glassmorphic pending-interruption banner with 3 icon actions) -->
+    <Transition name="slide-fade">
+      <div v-if="interruptionPendingMessage" class="interruption-pending-banner">
+        <div class="banner-glass-container">
+          <div class="banner-info">
+            <span class="banner-icon">⚡</span>
+            <div class="banner-text">
+              <div class="banner-title">智能体工具执行中</div>
+              <div class="banner-subtitle">您的输入已加入队列，将在工具执行完毕后自动发送：</div>
+              <div class="banner-preview">“{{ interruptionPendingMessage }}”</div>
+            </div>
+          </div>
+          <div class="banner-actions">
+            <!-- 向上发送箭头 (直接发送并打断) -->
+            <button class="tech-btn icon-action-btn success" @click="emit('forceSend')" title="直接发送并打断当前工具">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+            </button>
+            <!-- 向下撤回箭头 (撤回到输入框编辑) -->
+            <button class="tech-btn icon-action-btn secondary" @click="emit('withdraw')" title="撤回当前消息到输入框编辑">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <polyline points="19 12 12 19 5 12"></polyline>
+              </svg>
+            </button>
+            <!-- 垃圾桶 (直接删除此挂起消息，不影响当前流程) -->
+            <button class="tech-btn icon-action-btn danger" @click="emit('discard')" title="删除挂起消息（不影响当前运行）">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <MessageComposer
+      ref="composerRef"
       :disabled="isLoading || isCompacting"
       :messageCount="messages.length"
       :isStreaming="isStreaming"
@@ -491,4 +547,138 @@ const handleReset = () => {
 .notice-close:hover { opacity: 1; }
 
 
+/* ---- 挂起打断提示横幅 ---- */
+.interruption-pending-banner {
+  margin: 10px 16px 4px 16px;
+}
+
+.banner-glass-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 18px;
+  background: rgba(30, 30, 45, 0.85);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px dashed var(--accent-subtle, rgba(124, 143, 247, 0.35));
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: pulse-border-accent 3s infinite alternate;
+}
+
+@keyframes pulse-border-accent {
+  from { border-color: rgba(124, 143, 247, 0.25); }
+  to { border-color: rgba(124, 143, 247, 0.6); }
+}
+
+body.theme-light-apple .banner-glass-container,
+body.theme-light-openai .banner-glass-container {
+  background: rgba(250, 250, 252, 0.92) !important;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.banner-info {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.banner-icon {
+  font-size: 16px;
+  color: var(--accent);
+  margin-top: 1px;
+  animation: bounce-spark 2.5s infinite alternate;
+}
+
+@keyframes bounce-spark {
+  from { transform: translateY(0); }
+  to { transform: translateY(-2px); }
+}
+
+.banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.banner-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.banner-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.banner-preview {
+  font-size: 11.5px;
+  font-style: italic;
+  font-family: var(--font-mono, monospace);
+  color: var(--accent);
+  background: rgba(124, 143, 247, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tech-btn.icon-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-dim);
+  color: var(--text-secondary);
+}
+
+.tech-btn.icon-action-btn:hover {
+  transform: translateY(-0.5px);
+  color: var(--text-primary);
+}
+
+.tech-btn.icon-action-btn.success:hover {
+  background: rgba(46, 204, 113, 0.15) !important;
+  border-color: rgba(46, 204, 113, 0.4) !important;
+  color: #2ecc71 !important;
+}
+
+.tech-btn.icon-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.tech-btn.icon-action-btn.danger:hover {
+  background: rgba(255, 69, 58, 0.15) !important;
+  border-color: rgba(255, 69, 58, 0.4) !important;
+  color: var(--danger, #ff453a) !important;
+}
+
+/* slide-fade transition */
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(8px) scale(0.98);
+  opacity: 0;
+}
 </style>
