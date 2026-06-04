@@ -28,9 +28,10 @@ from agent_prototype.memory.session.types import (
     RenameSessionInput,
     ResetInput,
     SessionSummary,
+    ForkSessionInput
 )
 
-from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig,PendingApproval,ToolCallRecord,SessionRunRecord,SessionRunEventRecord,SessionRecord
+from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig,PendingApproval,ToolCallRecord,SessionRunRecord,SessionRunEventRecord
 from agent_prototype.memory.session.store import SqliteSessionStore
 
 
@@ -321,3 +322,178 @@ class SessionService:
             self.db.rollback()
             raise
         return {"ok": True}
+    
+    def fork_session(self,session_id:str,payload:ForkSessionInput)->SessionSummary:
+        """从指定截断点派生出一个新的分支会话"""
+
+        parent_record=self.store.read_session_record(session_id)
+        if parent_record is None:
+            raise ValueError("Parent session not found")
+        
+        parent_state=self.store.read_session_state(session_id)
+        if parent_state is None:
+            raise ValueError("Parent session state not found")
+        
+        message_index=payload.message_index
+
+        if message_index < 0 or message_index > len(parent_state.messages):
+            raise ValueError("Invalid message index")
+        
+        forked_messages = parent_state.messages[:message_index]
+
+        forked_state=AgentState()
+        forked_state.messages=forked_messages
+
+        forked_name = getattr(payload, "session_name", None) or f"fork: {parent_record.session_name or 'Untitled'}"
+        forked_session_id=uuid.uuid4().hex
+
+        try:
+            record=self.store.upsert_session_snapshot(
+                forked_session_id,
+                state=forked_state,
+                session_name=forked_name,
+                last_agent_name=parent_record.last_agent_name,
+                last_skill_name=parent_record.last_skill_name,
+                workspace_path=parent_record.workspace_path,
+                workspace_name=parent_record.workspace_name,
+                session_type=parent_record.session_type,
+            )
+
+            record.model_provider_id = parent_record.model_provider_id
+            record.model_id = parent_record.model_id
+            record.thinking_enabled = parent_record.thinking_enabled
+            record.thinking_effort = parent_record.thinking_effort
+            record.permission_profile = parent_record.permission_profile
+            
+            # 设置派生关联元数据
+            record.parent_session_id = session_id
+            record.fork_message_index = message_index
+            self.db.flush()
+
+            top_runs = (
+                self.db.query(SessionRunRecord)
+                .filter(
+                    SessionRunRecord.session_id == session_id,
+                    SessionRunRecord.parent_run_id.is_(None),
+                )
+                .order_by(SessionRunRecord.id.asc())
+                .all()
+            )
+            # 保留前 K 个运行记录 (对应 retained user 消息数)
+            k = sum(1 for msg in forked_messages if msg.role == "user")
+            runs_to_clone = top_runs[:k]
+            for parent_run in runs_to_clone:
+                # 5.1) 克隆主运行记录
+                new_run_id = f"run_{uuid.uuid4().hex[:12]}"
+                forked_run = SessionRunRecord(
+                    session_id=forked_session_id,
+                    run_id=new_run_id,
+                    parent_run_id=None,
+                    run_status=parent_run.run_status,
+                    agent_name=parent_run.agent_name,
+                    skill_name=parent_run.skill_name,
+                    user_input=parent_run.user_input,
+                    reply=parent_run.reply,
+                    event_count=parent_run.event_count,
+                    created_at=parent_run.created_at,
+                    finished_at=parent_run.finished_at,
+                    is_active=parent_run.is_active,
+                )
+                self.db.add(forked_run)
+                # 5.2) 克隆对应的 Trace 步骤事件
+                events = self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id == parent_run.run_id).all()
+                for ev in events:
+                    forked_ev = SessionRunEventRecord(
+                        run_id=new_run_id,
+                        event_index=ev.event_index,
+                        type=ev.type,
+                        content=ev.content,
+                        tool_name=ev.tool_name,
+                        tool_call_id=ev.tool_call_id,
+                        tool_result_json=ev.tool_result_json,
+                    )
+                    self.db.add(forked_ev)
+                # 5.3) 克隆对应的工具调用流水
+                tool_calls = self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id == parent_run.run_id).all()
+                for tc in tool_calls:
+                    forked_tc = ToolCallRecord(
+                        run_id=new_run_id,
+                        tool_name=tc.tool_name,
+                        tool_call_id=tc.tool_call_id,
+                        status=tc.status,
+                        input_json=tc.input_json,
+                        result_json=tc.result_json,
+                        started_at=tc.started_at,
+                        finished_at=tc.finished_at,
+                    )
+                self.db.add(forked_tc)
+                # 5.4) 克隆关联的子智能体运行记录
+                child_runs = (
+                    self.db.query(SessionRunRecord)
+                    .filter(SessionRunRecord.parent_run_id == parent_run.run_id)
+                    .all()
+                )
+                for child_run in child_runs:
+                    child_new_run_id = f"run_{uuid.uuid4().hex[:12]}"
+                    forked_child = SessionRunRecord(
+                        session_id=forked_session_id,
+                        run_id=child_new_run_id,
+                        parent_run_id=new_run_id,  # 关联到克隆出来的父运行 ID
+                        run_status=child_run.run_status,
+                        agent_name=child_run.agent_name,
+                        skill_name=child_run.skill_name,
+                        user_input=child_run.user_input,
+                        reply=child_run.reply,
+                        event_count=child_run.event_count,
+                        created_at=child_run.created_at,
+                        finished_at=child_run.finished_at,
+                        is_active=child_run.is_active,
+                    )
+                    self.db.add(forked_child)
+                    # 克隆子智能体运行的 Events & Tool Calls
+                    child_events = self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id == child_run.run_id).all()
+                    for cev in child_events:
+                        forked_cev = SessionRunEventRecord(
+                            run_id=child_new_run_id,
+                            event_index=cev.event_index,
+                            type=cev.type,
+                            content=cev.content,
+                            tool_name=cev.tool_name,
+                            tool_call_id=cev.tool_call_id,
+                            tool_result_json=cev.tool_result_json,
+                        )
+                        self.db.add(forked_cev)
+                    child_tool_calls = self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id == child_run.run_id).all()
+                    for ctc in child_tool_calls:
+                        forked_ctc = ToolCallRecord(
+                            run_id=child_new_run_id,
+                            tool_name=ctc.tool_name,
+                            tool_call_id=ctc.tool_call_id,
+                            status=ctc.status,
+                            input_json=ctc.input_json,
+                            result_json=ctc.result_json,
+                            started_at=ctc.started_at,
+                            finished_at=ctc.finished_at,
+                        )
+                        self.db.add(forked_ctc)
+            self.db.commit()
+            self.db.refresh(record)
+        except Exception:
+            self.db.rollback()
+            raise
+        return SessionSummary(
+            session_id=record.session_id,
+            session_name=record.session_name,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+            last_agent_name=record.last_agent_name,
+            last_skill_name=record.last_skill_name,
+            message_count=record.message_count,
+            last_reply_preview=record.last_reply_preview,
+            permission_profile=record.permission_profile,
+            workspace_path=record.workspace_path,
+            workspace_name=record.workspace_name,
+            session_type=record.session_type,
+            parent_session_id=record.parent_session_id,
+            fork_message_index=record.fork_message_index,
+        )

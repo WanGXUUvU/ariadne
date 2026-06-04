@@ -55,7 +55,15 @@ class SessionSummary(BaseModel):
     workspace_path: Optional[str] = None
     workspace_name: Optional[str] = None
     session_type: Optional[str] = Field(default="coding")
+    parent_session_id: Optional[str] = None
+    fork_message_index: Optional[int] = None
+
 
 class TruncateSessionInput(BaseModel):
     """截断 session 的领域输入结构体。"""
     message_index: int = Field(ge=0)
+
+class ForkSessionInput(BaseModel):
+    """派生分支会话的领域输入结构体。"""
+    message_index: int = Field(ge=0)
+    new_content: Optional[str] = None

@@ -24,6 +24,7 @@ from agent_prototype.memory.session.types import (
     SessionSummary,
     RenameSessionInput,
     TruncateSessionInput,
+    ForkSessionInput,
 )
 from agent_prototype.api.dto.schemas import SessionDetail
 from agent_prototype.memory.session.service import SessionService
@@ -49,6 +50,19 @@ def create_session_api(
     """
     return service.create_session(payload)
 
+@router.post("/sessions/{session_id}/fork", response_model=SessionSummary)
+def fork_session_api(
+    session_id: str,
+    payload: ForkSessionInput,
+    service: SessionService = Depends(get_session_service),
+) -> SessionSummary:
+    """从指定位置派生分支会话的 API 接口，深度复制历史消息与 Trace 流水记录。"""
+    try:
+        return service.fork_session(session_id, payload)
+    except ValueError as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
+
+
 @router.post("/sessions/{session_id}/truncate")
 def truncate_session_api(
     session_id: str,
@@ -60,7 +74,6 @@ def truncate_session_api(
         return service.truncate_session(session_id, payload.message_index)
     except ValueError as exc:
         return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
-
 
 
 @router.delete("/sessions/{session_id}")

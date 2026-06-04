@@ -169,4 +169,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ message_index }),
     }),
+  // 派生分支会话
+  forkSession: (session_id: string, message_index: number) =>
+    fetchApi<SessionSummary>(`/sessions/${session_id}/fork`, {
+      method: 'POST',
+      body: JSON.stringify({ message_index }),
+    }),
 };

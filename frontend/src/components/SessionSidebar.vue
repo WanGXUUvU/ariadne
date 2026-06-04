@@ -120,7 +120,12 @@ const filteredSessions = computed(() => {
   });
 });
 
-// 按工作区物理分组
+interface TreeSessionItem {
+  session: SessionSummary;
+  depth: number;
+}
+
+// 按工作区物理分组，且组内会话结构化为树状平铺
 const groupedSessions = computed(() => {
   const groups: Record<string, { workspaceName: string; sessions: SessionSummary[] }> = {};
 
@@ -137,11 +142,54 @@ const groupedSessions = computed(() => {
     groups[wsPath].sessions.push(session);
   });
 
-  return Object.entries(groups).map(([path, data]) => ({
-    workspacePath: path === 'global' ? null : path,
-    workspaceName: data.workspaceName,
-    sessions: data.sessions,
-  }));
+  return Object.entries(groups).map(([path, data]) => {
+    const sessionsList = data.sessions;
+    const treeItems: TreeSessionItem[] = [];
+
+    // 建立 ID 索引
+    const sessionMap = new Map<string, SessionSummary>();
+    sessionsList.forEach(s => sessionMap.set(s.session_id, s));
+
+    // 找出所有子节点
+    const childrenMap = new Map<string, SessionSummary[]>();
+    sessionsList.forEach(s => {
+      if (s.parent_session_id) {
+        if (!childrenMap.has(s.parent_session_id)) {
+          childrenMap.set(s.parent_session_id, []);
+        }
+        childrenMap.get(s.parent_session_id)!.push(s);
+      }
+    });
+
+    // 对每个父节点的子会话进行排序 (按创建时间)
+    childrenMap.forEach(list => {
+      list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    });
+
+    // 找到所有根节点 (无 parent_session_id，或 parent_session_id 对应的父节点不在该列表中)
+    const roots = sessionsList.filter(s => {
+      if (!s.parent_session_id) return true;
+      return !sessionMap.has(s.parent_session_id);
+    });
+    // 根节点排序 (最近更新的排前面)
+    roots.sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
+
+    // 递归进行深度优先遍历，平铺为 TreeSessionItem 数组
+    const traverse = (node: SessionSummary, depth: number) => {
+      treeItems.push({ session: node, depth });
+      const children = childrenMap.get(node.session_id) || [];
+      children.forEach(child => traverse(child, depth + 1));
+    };
+
+    roots.forEach(root => traverse(root, 0));
+
+    return {
+      workspacePath: path === 'global' ? null : path,
+      workspaceName: data.workspaceName,
+      treeItems,
+      sessions: data.sessions,
+    };
+  });
 });
 
 // 监听 activeId，自动展开高亮会话所属的物理工作区折叠组
@@ -355,50 +403,54 @@ const confirmDeleteFolder = (path: string | null, name: string, sessionsList: Se
 
           <!-- Group Body (Slide in and out) -->
           <Transition name="expand">
-            <div v-show="isGroupExpanded(group.workspacePath)" class="workspace-group-body">
+             <div v-show="isGroupExpanded(group.workspacePath)" class="workspace-group-body">
               <template
-                v-for="(session, idx) in group.sessions"
-                :key="session.session_id"
+                v-for="(item, idx) in group.treeItems"
+                :key="item.session.session_id"
               >
                 <div 
                   class="session-item"
-                  :class="{ active: activeId === session.session_id }"
-                  :style="{ animationDelay: `${idx * 20}ms` }"
-                  @click="$emit('select', session.session_id)"
+                  :class="{ active: activeId === item.session.session_id, 'is-branch': item.depth > 0 }"
+                  :style="{ paddingLeft: `${16 + item.depth * 14}px`, animationDelay: `${idx * 20}ms` }"
+                  @click="$emit('select', item.session.session_id)"
                 >
+                  <span v-if="item.depth > 0" class="branch-connector">└─</span>
                   <div class="session-info">
                     <div class="session-title">
                       <input
-                        v-if="editingId === session.session_id"
+                        v-if="editingId === item.session.session_id"
                         class="rename-input"
                         v-model="editingName"
-                        @blur="commitEdit(session.session_id)"
-                        @keyup.enter="commitEdit(session.session_id)"
+                        @blur="commitEdit(item.session.session_id)"
+                        @keyup.enter="commitEdit(item.session.session_id)"
                         @keyup.escape="cancelEdit"
                         @click.stop
                         :ref="el => { if (el) (el as HTMLInputElement).focus(); }"
                       />
                       <template v-else>
-                        <span v-if="getSessionTitle(session)">{{ getSessionTitle(session) }}</span>
-                        <span v-else class="session-title-untitled">Untitled <span class="session-hash">{{ getSessionId(session) }}</span></span>
+                        <span v-if="getSessionTitle(item.session)">{{ getSessionTitle(item.session) }}</span>
+                        <span v-else class="session-title-untitled">Untitled <span class="session-hash">{{ getSessionId(item.session) }}</span></span>
                       </template>
                     </div>
-                    <div class="session-meta mono-label">{{ session.message_count || 0 }} MSG &middot; {{ formatTime(session.updated_at || session.created_at) }}</div>
+                    <div class="session-meta mono-label">
+                      <span v-if="item.session.parent_session_id" class="branch-badge">⌥ Branch</span>
+                      {{ item.session.message_count || 0 }} MSG &middot; {{ formatTime(item.session.updated_at || item.session.created_at) }}
+                    </div>
                   </div>
                   <div class="session-actions">
-                    <button class="rename-btn" @click.stop="startEdit(session, $event)" title="Rename">
+                    <button class="rename-btn" @click.stop="startEdit(item.session, $event)" title="Rename">
                       <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </button>
-                    <button class="delete-btn" @click.stop="$emit('delete', session.session_id)" title="Delete">
+                    <button class="delete-btn" @click.stop="$emit('delete', item.session.session_id)" title="Delete">
                       <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                   </div>
                 </div>
 
                 <!-- 子 Agent 列表 展示 -->
-                <template v-if="activeId === session.session_id && getChildrenForSession(session.session_id).length > 0">
+                <template v-if="activeId === item.session.session_id && getChildrenForSession(item.session.session_id).length > 0">
                   <div
-                    v-for="(child, cidx) in getChildrenForSession(session.session_id)"
+                    v-for="(child, cidx) in getChildrenForSession(item.session.session_id)"
                     :key="child.run_id"
                     class="child-agent-item"
                     @click.stop="$emit('open-child-agent', child)"
@@ -1008,6 +1060,28 @@ body.theme-light-openai .popover-action-item:hover {
 .expand-leave-from {
   grid-template-rows: 1fr;
   opacity: 1;
+}
+
+/* ── Tree Branch Connectors & Badges ── */
+.branch-connector {
+  color: var(--text-muted);
+  opacity: 0.4;
+  font-family: monospace;
+  margin-right: 4px;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.branch-badge {
+  background: rgba(124, 143, 247, 0.08);
+  color: var(--accent, #7c8ff7);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  margin-right: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 </style>
 

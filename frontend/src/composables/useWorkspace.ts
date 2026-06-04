@@ -219,6 +219,56 @@ export function useWorkspace() {
     }
   };
 
+  const sendMessage = async (input: string, skillName?: string | null) => {
+    const trimmed = input.trim();
+    if (trimmed === '/fork' || trimmed.startsWith('/fork ')) {
+      if (!activeSessionId.value) return;
+
+      const parentName = activeSession.value?.session_name || 'Untitled';
+      // 计算在新会话中的命名，例如 fork: 开发周报
+      const forkName = `fork: ${parentName}`;
+
+      let newPrompt: string | null = null;
+      if (trimmed.startsWith('/fork ')) {
+        newPrompt = trimmed.substring(6).trim();
+      }
+
+      // 我们需要在原会话的末尾位置进行克隆所有消息
+      const messageIndex = messages.value.length;
+
+      try {
+        isChatLoading.value = true;
+        errorMsg.value = null;
+
+        // 调用后端克隆接口
+        const newSession = await api.forkSession(activeSessionId.value, messageIndex);
+
+        // 重载会话列表
+        await sessionState.loadSessions(newSession.session_id);
+        // 切换到新派生分支会话
+        activeSessionId.value = newSession.session_id;
+
+        // 重读会话细节以完成渲染
+        await sessionState.loadSessionDetail(newSession.session_id);
+
+        // 如果有附加新提示词，在新会话里自动发送
+        if (newPrompt && newPrompt !== '') {
+          setTimeout(() => {
+            runStreaming.sendMessage(newPrompt!, null);
+          }, 100);
+        }
+      } catch (err: any) {
+        errorMsg.value = 'Failed to fork session: ' + err.message;
+      } finally {
+        isChatLoading.value = false;
+      }
+      return;
+    }
+
+    // 正常发送消息
+    await runStreaming.sendMessage(input, skillName);
+  };
+
   return {
     activeView,
     sessions,
@@ -249,7 +299,7 @@ export function useWorkspace() {
     api,
     initializeWorkspace,
     createNewSession: sessionState.createNewSession,
-    sendMessage: runStreaming.sendMessage,
+    sendMessage,
     retryLastRun,
     editAndReRun,
     stopStreaming: runStreaming.stopStreaming,

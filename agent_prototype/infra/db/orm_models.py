@@ -53,6 +53,12 @@ class SessionRecord(Base):
     workspace_path = Column(String, nullable=True)
     workspace_name = Column(String, nullable=True)
     session_type = Column(String, nullable=False, default="coding", server_default="coding")
+    parent_session_id = Column(
+        String,
+        ForeignKey("session_records.session_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    fork_message_index = Column(Integer, nullable=True)
 
 
 class SessionRunRecord(Base):

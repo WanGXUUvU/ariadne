@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: execution
-- Task: TASK-086 大模型网络与 API 错误弹性重试
-- Gate: coding / testing
-- Allowed Now: coach (Backend lane) / auto (Frontend lane)
+- Phase: verification
+- Task: TASK-088 会话派生分支多版本探索 (Session Forking Branches)
+- Gate: code-complete / verification
+- Allowed Now: review / verify
 - Lane: Fast
 - Blocked: None
-- Next action: 前端实现：在 `useRunStreaming.ts` 捕获连接异常并将状态置为 `network_error`，在 `MessageList.vue` / `ChatPanel.vue` 中渲染设计精美的网络错误卡片并提供“Retry”按钮支持断点继续。
+- Next action: 部署并手动测试 `/fork` 与 `/fork <提问>` 命令的运行效果。
 
 ## 读取规则
 - `STATUS.md` 是当前唯一权威入口，先看这里再看路线图。
@@ -22,6 +22,9 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
+| 2026-06-04 | TASK-088 归档 | Verify / Review | 成功实现命令行 `/fork` 与 `/fork <提问>` 会话分支派生。后端深拷贝消息快照及 Trace 流水（Runs, Events, ToolCalls）；前端 useWorkspace 编排拦截命令；侧边栏实现 DFS 嵌套树状结构渲染及连接线、⌥ Branch 徽章，70项单测与32项集成测试全绿，前端打包编译成功。 |
+| 2026-06-03 | TASK-087 归档 | Verify / Review | 成功实现历史消息原地编辑与级联截断清理逻辑，包括后端 SessionService 级联物理删除、前端 MessageList inline Textarea 编辑器及流式重发，96项单测/32项集成测试全绿。 |
+| 2026-06-03 | TASK-086 归档 | Verify / Review | 成功实现 LLM API 网络与临时服务错误自动回退重试，完成前端流式异常捕获、部分响应留存、以及顶配 glassmorphic 错误卡片与一键 Retry 触发器。 |
 | 2026-06-02 | TASK-083/084/085 归档 | Verify / Review | 成功实现并行工具批次审批状态机与进度闭环、MessageList 模块化重构与审批 UX 升级、侧边栏项目文件夹快捷操作与聊天区顶部绑定栏净化，前端构建与测试 100% 绿灯。 |
 | 2026-05-30 | 已完成任务卡归档 | — | 将 TASK-073/074/075/076/078/079/080/081/082 移入 `specs/done/`。 |
 | 2026-05-30 | `TASK-076` 并发工具执行与流式进度流完美收口 | Verify / Review | 成功实现基于 `asyncio.gather` 与 `asyncio.Queue` 管道的流式进度并发广播，完成跨线程 `run_coroutine_threadsafe` 自愈通信，以及审批拦截时 Task 优雅 Cancel 安全手刹，前后端 Vue 3 呼吸动效完美打包编译，96 项单测全绿通过。 |

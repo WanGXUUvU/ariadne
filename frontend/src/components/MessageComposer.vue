@@ -108,6 +108,7 @@ const slashMenuIndex = ref(0);
 // 固定命令列表
 const FIXED_COMMANDS = [
   { id: 'compact', label: 'compact', description: '压缩当前对话上下文', icon: '⚡️' },
+  { id: 'fork', label: 'fork', description: '从当前会话克隆派生出一个新的分支会话', icon: '⌥' },
 ];
 
 // 合并固定命令 + skill 列表的过滤结果
@@ -154,6 +155,17 @@ const selectSlashItem = (item: typeof slashMenuItems.value[number]) => {
     text.value = '';
     showSlashMenu.value = false;
     emit('compact');
+    return;
+  }
+  if (item.type === 'command' && item.id === 'fork') {
+    text.value = '/fork ';
+    showSlashMenu.value = false;
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.focus();
+        textareaRef.value.selectionStart = textareaRef.value.selectionEnd = text.value.length;
+      }
+    });
     return;
   }
   if (item.type === 'skill') {
