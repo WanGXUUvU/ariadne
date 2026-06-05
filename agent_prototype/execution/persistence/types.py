@@ -41,6 +41,7 @@ class AgentInput(BaseModel):
     session_id: str = Field(min_length=1)
     user_input: str = Field(min_length=1)
     skill_name: Optional[str] = None
+    workspace_path: Optional[str] = None
 
 
 class RunMetadata(BaseModel):

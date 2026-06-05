@@ -107,6 +107,7 @@ class AgentRunner:
                     tool_calls,
                     self.allow_tool_names,
                     event_index,
+                    workspace_path=getattr(agent_input, "workspace_path", None),
                 )
                 events.extend(tool_turn.events)
                 event_index = tool_turn.next_event_index
@@ -202,6 +203,7 @@ class AgentRunner:
                     tool_calls,
                     self.allow_tool_names,
                     event_index,
+                    workspace_path=getattr(agent_input, "workspace_path", None),
                 )
                 for event in tool_turn.events:
                     yield event

@@ -116,6 +116,14 @@ class ChildAgentDispatcher:
         """在线程池中执行单个子 Agent 并落库结果。"""
         db = SessionLocal()
         try:
+            from agent_prototype.infra.db.orm_models import SessionRecord
+            session_rec = db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
+            workspace_path = None
+            if session_rec:
+                path_val = getattr(session_rec, "workspace_path", None)
+                if isinstance(path_val, str):
+                    workspace_path = path_val
+
             adapter = RuntimeContextFactory(db).build_adapter(session_id)
             child_state = AgentState()
             definition = AgentDefinition(id=child_run_id, name=agent_name)
@@ -133,6 +141,7 @@ class ChildAgentDispatcher:
                 AgentInput(
                     session_id=session_id,
                     user_input=task,
+                    workspace_path=workspace_path,
                 )
             )
 

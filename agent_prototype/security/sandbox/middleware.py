@@ -56,50 +56,21 @@ class SandboxMiddleware(BaseMiddleware):
         if not workspace_path:
             return await next_call()
 
-        # 3. 解析工具入参 JSON，执行工作区虚拟投影与参数改写
-        try:
-            args = json.loads(context.tool_args)
-        except Exception:
-            args = {}
+        # 3. 直接委派给公共 SandboxPathResolver 校验并重写
+        from agent_prototype.security.sandbox.resolver import SandboxPathResolver
+        ok, modified_args, err_msg = SandboxPathResolver.resolve_and_rewrite(
+            context.tool_name, context.tool_args, workspace_path
+        )
+        if not ok:
+            return ToolResult(
+                ok=False,
+                content=None,
+                error=ToolError(
+                    code="SANDBOX_VIOLATION",
+                    tool_name=context.tool_name,
+                    message=err_msg or "Sandbox Violation",
+                ),
+            )
 
-        path_keys = {"path", "file_path", "dir_path", "filename", "filepath", "directory"}
-        sandbox_root = Path(workspace_path).resolve()
-        modified = False
-
-        for k, v in args.items():
-            if k in path_keys and isinstance(v, str):
-                p_str = v.strip()
-
-                # 路径解析：绝对路径直接 resolve，相对路径拼接工作区根再 resolve
-                p_path = Path(p_str)
-                if p_path.is_absolute():
-                    # ── 升级：虚拟化 chroot 风格，将以 / 开头的路径投影到工作区根目录下 ──
-                    resolved_p = (sandbox_root / p_str.lstrip("/")).resolve()
-                else:
-                    # 相对路径 (例如 src/App.vue 或 ../etc/passwd)
-                    resolved_p = (sandbox_root / p_str).resolve()
-
-                # 物理路径防越界逃逸 (使用 parents 关系判断，防止前缀相似漏洞)
-                is_inside = (sandbox_root in resolved_p.parents) or (resolved_p == sandbox_root)
-                if not is_inside:
-                    logger.error(
-                        f"[SandboxMiddleware] 沙箱安全拦截！路径越界逃逸: {v} -> {resolved_p}"
-                    )
-                    return ToolResult(
-                        ok=False,
-                        content=None,
-                        error=ToolError(
-                            code="SANDBOX_VIOLATION",
-                            tool_name=context.tool_name,
-                            message=f"Sandbox Violation: Path '{v}' resolves outside the workspace '{sandbox_root}'.",
-                        ),
-                    )
-
-                args[k] = str(resolved_p)
-                modified = True
-
-        if modified:
-            context.tool_args = json.dumps(args)
-            logger.info(f"[SandboxMiddleware] 工作区投影映射成功，参数改写为: {context.tool_args}")
-
+        context.tool_args = modified_args
         return await next_call()

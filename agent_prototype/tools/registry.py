@@ -77,6 +77,28 @@ class ToolRegistry:  # 工具注册中心
         self, name: str, arguments: str, context: Optional[Any] = None
     ) -> ToolResult:
         """安全解析入参并执行指定工具，拦截底层一切异常并包装为统一的 ToolResult。"""
+        # 强制从 context 中提取 workspace_path 进行安全和投影改写
+        workspace_path = getattr(context, "workspace_path", None)
+        if not workspace_path and hasattr(context, "extra"):
+            workspace_path = context.extra.get("workspace_path")
+
+        if workspace_path:
+            from agent_prototype.security.sandbox.resolver import SandboxPathResolver
+            ok, modified_args, err_msg = SandboxPathResolver.resolve_and_rewrite(
+                name, arguments, workspace_path
+            )
+            if not ok:
+                return ToolResult(
+                    ok=False,
+                    error=ToolError(
+                        code="SANDBOX_VIOLATION",
+                        tool_name=name,
+                        message=err_msg or "Sandbox Violation",
+                    ),
+                    metadata={"tool_name": name},
+                )
+            arguments = modified_args
+
         tool = self._tools.get(name)  # 按名字找工具
         if tool is None:
             return ToolResult(

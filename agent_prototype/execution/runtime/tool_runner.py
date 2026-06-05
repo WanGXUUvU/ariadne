@@ -54,6 +54,7 @@ def handle_tool_calls(
     tool_calls: list[ToolCall],
     allow_tool_names: Optional[list[str]],
     event_index: int,
+    workspace_path: Optional[str] = None,
 ) -> ToolTurnResult:
     """同步工具执行器：老老实实、挨个同步去调用大模型想用的那批工具。
     在调用前会进行白名单安全拦截（如果工具不被允许，直接报错）。全部调完后把产生的事件和工具答复包装成结算账单。
@@ -86,9 +87,20 @@ def handle_tool_calls(
         if allow_tool_names is not None and tool_call.function.name not in allow_tool_names:
             raise ValueError(f"Tool not allowed: {tool_call.function.name}")
 
+        # 为同步工具执行构造轻量 Context，确保下沉沙箱生效
+        from agent_prototype.security.middleware.base import ToolCallContext
+        context = ToolCallContext(
+            tool_name=tool_call.function.name,
+            tool_args=tool_call.function.arguments,
+            tool_call_id=tool_call.id,
+            session_id="",
+            extra={"workspace_path": workspace_path} if workspace_path else {}
+        )
+
         tool_result = tool_registry.execute_tool_call(
             tool_call.function.name,
             tool_call.function.arguments,
+            context,
         )
 
         if tool_result.ok:
