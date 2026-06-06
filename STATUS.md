@@ -2,12 +2,12 @@
 
 ## Current Status
 - Phase: planning
-- Task: TASK-092 内存虚拟文件系统暂存与打断回滚机制 (In-Memory VFS Staging & Cancellation Rollback) & TASK-093 统一工作区投影与沙箱安全校验 (Unified Workspace Staging & Sandbox Path Redirection)
+- Task: TASK-094A 统一 Run 终态收口重构教学卡 (Unified Run Finalization Refactor - Coaching Slice)
 - Gate: design / planning
 - Allowed Now: review / plan
 - Lane: Fast
 - Blocked: None
-- Next action: 讨论并实现写文件工具在内存 VFS 中的暂存与统一沙箱安全拦截（支持同步子 Agent 运行模式）。
+- Next action: 先按教学模式拆清统一终态收口重构，再回到 TASK-094 的工具状态语义与低 token 协议。
 
 
 ## 读取规则
@@ -23,6 +23,7 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
+| 2026-06-06 | `TASK-092` / `TASK-093` 主线验收完成并切换到 `TASK-094` | Verify / planning | 补充 VFS 主线验收测试：同步写入仅在 run completed 后落盘，流式取消会回滚 staged 写入且 run 记为 cancelled。 |
 | 2026-06-04 | 智能体被打断排队机制与工具实时自动展开完成 | Verify / Review | 成功实现流式打断消息排队（Up/Down/Trash三向选项），工具在运行时自动展开显示发光呼吸灯，修复了打断时工具回复在DB快照中丢失的Bug，后端单测与集成测试100%通过。 |
 | 2026-06-04 | TASK-091 归档 | Verify / Review | 成功实现多会话并行流式生成与状态隔离。重构 useWorkspace.ts 状态为 sessionStates 映射，利用 Vue Writable Computed 代理，在零改动 Vue 视图组件的前提下无缝支持并行；移除切换会话时的主动 stopStreaming 中止动作；重构 useRunStreaming.ts 使流式写入锁定目标会话数据桶，前端 Vite 编译 100% 成功。 |
 | 2026-06-04 | TASK-088 归档 | Verify / Review | 成功实现命令行 `/fork` 与 `/fork <提问>` 会话分支派生。后端深拷贝消息快照及 Trace 流水（Runs, Events, ToolCalls）；前端 useWorkspace 编排拦截命令；侧边栏实现 DFS 嵌套树状结构渲染及连接线、⌥ Branch 徽章，70项单测与32项集成测试全绿，前端打包编译成功。 |

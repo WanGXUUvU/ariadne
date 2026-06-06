@@ -31,7 +31,12 @@ from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.memory.session.store import SqliteSessionStore
 from agent_prototype.memory.run.store import SqliteRunStore
 from agent_prototype.tools.registry import build_run_registry
-from agent_prototype.execution.persistence.types import AgentInput, AgentOutput
+from agent_prototype.execution.persistence.types import (
+    AgentInput,
+    AgentOutput,
+    RunFinalizationInput,
+    RunFinalStatus,
+)
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.child_agent_dispatcher import ChildAgentDispatcher
@@ -85,13 +90,23 @@ class RunService:
 
             output = agent.run(agent_input, run_id=run_id)
             output.state.agent_name = ctx.effective_agent_name
-            return self.persist.save_completed(
-                agent_input=agent_input,
-                output=output,
-                effective_agent_name=ctx.effective_agent_name,
-                run_id=run_id,
-                usage=output.usage,
-                session_type=ctx.session_type,
+            metadata = self.persist.finalize_run(
+                RunFinalizationInput(
+                    session_id=agent_input.session_id,
+                    run_id=run_id,
+                    status=RunFinalStatus.COMPLETED,
+                    user_input=agent_input.user_input,
+                    partial_reply=output.reply,
+                    agent_name=ctx.effective_agent_name,
+                    skill_name=agent_input.skill_name,
+                    events=output.events,
+                    state=output.state,
+                    usage=output.usage,
+                    session_type=ctx.session_type,
+                )
+            )
+            return output.model_copy(
+                update={"metadata": metadata},
             )
         except Exception:
             RunVfsRegistry.discard(run_id)
@@ -109,8 +124,8 @@ class RunService:
                 self._run_store,
                 self.approval_store,
                 agent_input.session_id,
-                run_id,
-                agent_input,
+                run_id=run_id,
+                agent_input=agent_input,
             )
             agent = self._build_agent_runner(ctx, run_id, agent_input)
 
@@ -137,14 +152,18 @@ class RunService:
         skill_name: Optional[str],
     ) -> dict:
         """保存被中止 run 的当前状态。"""
-        return self.persist.save_cancelled(
-            session_id,
-            run_id,
-            user_input,
-            partial_reply,
-            agent_name,
-            skill_name,
+        self.persist.finalize_run(
+            RunFinalizationInput(
+                session_id=session_id,
+                run_id=run_id,
+                status=RunFinalStatus.CANCELLED,
+                user_input=user_input,
+                partial_reply=partial_reply,
+                agent_name=agent_name,
+                skill_name=skill_name,
+            )
         )
+        return {"ok": True}
 
     def get_run_detail(self, session_id: str, run_id: str):
         """返回某次 run 的回复和工具调用详情。"""

@@ -13,7 +13,6 @@ from typing import Optional
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.memory.run.store import SqliteRunStore
 from agent_prototype.execution.persistence.types import AgentInput
-from agent_prototype.execution.runtime.types import AgentEvent, AgentState
 
 
 class ToolRunObserver:
@@ -79,31 +78,3 @@ class ToolRunObserver:
         )
         self.db.commit()
         return record.id
-
-    # ── 暂停处理 ─────────────────────────────────────────────────────────────
-
-    def handle_paused(
-        self,
-        state: AgentState,
-        events: list[AgentEvent],
-        partial_reply: str,
-    ) -> None:
-        """审批暂停时，存储当前 run 的中间状态,并刷新状态快照"""
-        pending = self.approval_store.get_next_pending_for_run(self.run_id)
-        if pending is not None:
-            self.approval_store.refresh_pending_saved_messages_for_batch(
-                batch_id=pending.batch_id or pending.run_id,
-                saved_messages=state.messages,
-            )
-        self.run_store.save_partial_run(
-            session_id=self.session_id,
-            run_id=self.run_id,
-            agent_name=self.agent_input.agent_name,
-            skill_name=self.agent_input.skill_name,
-            user_input=self.agent_input.user_input,
-            partial_reply=partial_reply,
-            state=state,
-            events=events,
-        )
-        self.run_store.update_run_status(run_id=self.run_id, status="paused")
-        self.db.commit()

@@ -11,6 +11,7 @@
 
 # ── 标准库 ────────────────────────────────────────────────────────────────────
 import logging
+import asyncio
 from typing import AsyncIterator, List
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,11 @@ logger = logging.getLogger(__name__)
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
 from agent_prototype.core.types import ModelStreamEvent
 from agent_prototype.execution.runtime.types import AgentEvent
-from agent_prototype.execution.persistence.types import AgentInput, AgentOutput, RunMetadata
+from agent_prototype.execution.persistence.types import (
+    AgentInput,
+    RunFinalizationInput,
+    RunFinalStatus,
+)
 from agent_prototype.execution.streaming.types import StreamFrame
 from agent_prototype.execution.streaming.sse import _sse_frame
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
@@ -62,22 +67,12 @@ class StreamRunSession:
         self.persist = persist
 
     async def run(self) -> AsyncIterator[str]:
-        """流式大戏开演！这是最核心的方法，会按顺序不断吐出 SSE 数据帧。
-        在执行过程中，它会把大模型的思维过程（thinking_delta）和正文回复（delta）源源不断地挤出来，
-        如果在执行工具时遇到审批阻碍，就会自动转入“审批挂起”状态；如果一路顺风顺利答完，就会完成并落库。
-        如果在中途被强行中断（异常或取消），它会使用 `save_cancelled` 做好善后，绝对不丢失用户的输入。
-
-        会给出来的结果：
-        - 一个异步生成器迭代器，实时 yield 符合 SSE 协议的纯文本帧。
-        """
-        completed = False
+        """流式运行主循环。"""
         partial_reply = ""
-        thinking_buf = ""  # 当前轮次的 thinking 内容，遇到 AgentEvent 时 flush 进 events
+        thinking_buf = ""
         events: list[AgentEvent] = []
 
         def _flush_thinking() -> None:
-            """把当前积累的 thinking_buf 作为一条事件追加到 events，然后清空 buf。
-            在每个 AgentEvent（工具调用/结果）入队前调用，保证 thinking 位于对应工具调用之前。"""
             nonlocal thinking_buf
             if thinking_buf:
                 events.append(
@@ -106,49 +101,84 @@ class StreamRunSession:
                     thinking_buf += item.thinking_delta or ""
                     yield _sse_frame(
                         StreamFrame(
-                            type="thinking_delta", data={"content": item.thinking_delta or ""}
+                            type="thinking_delta",
+                            data={"content": item.thinking_delta or ""},
                         )
                     )
                 elif isinstance(item, AgentEvent):
                     if item.type == "tool_progress":
-                        # 进度消息仅作为即时通道数据发射，不阻断思考流，亦不落库存储
                         yield _sse_frame(StreamFrame(type="agent_event", data=item.model_dump()))
                     else:
                         _flush_thinking()
                         events.append(item)
                         yield _sse_frame(StreamFrame(type="agent_event", data=item.model_dump()))
 
-            # 循环正常结束：flush 最后一轮 thinking（最终回答前的思考，无后续工具调用）
             _flush_thinking()
             paused = any(e.type == "approval_required" for e in events)
-            if paused:
-                yield self._handle_paused(events, partial_reply)
-            else:
-                yield self._handle_completed(events, partial_reply)
-            completed = True
 
-        finally:
-            if not completed:
-                try:
-                    # abort 时 async for 中断，_flush_thinking() 未被调用，
-                    # 在此补做：把当前轮次未 flush 的 thinking 追加为事件。
-                    _flush_thinking()
-                    self.persist.save_cancelled(
-                        self.agent_input.session_id,
-                        self.run_id,
-                        self.agent_input.user_input,
-                        partial_reply,
-                        self.ctx.effective_agent_name,
-                        self.agent_input.skill_name,
+            if paused:
+                self.persist.finalize_run(
+                    self._build_finalization(
+                        status=RunFinalStatus.PAUSED,
                         events=events,
-                        state=self.agent.state,
+                        partial_reply=partial_reply,
                     )
-                except Exception:
-                    logger.exception(
-                        "Failed to persist cancelled run: session_id=%s run_id=%s",
-                        self.agent_input.session_id,
-                        self.run_id,
+                )
+                yield _sse_frame(StreamFrame(type="paused", data={"run_id": self.run_id}))
+            else:
+                metadata = self.persist.finalize_run(
+                    self._build_finalization(
+                        status=RunFinalStatus.COMPLETED,
+                        events=events,
+                        partial_reply=partial_reply,
                     )
+                )
+                yield _sse_frame(
+                    StreamFrame(
+                        type="end",
+                        data={
+                            "reply": partial_reply,
+                            "state": self.agent.state.model_dump(),
+                            "metadata": metadata.model_dump(),
+                        },
+                    )
+                )
+
+        except (GeneratorExit, asyncio.CancelledError):
+            _flush_thinking()
+            try:
+                self.persist.finalize_run(
+                    self._build_finalization(
+                        status=RunFinalStatus.CANCELLED,
+                        events=events,
+                        partial_reply=partial_reply,
+                    )
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to persist cancelled run: session_id=%s run_id=%s",
+                    self.agent_input.session_id,
+                    self.run_id,
+                )
+            raise
+
+        except Exception:
+            _flush_thinking()
+            try:
+                self.persist.finalize_run(
+                    self._build_finalization(
+                        status=RunFinalStatus.FAILED,
+                        events=events,
+                        partial_reply=partial_reply,
+                    )
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to persist failed run: session_id=%s run_id=%s",
+                    self.agent_input.session_id,
+                    self.run_id,
+                )
+            raise
 
     # ── 私有帧构造 ────────────────────────────────────────────────────────────
 
@@ -171,56 +201,23 @@ class StreamRunSession:
             )
         )
 
-    def _handle_paused(self, events: List[AgentEvent], partial_reply: str) -> str:
-        """内部方法：当运行因为工具需要人工审批而暂停时，紧急通过 observer 观察者进行中间态快照落库，并生产一个“暂停（paused）”帧。
-
-        需要拿到的东西：
-        - events: 中断前已经产生的所有事件。
-        - partial_reply: 中断前已经生成的半成品答复。
-
-        会给出来的结果：
-        - 告诉前端已暂停的 paused 帧字符串。
-        """
-        self.observer.handle_paused(self.agent.state, events, partial_reply)
-        return _sse_frame(StreamFrame(type="paused", data={"run_id": self.run_id}))
-
-    def _handle_completed(self, events: List[AgentEvent], partial_reply: str) -> str:
-        """内部方法：当运行正常且顺利完成时，委托 persist 落库小助手把最终结果完整地写入数据库，并生产一个“谢幕（end）”帧。
-
-        需要拿到的东西：
-        - events: 运行中产生的所有完整事件。
-        - partial_reply: 智能体的最终完整答复。
-
-        会给出来的结果：
-        - 告诉前端运行结束的 end 帧字符串（包含最终回复和元数据）。
-        """
-        output = AgentOutput(
-            reply=partial_reply,
-            state=self.agent.state,
-            events=events,
-            metadata=RunMetadata(
-                session_id=self.agent_input.session_id,
-                run_id=self.run_id,
-                agent_name=self.ctx.effective_agent_name,
-                skill_name=self.agent_input.skill_name,
-            ),
-        )
-        output.state.agent_name = self.ctx.effective_agent_name
-        output = self.persist.save_completed(
-            agent_input=self.agent_input,
-            output=output,
-            effective_agent_name=self.ctx.effective_agent_name,
+    def _build_finalization(
+        self,
+        *,
+        status: RunFinalStatus,
+        events: List[AgentEvent],
+        partial_reply: str,
+    ) -> RunFinalizationInput:
+        return RunFinalizationInput(
+            session_id=self.agent_input.session_id,
             run_id=self.run_id,
+            status=status,
+            user_input=self.agent_input.user_input,
+            partial_reply=partial_reply,
+            agent_name=self.ctx.effective_agent_name,
+            skill_name=self.agent_input.skill_name,
+            events=events,
+            state=self.agent.state,
             usage=self.agent.last_usage,
             session_type=self.ctx.session_type,
-        )
-        return _sse_frame(
-            StreamFrame(
-                type="end",
-                data={
-                    "reply": partial_reply,
-                    "state": self.agent.state.model_dump(),
-                    "metadata": output.metadata.model_dump(),
-                },
-            )
         )

@@ -8,7 +8,7 @@
 
 不负责：感知 HTTP 协议、直接操作 DB 模型。
 上游：approval_routes.py
-下游：RuntimeContextFactory.build_adapter / RunPersistenceService.save_resumed
+下游：RuntimeContextFactory.build_adapter / RunPersistenceService.finalize_run
 """
 
 # ── 标准库 ────────────────────────────────────────────────────────────────────
@@ -19,7 +19,11 @@ from typing import AsyncIterator
 from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.execution.persistence.types import AgentInput
+from agent_prototype.execution.persistence.types import (
+    AgentInput,
+    RunFinalizationInput,
+    RunFinalStatus,
+)
 from agent_prototype.execution.runtime.types import AgentEvent, AgentState
 from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.core.types import ChatMessage
@@ -199,11 +203,19 @@ class ResumeRunService:
         # ── 关键：如果同 run 还有别的 pending approval，先别继续模型 ───────
         if not self.approval_store.is_batch_fully_resolved(batch_id):
             next_pending = self.approval_store.get_next_pending_for_batch(batch_id)
-            self.persist.save_resumed_partial(
-                run_id=approval.run_id,
-                session_id=approval.session_id,
-                events=[tool_result_event],
-                agent_state=state,
+            self.persist.finalize_run(
+                RunFinalizationInput(
+                    session_id=approval.session_id,
+                    run_id=approval.run_id,
+                    status=RunFinalStatus.PAUSED,
+                    user_input="",
+                    partial_reply="",
+                    agent_name=agent_name,
+                    skill_name=run_record.skill_name if run_record else None,
+                    events=[tool_result_event],
+                    state=state,
+                    append_events=True,
+                )
             )
             yield _sse_frame(
                 StreamFrame(
@@ -248,12 +260,20 @@ class ResumeRunService:
                 yield _sse_frame(StreamFrame(type="agent_event", data=item.model_dump()))
 
         # ── 落库 ─────────────────────────────────────────────────────────────
-        self.persist.save_resumed(
-            run_id=approval.run_id,
-            session_id=approval.session_id,
-            events=events,
-            partial_reply=partial_reply,
-            agent_state=agent.state,
+        self.persist.finalize_run(
+            RunFinalizationInput(
+                session_id=approval.session_id,
+                run_id=approval.run_id,
+                status=RunFinalStatus.COMPLETED,
+                user_input="",
+                partial_reply=partial_reply,
+                agent_name=agent_name,
+                skill_name=run_record.skill_name if run_record else None,
+                events=events,
+                state=agent.state,
+                usage=agent.last_usage,
+                append_events=True,
+            )
         )
 
         yield _sse_frame(

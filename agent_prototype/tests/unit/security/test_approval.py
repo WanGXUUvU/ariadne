@@ -99,7 +99,12 @@ class TestNeedsApproval(unittest.TestCase):
 class TestAsyncHandleToolCallsApproval(unittest.TestCase):
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
 
     def test_never_policy_executes_write_tool_directly(self):
         """NEVER policy：WRITE 工具直接执行，不产生 approval_required 事件。"""

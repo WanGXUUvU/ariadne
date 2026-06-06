@@ -6,15 +6,16 @@
 """
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
 from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.core.types import ModelUsage
+from agent_prototype.execution.runtime.types import AgentEvent, AgentState
 from agent_prototype.security.policy.types import ApprovalPolicy
-
 
 @dataclass
 class RunContext:
@@ -70,3 +71,28 @@ class FinalizeRunInput(BaseModel):
     partial_reply: str
     agent_name: Optional[str] = None
     skill_name: Optional[str] = None
+
+class RunFinalStatus(str, Enum):
+    """一次 run 的统一终态。"""
+
+    COMPLETED = "completed"
+    PAUSED = "paused"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+
+
+class RunFinalizationInput(BaseModel):
+    """统一的 run 终态收口输入。"""
+
+    session_id: str
+    run_id: str
+    status: RunFinalStatus
+    user_input: str
+    partial_reply: str
+    agent_name: Optional[str] = None
+    skill_name: Optional[str] = None
+    events: list[AgentEvent] = Field(default_factory=list)
+    state: AgentState = Field(default_factory=AgentState)
+    usage: Optional[ModelUsage] = None
+    session_type: str = "coding"
+    append_events: bool = False
