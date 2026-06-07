@@ -11,21 +11,29 @@
 - 不感知 HTTP/SSE。
 """
 
+from concurrent.futures import Future
 import uuid
 from typing import Callable
 
 from sqlalchemy.orm import Session
 
 from agent_prototype.agent.types import AgentDefinition
-from agent_prototype.execution.persistence.types import AgentInput
+from agent_prototype.execution.persistence.service import RunPersistenceService
+from agent_prototype.execution.persistence.types import AgentInput, RunContext
 from agent_prototype.execution.runtime.agent_executor import _executor, _global_futures
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.execution.runtime.execution_session import (
+    RunExecutionDeps,
+    RunExecutionResult,
+    RunExecutionSession,
+)
 from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
 from agent_prototype.infra.db.engine import SessionLocal
-from agent_prototype.memory.run.store import SqliteRunStore
+from agent_prototype.infra.db.orm_models import SessionRunRecord
 from agent_prototype.tools.registry import build_run_registry
+from agent_prototype.security.policy.types import ApprovalPolicy
 
 
 class ChildAgentDispatcher:
@@ -66,12 +74,15 @@ class ChildAgentDispatcher:
                     result[run_id] = {"status": "not_found"}
                     continue
 
-                future = _global_futures[run_id]
+                future: Future[RunExecutionResult] = _global_futures[run_id]
                 if future.done():
                     if future.exception():
                         result[run_id] = {"status": "error", "error": str(future.exception())}
                     else:
-                        result[run_id] = {"status": "done", "reply": future.result().reply}
+                        result[run_id] = {
+                            "status": "done",
+                            "reply": future.result().partial_reply,
+                        }
                 else:
                     result[run_id] = {"status": "running"}
             return result
@@ -86,7 +97,7 @@ class ChildAgentDispatcher:
             if future is None:
                 raise LookupError(f"child_run_id {child_run_id} not found")
             output = future.result(timeout=120)
-            return output.reply
+            return output.partial_reply
 
         return child_waiter
 
@@ -104,7 +115,7 @@ class ChildAgentDispatcher:
 
         result = future.result()
         del _global_futures[run_id]
-        return {"status": "done", "reply": result.reply, "error": None}
+        return {"status": "done", "reply": result.partial_reply, "error": None}
 
     def _run_child_worker(
         self,
@@ -139,31 +150,42 @@ class ChildAgentDispatcher:
                     child_waiter=self.make_child_waiter(),
                 ),
             )
-            output = agent.run(
-                AgentInput(
-                    session_id=session_id,
-                    user_input=task,
-                    workspace_path=workspace_path,
-                ),
-                run_id=child_run_id,
-            )
-
-            run_store = SqliteRunStore(db)
-            run_store.create_child_run(
-                parent_run_id=parent_run_id,
+            agent_input = AgentInput(
                 session_id=session_id,
-                run_id=child_run_id,
-                agent_name=agent_name,
                 user_input=task,
-                reply=output.reply,
-                events=output.events,
+                workspace_path=workspace_path,
             )
+            ctx = RunContext(
+                state=child_state,
+                definition=definition,
+                adapter=adapter,
+                approval_policy=ApprovalPolicy.NEVER,
+                effective_agent_name=agent_name,
+                workspace_path=workspace_path or "",
+                session_type="coding",
+            )
+            result = RunExecutionSession(
+                RunExecutionDeps(
+                    ctx=ctx,
+                    agent=agent,
+                    persist=RunPersistenceService(db),
+                    agent_input=agent_input,
+                    run_id=child_run_id,
+                    update_session_snapshot=False,
+                )
+            ).collect_final_result_sync()
+
+            # 子 run 的主记录和事件已经由统一 finalization 写入，这里只补父子关联。
+            run_record = (
+                db.query(SessionRunRecord)
+                .filter(SessionRunRecord.run_id == child_run_id)
+                .first()
+            )
+            if run_record is None:
+                raise LookupError(f"child run {child_run_id} not found after finalization")
+            run_record.parent_run_id = parent_run_id
             db.commit()
-            staged_vfs = RunVfsRegistry.get(child_run_id)
-            if staged_vfs is not None:
-                staged_vfs.commit_all()
-                RunVfsRegistry.take(child_run_id)
-            return output
+            return result
         except Exception:
             db.rollback()
             RunVfsRegistry.discard(child_run_id)

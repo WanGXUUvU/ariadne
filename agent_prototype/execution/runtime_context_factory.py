@@ -51,10 +51,16 @@ class RuntimeContextFactory:
         self.store = SqliteSessionStore(db)
 
     def build(self, agent_input: AgentInput) -> RunContext:
-        """构建一次运行所需的完整上下文。"""
+        """构建一次运行所需的完整上下文。
+
+        这一步的产物就是 RunContext。它是 run 开始前最关键的稳定背景物料，
+        后面的 RunService / RunExecutionSession / AgentRunner 都默认依赖它。
+        """
         session_id = agent_input.session_id
         record = self._read_session_record(session_id)
+        # 先根据 session 绑定的 provider/model 准备好模型适配器。
         adapter = self._build_adapter(session_id, record)
+        # 读取 session 最新状态快照，作为本轮运行起点。
         state = self.store.get(session_id) or AgentState()
 
         context_tokens = record.context_tokens if record and record.context_tokens else 0
@@ -64,6 +70,7 @@ class RuntimeContextFactory:
         context_length = self._resolve_context_length(record, context_tokens)
 
         if state.messages:
+            # 在真正进入 run 前，先按当前模型上下文长度预算执行一次自动压缩。
             compactor = HistoryCompactor(adapter)
             compact_result = CompactService(self.db).auto_compact_in_memory(
                 state=state,
@@ -94,6 +101,7 @@ class RuntimeContextFactory:
 
         approval_policy = self._resolve_approval_policy(record)
 
+        # 最终产出的 RunContext 是“这一轮已经准备好可以直接执行”的稳定运行背景。
         return RunContext(
             state=state,
             definition=runtime_definition,

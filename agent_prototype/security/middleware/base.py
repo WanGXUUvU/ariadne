@@ -17,12 +17,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ToolCallContext:
-    """工具调用上下文对象，作为安全中间件与工具之间的数据流转载体。"""
+    """工具调用上下文对象，作为安全中间件与工具之间的数据流转载体。
 
+    这个对象的定位不是“整次 run 的上下文”，而是“单次 tool call 的执行上下文”。
+    它会一路经过 middleware pipeline，最后传到具体工具实现。
+    """
+
+    # 本次调用的工具名，例如 read_file / write_file。
     tool_name: str
+    # 模型生成的原始 arguments 字符串，尚未被工具层解析前的形态。
     tool_args: str
+    # 模型为这次 tool call 分配的唯一 ID。
     tool_call_id: str
+    # tool call 所属 session。
     session_id: str
+    # tool call 所属 run；用于 VFS、trace、审批恢复等跨层关联。
     run_id: Optional[str] = None
     extra: dict[str, Any] = field(default_factory=dict)
     """元数据字典，用于中间件之间传递共享状态或参数"""

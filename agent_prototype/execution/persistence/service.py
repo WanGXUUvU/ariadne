@@ -60,30 +60,32 @@ class RunPersistenceService:
                 new_events=finalization.events,
                 final_reply=finalization.partial_reply,
             )
-            self.store.upsert_session_snapshot(
-                session_id=finalization.session_id,
-                state=finalization.state,
-                last_agent_name=finalization.agent_name,
-                last_skill_name=finalization.skill_name,
-                last_reply_preview=build_reply_preview(finalization.partial_reply),
-            )
+            if finalization.update_session_snapshot:
+                self.store.upsert_session_snapshot(
+                    session_id=finalization.session_id,
+                    state=finalization.state,
+                    last_agent_name=finalization.agent_name,
+                    last_skill_name=finalization.skill_name,
+                    last_reply_preview=build_reply_preview(finalization.partial_reply),
+                )
             self._run_store.update_run_status(
                 run_id=finalization.run_id,
                 status=RunFinalStatus.COMPLETED.value,
             )
             return
 
-        self.store.upsert_session_snapshot(
-            finalization.session_id,
-            state=finalization.state,
-            last_agent_name=finalization.agent_name,
-            last_skill_name=finalization.skill_name,
-            last_reply_preview=build_reply_preview(finalization.partial_reply),
-            context_tokens=(
-                finalization.usage.input_tokens if finalization.usage else None
-            ),
-            session_type=finalization.session_type,
-        )
+        if finalization.update_session_snapshot:
+            self.store.upsert_session_snapshot(
+                finalization.session_id,
+                state=finalization.state,
+                last_agent_name=finalization.agent_name,
+                last_skill_name=finalization.skill_name,
+                last_reply_preview=build_reply_preview(finalization.partial_reply),
+                context_tokens=(
+                    finalization.usage.input_tokens if finalization.usage else None
+                ),
+                session_type=finalization.session_type,
+            )
         self._run_store.save_run_trace(
             session_id=finalization.session_id,
             run_id=finalization.run_id,
@@ -105,10 +107,11 @@ class RunPersistenceService:
                 run_id=finalization.run_id,
                 new_events=finalization.events,
             )
-            self.store.upsert_session_snapshot(
-                session_id=finalization.session_id,
-                state=finalization.state,
-            )
+            if finalization.update_session_snapshot:
+                self.store.upsert_session_snapshot(
+                    session_id=finalization.session_id,
+                    state=finalization.state,
+                )
         else:
             pending = self.approval_store.get_next_pending_for_run(finalization.run_id)
             if pending is not None:
@@ -145,10 +148,11 @@ class RunPersistenceService:
                 run_id=finalization.run_id,
                 new_events=finalization.events,
             )
-            self.store.upsert_session_snapshot(
-                session_id=finalization.session_id,
-                state=state,
-            )
+            if finalization.update_session_snapshot:
+                self.store.upsert_session_snapshot(
+                    session_id=finalization.session_id,
+                    state=state,
+                )
         else:
             self._run_store.save_partial_run(
                 session_id=finalization.session_id,

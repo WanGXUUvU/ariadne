@@ -36,8 +36,13 @@ from agent_prototype.execution.persistence.types import (
     AgentOutput,
     RunFinalizationInput,
     RunFinalStatus,
+    RunMetadata,
 )
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.execution.runtime.execution_session import (
+    RunExecutionDeps,
+    RunExecutionSession,
+)
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.child_agent_dispatcher import ChildAgentDispatcher
 from agent_prototype.execution.persistence.service import RunPersistenceService
@@ -88,25 +93,27 @@ class RunService:
             ctx = self.context_factory.build(agent_input)
             agent = self._build_agent_runner(ctx, run_id, agent_input)
 
-            output = agent.run(agent_input, run_id=run_id)
-            output.state.agent_name = ctx.effective_agent_name
-            metadata = self.persist.finalize_run(
-                RunFinalizationInput(
+            result = RunExecutionSession(
+                RunExecutionDeps(
+                    ctx=ctx,
+                    agent=agent,
+                    persist=self.persist,
+                    agent_input=agent_input,
+                    run_id=run_id,
+                )
+            ).collect_final_result_sync()
+            result.state.agent_name = ctx.effective_agent_name
+            return AgentOutput(
+                reply=result.partial_reply,
+                state=result.state,
+                events=result.events,
+                metadata=RunMetadata(
                     session_id=agent_input.session_id,
                     run_id=run_id,
-                    status=RunFinalStatus.COMPLETED,
-                    user_input=agent_input.user_input,
-                    partial_reply=output.reply,
                     agent_name=ctx.effective_agent_name,
                     skill_name=agent_input.skill_name,
-                    events=output.events,
-                    state=output.state,
-                    usage=output.usage,
-                    session_type=ctx.session_type,
-                )
-            )
-            return output.model_copy(
-                update={"metadata": metadata},
+                ),
+                usage=result.usage,
             )
         except Exception:
             RunVfsRegistry.discard(run_id)

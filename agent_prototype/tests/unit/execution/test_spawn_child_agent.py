@@ -114,6 +114,7 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             patch("agent_prototype.execution.child_agent_dispatcher._global_futures", self.futures),
             patch("agent_prototype.execution.child_agent_dispatcher.AgentRunner") as MockAgent,
             patch("agent_prototype.execution.child_agent_dispatcher.RunVfsRegistry") as MockVfsRegistry,
+            patch("agent_prototype.execution.persistence.service.RunVfsRegistry") as MockPersistVfsRegistry,
             patch(
                 "agent_prototype.execution.child_agent_dispatcher.SessionLocal", self.session_local
             ),
@@ -123,7 +124,7 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             mock_instance.run.return_value = fake_output
             MockAgent.return_value = mock_instance
             staged_vfs = MagicMock()
-            MockVfsRegistry.get.return_value = staged_vfs
+            MockPersistVfsRegistry.get.return_value = staged_vfs
 
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.make_child_dispatcher(
@@ -155,7 +156,7 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             self.assertEqual(mock_instance.run.call_args.kwargs["run_id"], child_run_id)
             MockVfsRegistry.create.assert_called_once_with(child_run_id)
             staged_vfs.commit_all.assert_called_once()
-            MockVfsRegistry.take.assert_called_once_with(child_run_id)
+            MockPersistVfsRegistry.take.assert_called_once_with(child_run_id)
         finally:
             db.close()
 

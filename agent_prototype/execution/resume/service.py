@@ -23,23 +23,34 @@ from agent_prototype.execution.persistence.types import (
     AgentInput,
     RunFinalizationInput,
     RunFinalStatus,
+    RunContext,
 )
 from agent_prototype.execution.runtime.types import AgentEvent, AgentState
 from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.execution.streaming.types import StreamFrame
 from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.run.store import SqliteRunStore
 from agent_prototype.infra.db.orm_models import SessionRunRecord
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.security.middleware.base import MiddlewarePipeline, ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.execution.runtime.execution_session import (
+    AgentEventItem,
+    FinalResultItem,
+    RunExecutionDeps,
+    RunExecutionSession,
+    TextDeltaItem,
+    ThinkingDeltaItem,
+)
 from agent_prototype.execution.streaming.sse import _sse_frame
 from agent_prototype.agent.definition import AgentDefinitionService
 from agent_prototype.execution.persistence.service import RunPersistenceService
 from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
+from agent_prototype.observation.tool_run_observer import ToolRunObserver
 
 
 class ResumeRunService:
@@ -94,7 +105,10 @@ class ResumeRunService:
             status_checker=lambda ids: {},
             child_waiter=lambda run_id: "",
         )
-        model_adapter = RuntimeContextFactory(self.db).build_adapter(approval.session_id)
+        runtime_factory = RuntimeContextFactory(self.db)
+        model_adapter = runtime_factory.build_adapter(approval.session_id)
+        session_record = self.session_store.read_session_record(approval.session_id)
+        approval_policy = runtime_factory._resolve_approval_policy(session_record)
 
         # ── 执行审批结果，构造工具结果事件 ────────────────────────────────────
         event_index = approval.event_index
@@ -103,9 +117,7 @@ class ResumeRunService:
             tr = ToolResult(ok=False, content=content)
         else:
             loop = asyncio.get_event_loop()
-            workspace_path = self.session_store.read_session_record(
-                approval.session_id
-            ).workspace_path
+            workspace_path = session_record.workspace_path if session_record else None
             pipeline = MiddlewarePipeline([SandboxMiddleware()])
             extra = {
                 "workspace_path": workspace_path,
@@ -235,6 +247,7 @@ class ResumeRunService:
             allow_tool_names=definition.tool_names,
             model_adapter=model_adapter,
             tool_registry=tool_registry,
+            approval_policy=approval_policy,
         )
         agent_input = AgentInput.model_construct(
             session_id=approval.session_id,
@@ -242,47 +255,72 @@ class ResumeRunService:
             agent_name=None,
             skill_name=None,
         )
-        partial_reply = ""
-        events: list[AgentEvent] = [tool_result_event]
-        workspace_path = self.session_store.read_session_record(approval.session_id).workspace_path
-        async for item in agent.async_stream_run(
+        workspace_path = session_record.workspace_path if session_record else None
+        ctx = RunContext(
+            state=state,
+            definition=definition,
+            adapter=model_adapter,
+            approval_policy=approval_policy,
+            effective_agent_name=agent_name,
+            workspace_path=workspace_path or "",
+            session_type="coding",
+        )
+        observer = ToolRunObserver(
+            self.db,
+            SqliteRunStore(self.db),
+            self.approval_store,
+            approval.session_id,
+            approval.run_id,
             agent_input,
-            skip_user_message=True,
-            event_index=event_index,
-            run_id=approval.run_id,
-            workspace_path=workspace_path,
-        ):
-            if isinstance(item, str):
-                partial_reply += item
-                yield _sse_frame(StreamFrame(type="delta", data={"content": item}))
-            elif isinstance(item, AgentEvent):
-                events.append(item)
-                yield _sse_frame(StreamFrame(type="agent_event", data=item.model_dump()))
-
-        # ── 落库 ─────────────────────────────────────────────────────────────
-        self.persist.finalize_run(
-            RunFinalizationInput(
-                session_id=approval.session_id,
+        )
+        session = RunExecutionSession(
+            RunExecutionDeps(
+                ctx=ctx,
+                agent=agent,
+                persist=self.persist,
+                agent_input=agent_input,
                 run_id=approval.run_id,
-                status=RunFinalStatus.COMPLETED,
-                user_input="",
-                partial_reply=partial_reply,
-                agent_name=agent_name,
-                skill_name=run_record.skill_name if run_record else None,
-                events=events,
-                state=agent.state,
-                usage=agent.last_usage,
+                on_tool_start=observer.on_tool_start,
+                on_tool_finish=observer.on_tool_finish,
+                on_approval_required=observer.on_approval_required,
+                skip_user_message=True,
+                event_index=event_index,
+                initial_events=[tool_result_event],
                 append_events=True,
             )
         )
 
-        yield _sse_frame(
-            StreamFrame(
-                type="end",
-                data={
-                    "reply": partial_reply,
-                    "run_id": approval.run_id,
-                    "state": agent.state.model_dump(),
-                },
-            )
-        )
+        async for item in session.run():
+            if isinstance(item, TextDeltaItem):
+                yield _sse_frame(StreamFrame(type="delta", data={"content": item.content}))
+            elif isinstance(item, ThinkingDeltaItem):
+                yield _sse_frame(
+                    StreamFrame(type="thinking_delta", data={"content": item.content})
+                )
+            elif isinstance(item, AgentEventItem):
+                yield _sse_frame(
+                    StreamFrame(type="agent_event", data=item.event.model_dump())
+                )
+            elif isinstance(item, FinalResultItem):
+                if item.result.status == RunFinalStatus.PAUSED:
+                    next_pending = self.approval_store.get_next_pending_for_batch(batch_id)
+                    yield _sse_frame(
+                        StreamFrame(
+                            type="paused",
+                            data={
+                                "run_id": approval.run_id,
+                                "approval_id": next_pending.id if next_pending else None,
+                            },
+                        )
+                    )
+                else:
+                    yield _sse_frame(
+                        StreamFrame(
+                            type="end",
+                            data={
+                                "reply": item.result.partial_reply,
+                                "run_id": approval.run_id,
+                                "state": item.result.state.model_dump(),
+                            },
+                        )
+                    )
