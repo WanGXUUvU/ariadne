@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from agent_prototype.security.middleware.base import ToolCallContext
 from agent_prototype.tools.registry import build_default_tool_registry
 
 
@@ -52,6 +53,45 @@ class TestToolRegistry(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertTrue(file_path.exists())
         self.assertEqual(file_path.read_text(encoding="utf-8"), "hello write")
+
+    def test_execute_list_dir_rewrites_relative_path_with_workspace_context(self):
+        workspace_path = Path(self.temp_dir.name) / "workspace"
+        target_dir = workspace_path / "src"
+        target_dir.mkdir(parents=True)
+        (target_dir / "a.txt").write_text("a", encoding="utf-8")
+        (target_dir / "b.txt").write_text("b", encoding="utf-8")
+        context = ToolCallContext(
+            tool_name="list_dir",
+            tool_args='{"path":"src"}',
+            tool_call_id="call_123",
+            session_id="session_123",
+            extra={"workspace_path": str(workspace_path)},
+        )
+
+        result = self.registry.execute_tool_call("list_dir", '{"path":"src"}', context)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.content, "a.txt\nb.txt")
+
+    def test_execute_read_file_blocks_workspace_escape(self):
+        workspace_path = Path(self.temp_dir.name) / "workspace"
+        workspace_path.mkdir()
+        context = ToolCallContext(
+            tool_name="read_file",
+            tool_args='{"path":"../../../etc/passwd"}',
+            tool_call_id="call_456",
+            session_id="session_456",
+            extra={"workspace_path": str(workspace_path)},
+        )
+
+        result = self.registry.execute_tool_call(
+            "read_file",
+            '{"path":"../../../etc/passwd"}',
+            context,
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error.code, "SANDBOX_VIOLATION")
 
     def test_unknown_tool_raises_structured_error(self):
         result = self.registry.execute_tool_call("missing_tool", "{}")

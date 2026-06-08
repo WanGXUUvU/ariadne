@@ -133,8 +133,8 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(str(ctx.exception), "Middleware crashed on purpose")
 
-    async def test_sandbox_relative_path_rewrite(self):
-        """测试 SandboxMiddleware 在绑定工作区时，对入参相对路径进行自动投影重写。"""
+    async def test_sandbox_relative_path_passthrough(self):
+        """测试 SandboxMiddleware 不再改写相对路径参数。"""
         sandbox = SandboxMiddleware()
         context = ToolCallContext(
             tool_name="write_file",
@@ -146,15 +146,15 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
 
         async def terminal():
             args = json.loads(context.tool_args)
-            self.assertEqual(args["path"], "/fake/workspace/root/src/App.vue")
+            self.assertEqual(args["path"], "src/App.vue")
             return ToolResult(ok=True, content="ok")
 
         pipeline = MiddlewarePipeline([sandbox])
         result = await pipeline.execute(context, terminal)
         self.assertTrue(result.ok)
 
-    async def test_sandbox_absolute_path_virtualization(self):
-        """测试 SandboxMiddleware 在绑定工作区时，对绝对路径（/开头）进行虚拟投影重写。"""
+    async def test_sandbox_absolute_path_passthrough(self):
+        """测试 SandboxMiddleware 不再改写绝对路径参数。"""
         sandbox = SandboxMiddleware()
         context = ToolCallContext(
             tool_name="read_file",
@@ -166,31 +166,12 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
 
         async def terminal():
             args = json.loads(context.tool_args)
-            self.assertEqual(args["path"], "/fake/workspace/root/package.json")
+            self.assertEqual(args["path"], "/package.json")
             return ToolResult(ok=True, content="ok")
 
         pipeline = MiddlewarePipeline([sandbox])
         result = await pipeline.execute(context, terminal)
         self.assertTrue(result.ok)
-
-    async def test_sandbox_violation_blocks(self):
-        """测试 SandboxMiddleware 成功捕获 ../ 逃逸路径并强行安全拦截。"""
-        sandbox = SandboxMiddleware()
-        context = ToolCallContext(
-            tool_name="read_file",
-            tool_args='{"path": "../../../etc/passwd"}',
-            tool_call_id="call_000",
-            session_id="session_xyz",
-            extra={"workspace_path": "/fake/workspace/root"},
-        )
-
-        async def terminal():
-            self.fail("Terminal should not be called due to sandbox violation")
-
-        pipeline = MiddlewarePipeline([sandbox])
-        result = await pipeline.execute(context, terminal)
-        self.assertFalse(result.ok)
-        self.assertEqual(result.error.code, "SANDBOX_VIOLATION")
 
     async def test_sandbox_tool_not_allowed_blocks(self):
         """测试 SandboxMiddleware 对不在 allow_tool_names 白名单里的工具执行优雅拦截。"""
