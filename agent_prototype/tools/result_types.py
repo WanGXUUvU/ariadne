@@ -18,6 +18,7 @@
 """
 
 from typing import Any, Optional
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -38,3 +39,9 @@ class ToolResult(BaseModel):
     content: Optional[str] = None
     error: Optional[ToolError] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+class ToolState(str,Enum):
+    """工具写入的vfs状态。"""
+    STAGED="staged"
+    COMMITTED="committed"
+    ROLLED_BACK="rolled_back"

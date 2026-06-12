@@ -83,7 +83,7 @@ class FinalizeRunInput(BaseModel):
     """内部用，run 完成时写库。"""
 
     user_input: str
-    partial_reply: str
+    reply_text: str
     agent_name: Optional[str] = None
 
 class RunFinalStatus(str, Enum):
@@ -111,7 +111,7 @@ class RunFinalizationInput(BaseModel):
     # 当前 run 对应的用户输入；中断/失败场景补 user message 时要用。
     user_input: str
     # 最终完整 reply，或者中断时的 partial reply。
-    partial_reply: str
+    reply_text: str
     # 本轮实际执行的 agent 名称；用于 run 摘要和 session 元数据。
     agent_name: Optional[str] = None
     # 本轮正式事件账本；注意不包含所有过程噪音，例如 tool_progress。

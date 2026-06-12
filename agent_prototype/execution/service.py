@@ -104,7 +104,7 @@ class RunService:
             ).execute_sync()
             result.state.agent_name = ctx.effective_agent_name
             return AgentOutput(
-                reply=result.partial_reply,
+                reply=result.reply_text,
                 state=result.state,
                 events=result.events,
                 metadata=RunMetadata(
@@ -153,7 +153,7 @@ class RunService:
         session_id: str,
         run_id: str,
         user_input: str,
-        partial_reply: str,
+        reply_text: str,
         agent_name: Optional[str],
     ) -> dict:
         """保存被中止 run 的当前状态。"""
@@ -163,7 +163,7 @@ class RunService:
                 run_id=run_id,
                 status=RunFinalStatus.CANCELLED,
                 user_input=user_input,
-                partial_reply=partial_reply,
+                reply_text=reply_text,
                 agent_name=agent_name,
             )
         )

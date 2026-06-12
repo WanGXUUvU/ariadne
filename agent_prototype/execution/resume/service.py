@@ -221,7 +221,7 @@ class ResumeRunService:
                     run_id=approval.run_id,
                     status=RunFinalStatus.PAUSED,
                     user_input="",
-                    partial_reply="",
+                    reply_text="",
                     agent_name=agent_name,
                     events=[tool_result_event],
                     state=state,
@@ -272,7 +272,7 @@ class ResumeRunService:
             approval.run_id,
             agent_input,
         )
-        session = RunLifecycle(
+        lifecycle = RunLifecycle(
             RunLifecycleParams(
                 ctx=ctx,
                 agent_runner=agent_runner,
@@ -289,7 +289,7 @@ class ResumeRunService:
             )
         )
 
-        async for item in session.iterate():
+        async for item in lifecycle.iterate():
             if isinstance(item, TextDeltaItem):
                 yield _sse_frame(StreamFrame(type="delta", data={"content": item.content}))
             elif isinstance(item, ThinkingDeltaItem):
@@ -317,7 +317,7 @@ class ResumeRunService:
                         StreamFrame(
                             type="end",
                             data={
-                                "reply": item.result.partial_reply,
+                                "reply": item.result.reply_text,
                                 "run_id": approval.run_id,
                                 "state": item.result.state.model_dump(),
                             },

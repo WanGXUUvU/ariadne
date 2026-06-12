@@ -61,7 +61,7 @@ class RunLifecycleResult(BaseModel):
     """一次执行会话结束后的统一结果。"""
 
     status: RunFinalStatus
-    partial_reply: str
+    reply_text: str
     events: list[AgentEvent]
     state: AgentState
     usage: Optional[ModelUsage] = None
@@ -111,7 +111,7 @@ class RunLifecycle:
 
     async def iterate(self) -> AsyncIterator[RunLifecycleItem]:
         """执行共享主循环，并实时产出通用执行项。"""
-        partial_reply = ""
+        reply_text = ""
         thinking_buf = ""
         events: list[AgentEvent] = list(self.deps.initial_events)
 
@@ -141,7 +141,7 @@ class RunLifecycle:
             ):
                 if isinstance(item, str):
                     # 普通文本增量：一边累积，一边实时往上 yield。
-                    partial_reply += item
+                    reply_text += item
                     yield TextDeltaItem(content=item)
 
                 elif isinstance(item, ModelStreamEvent) and item.type == "thinking_delta":
@@ -174,14 +174,14 @@ class RunLifecycle:
                 self._build_finalization(
                     status=status,
                     events=events,
-                    partial_reply=partial_reply,
+                    reply_text=reply_text,
                 )
             )
 
             yield FinalResultItem(
                 result=RunLifecycleResult(
                     status=status,
-                    partial_reply=partial_reply,
+                    reply_text=reply_text,
                     events=events,
                     state=self.deps.agent_runner.state,
                     usage=self.deps.agent_runner.last_usage,
@@ -197,7 +197,7 @@ class RunLifecycle:
                     self._build_finalization(
                         status=RunFinalStatus.CANCELLED,
                         events=events,
-                        partial_reply=partial_reply,
+                        reply_text=reply_text,
                     )
                 )
             except Exception:
@@ -216,7 +216,7 @@ class RunLifecycle:
                 self._build_finalization(
                     status=RunFinalStatus.FAILED,
                     events=events,
-                    partial_reply=partial_reply,
+                    reply_text=reply_text,
                 )
             )
             raise
@@ -226,7 +226,7 @@ class RunLifecycle:
         *,
         status: RunFinalStatus,
         events: list[AgentEvent],
-        partial_reply: str,
+        reply_text: str,
         state: Optional[AgentState] = None,
         usage: Optional[ModelUsage] = None,
     ) -> RunFinalizationInput:
@@ -241,7 +241,7 @@ class RunLifecycle:
             run_id=self.deps.run_id,
             status=status,
             user_input=self.deps.agent_input.user_input,
-            partial_reply=partial_reply,
+            reply_text=reply_text,
             agent_name=self.deps.ctx.effective_agent_name,
             events=events,
             state=state or self.deps.agent_runner.state,
@@ -276,14 +276,14 @@ class RunLifecycle:
             self._build_finalization(
                 status=RunFinalStatus.COMPLETED,
                 events=output.events,
-                partial_reply=output.reply,
+                reply_text=output.reply,
                 state=output.state,
                 usage=output.usage,
             )
         )
         return RunLifecycleResult(
             status=RunFinalStatus.COMPLETED,
-            partial_reply=output.reply,
+            reply_text=output.reply,
             events=output.events,
             state=output.state,
             usage=output.usage,

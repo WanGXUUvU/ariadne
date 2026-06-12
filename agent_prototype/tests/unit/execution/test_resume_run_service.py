@@ -171,7 +171,7 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
             finalization = service.persist.finalize_run.call_args.args[0]
             self.assertEqual(finalization.status, RunFinalStatus.COMPLETED)
             self.assertTrue(finalization.append_events)
-            self.assertEqual(finalization.partial_reply, "done")
+            self.assertEqual(finalization.reply_text, "done")
             self.assertEqual(finalization.run_id, run_id)
         finally:
             db.close()

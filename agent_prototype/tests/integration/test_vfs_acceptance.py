@@ -197,7 +197,7 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
                     session_id=session_id,
                     run_id=run_id,
                     user_input="流式写文件然后取消",
-                    partial_reply="partial",
+                    reply_text="partial",
                     agent_name="software_engineer",
                 )
                 stream = None

@@ -60,14 +60,14 @@ class RunRecorder:
             self._run_store.append_run_events(
                 run_id=finalization.run_id,
                 new_events=finalization.events,
-                final_reply=finalization.partial_reply,
+                final_reply=finalization.reply_text,
             )
             if finalization.update_session_snapshot:
                 self.store.save_state(
                     session_id=finalization.session_id,
                     state=finalization.state,
                     last_agent_name=finalization.agent_name,
-                    last_reply_preview=build_reply_preview(finalization.partial_reply),
+                    last_reply_preview=build_reply_preview(finalization.reply_text),
                 )
             self._run_store.update_run_status(
                 run_id=finalization.run_id,
@@ -80,7 +80,7 @@ class RunRecorder:
                 finalization.session_id,
                 state=finalization.state,
                 last_agent_name=finalization.agent_name,
-                last_reply_preview=build_reply_preview(finalization.partial_reply),
+                last_reply_preview=build_reply_preview(finalization.reply_text),
                 context_tokens=(
                     finalization.usage.input_tokens if finalization.usage else None
                 ),
@@ -92,7 +92,7 @@ class RunRecorder:
             agent_name=finalization.agent_name,
 
             user_input=finalization.user_input,
-            reply=finalization.partial_reply,
+            reply=finalization.reply_text,
             events=finalization.events,
         )
         self.db.flush()
@@ -126,7 +126,7 @@ class RunRecorder:
                 agent_name=finalization.agent_name,
     
                 user_input=finalization.user_input,
-                partial_reply=finalization.partial_reply,
+                reply_text=finalization.reply_text,
                 state=finalization.state,
                 events=finalization.events,
             )
@@ -162,7 +162,7 @@ class RunRecorder:
                 agent_name=finalization.agent_name,
     
                 user_input=finalization.user_input,
-                partial_reply=finalization.partial_reply,
+                reply_text=finalization.reply_text,
                 state=state,
                 events=finalization.events,
             )

@@ -53,7 +53,7 @@ class RunSSEBridge:
         """消费通用执行项，并实时翻译成 SSE。"""
         yield self._start_frame()
 
-        session = RunLifecycle(
+        lifecycle = RunLifecycle(
             RunLifecycleParams(
                 ctx=self.ctx,
                 agent_runner=self.agent_runner,
@@ -67,7 +67,7 @@ class RunSSEBridge:
         )
 
         try:
-            async for item in session.iterate():
+            async for item in lifecycle.iterate():
                 if isinstance(item, TextDeltaItem):
                     yield _sse_frame(
                         StreamFrame(
@@ -105,7 +105,7 @@ class RunSSEBridge:
                             StreamFrame(
                                 type="end",
                                 data={
-                                    "reply": item.result.partial_reply,
+                                    "reply": item.result.reply_text,
                                     "state": item.result.state.model_dump(),
                                     "metadata": RunMetadata(
                                         session_id=self.agent_input.session_id,
