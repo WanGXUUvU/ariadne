@@ -43,7 +43,7 @@ class TestSessionTruncate(unittest.TestCase):
             ChatMessage(role="user", content="I don't know"),
             ChatMessage(role="assistant", content="Because he was outstanding in his field!"),
         ]
-        self.service.store.upsert_session_snapshot(session_id, state)
+        self.service.store.save_state(session_id, state)
 
         # 2. 插入对应的 runs, events, tool calls, pending approvals 记录
         run1 = SessionRunRecord(session_id=session_id, run_id="r1", user_input="Hello", reply="Hi", parent_run_id=None)
@@ -104,7 +104,7 @@ class TestSessionTruncate(unittest.TestCase):
             ChatMessage(role="user", content="I don't know"),
             ChatMessage(role="assistant", content="Because he was outstanding in his field!"),
         ]
-        self.service.store.upsert_session_snapshot(session_id, state)
+        self.service.store.save_state(session_id, state)
 
         # 2. 插入对应的 runs, events, tool calls, pending approvals 记录
         run1 = SessionRunRecord(session_id=session_id, run_id="r1", user_input="Hello", reply="Hi", parent_run_id=None)

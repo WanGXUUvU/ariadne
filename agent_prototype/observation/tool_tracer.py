@@ -4,24 +4,24 @@
 - 封装工具执行过程中所有与数据库相关的副作用回调。
 - 把 on_tool_start / on_tool_finish / on_approval_required 从 run_service 中解耦出来。
 上游：run_service.py 构造并注入
-下游：SqliteRunStore / SqliteApprovalStore（通过构造参数传入）
+下游：RunTraceStore / SqliteApprovalStore（通过构造参数传入）
 """
 
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from agent_prototype.security.approval.store import SqliteApprovalStore
-from agent_prototype.memory.run.store import SqliteRunStore
+from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.execution.persistence.types import AgentInput
 
 
-class ToolRunObserver:
+class ToolTracer:
     """工具调用生命周期观察者，专门负责落库副作用。"""
 
     def __init__(
         self,
         db: Session,
-        run_store: SqliteRunStore,
+        run_store: RunTraceStore,
         approval_store: SqliteApprovalStore,
         session_id: str,
         run_id: str,

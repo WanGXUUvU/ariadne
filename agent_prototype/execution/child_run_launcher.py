@@ -18,31 +18,31 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from agent_prototype.agent.types import AgentDefinition
-from agent_prototype.execution.persistence.service import RunPersistenceService
+from agent_prototype.execution.persistence.run_recorder import RunRecorder
 from agent_prototype.execution.persistence.types import AgentInput, RunContext
 from agent_prototype.execution.runtime.agent_executor import _executor, _global_futures
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
-from agent_prototype.execution.runtime.execution_session import (
-    RunExecutionDeps,
-    RunExecutionResult,
-    RunExecutionSession,
+from agent_prototype.execution.runtime.run_lifecycle import (
+    RunLifecycleParams,
+    RunLifecycleResult,
+    RunLifecycle,
 )
 from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
-from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
+from agent_prototype.execution.run_context_factory import RunContextFactory
 from agent_prototype.infra.db.engine import SessionLocal
 from agent_prototype.infra.db.orm_models import SessionRunRecord
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.security.policy.types import ApprovalPolicy
 
 
-class ChildAgentDispatcher:
+class ChildRunLauncher:
     """子 Agent 线程调度与状态查询服务。"""
 
     def __init__(self, db: Session):
         self.db = db
 
-    def make_child_dispatcher(
+    def create_launcher(
         self,
         parent_run_id: str,
         session_id: str,
@@ -52,7 +52,7 @@ class ChildAgentDispatcher:
         def child_dispatcher(task: str, agent_name: str = "子Agent") -> str:
             child_run_id = uuid.uuid4().hex
             future = _executor.submit(
-                self._run_child_worker,
+                self._execute_child,
                 task=task,
                 child_run_id=child_run_id,
                 parent_run_id=parent_run_id,
@@ -64,7 +64,7 @@ class ChildAgentDispatcher:
 
         return child_dispatcher
 
-    def make_status_checker(self) -> Callable[[list[str]], dict]:
+    def create_status_checker(self) -> Callable[[list[str]], dict]:
         """构造批量查询子 Agent 状态的回调。"""
 
         def status_checker(child_run_ids: list[str]) -> dict:
@@ -74,7 +74,7 @@ class ChildAgentDispatcher:
                     result[run_id] = {"status": "not_found"}
                     continue
 
-                future: Future[RunExecutionResult] = _global_futures[run_id]
+                future: Future[RunLifecycleResult] = _global_futures[run_id]
                 if future.done():
                     if future.exception():
                         result[run_id] = {"status": "error", "error": str(future.exception())}
@@ -89,7 +89,7 @@ class ChildAgentDispatcher:
 
         return status_checker
 
-    def make_child_waiter(self) -> Callable[[str], str]:
+    def create_waiter(self) -> Callable[[str], str]:
         """构造阻塞等待单个子 Agent 完成的回调。"""
 
         def child_waiter(child_run_id: str) -> str:
@@ -117,7 +117,7 @@ class ChildAgentDispatcher:
         del _global_futures[run_id]
         return {"status": "done", "reply": result.partial_reply, "error": None}
 
-    def _run_child_worker(
+    def _execute_child(
         self,
         task: str,
         child_run_id: str,
@@ -137,17 +137,17 @@ class ChildAgentDispatcher:
                 if isinstance(path_val, str):
                     workspace_path = path_val
 
-            adapter = RuntimeContextFactory(db).build_adapter(session_id)
+            adapter = RunContextFactory(db).create_adapter(session_id)
             child_state = AgentState()
             definition = AgentDefinition(id=child_run_id, name=agent_name)
-            agent = AgentRunner(
+            agent_runner = AgentRunner(
                 state=child_state,
-                definition=definition,
+                agent_profile=definition,
                 model_adapter=adapter,
                 tool_registry=build_run_registry(
-                    child_dispatcher=self.make_child_dispatcher(child_run_id, session_id),
-                    status_checker=self.make_status_checker(),
-                    child_waiter=self.make_child_waiter(),
+                    child_dispatcher=self.create_launcher(child_run_id, session_id),
+                    status_checker=self.create_status_checker(),
+                    child_waiter=self.create_waiter(),
                 ),
             )
             agent_input = AgentInput(
@@ -157,23 +157,23 @@ class ChildAgentDispatcher:
             )
             ctx = RunContext(
                 state=child_state,
-                definition=definition,
+                agent_profile=definition,
                 adapter=adapter,
                 approval_policy=ApprovalPolicy.NEVER,
                 effective_agent_name=agent_name,
                 workspace_path=workspace_path or "",
                 session_type="coding",
             )
-            result = RunExecutionSession(
-                RunExecutionDeps(
+            result = RunLifecycle(
+                RunLifecycleParams(
                     ctx=ctx,
-                    agent=agent,
-                    persist=RunPersistenceService(db),
+                    agent_runner=agent_runner,
+                    persist=RunRecorder(db),
                     agent_input=agent_input,
                     run_id=child_run_id,
                     update_session_snapshot=False,
                 )
-            ).collect_final_result_sync()
+            ).execute_sync()
 
             # 子 run 的主记录和事件已经由统一 finalization 写入，这里只补父子关联。
             run_record = (

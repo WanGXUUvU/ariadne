@@ -9,17 +9,17 @@ from agent_prototype.execution.persistence.types import (
 from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.streaming.sse import build_reply_preview
-from agent_prototype.memory.run.store import SqliteRunStore
-from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.run.store import RunTraceStore
+from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.security.approval.store import SqliteApprovalStore
-
-class RunPersistenceService:
+from agent_prototype.tools.result_types import ToolState
+class RunRecorder:
     """run 终态统一持久化入口。"""
 
     def __init__(self, db: Session):
         self.db = db
-        self.store = SqliteSessionStore(db)
-        self._run_store = SqliteRunStore(db)
+        self.store = SessionStore(db)
+        self._run_store = RunTraceStore(db)
         self.approval_store = SqliteApprovalStore(db)
 
     def finalize_run(self, finalization: RunFinalizationInput) -> RunMetadata:
@@ -28,7 +28,6 @@ class RunPersistenceService:
             session_id=finalization.session_id,
             run_id=finalization.run_id,
             agent_name=finalization.agent_name,
-            skill_name=finalization.skill_name,
         )
         try:
             if finalization.status == RunFinalStatus.COMPLETED:
@@ -54,6 +53,9 @@ class RunPersistenceService:
         return run, tool_calls
 
     def _finalize_completed(self, finalization: RunFinalizationInput) -> None:
+        for event in finalization.events:
+            if event.tool_result and event.tool_result.metadata.get("state")=="staged":
+                event.tool_result.metadata["state"]=ToolState.COMMITTED.value
         if finalization.append_events:
             self._run_store.append_run_events(
                 run_id=finalization.run_id,
@@ -61,11 +63,10 @@ class RunPersistenceService:
                 final_reply=finalization.partial_reply,
             )
             if finalization.update_session_snapshot:
-                self.store.upsert_session_snapshot(
+                self.store.save_state(
                     session_id=finalization.session_id,
                     state=finalization.state,
                     last_agent_name=finalization.agent_name,
-                    last_skill_name=finalization.skill_name,
                     last_reply_preview=build_reply_preview(finalization.partial_reply),
                 )
             self._run_store.update_run_status(
@@ -75,11 +76,10 @@ class RunPersistenceService:
             return
 
         if finalization.update_session_snapshot:
-            self.store.upsert_session_snapshot(
+            self.store.save_state(
                 finalization.session_id,
                 state=finalization.state,
                 last_agent_name=finalization.agent_name,
-                last_skill_name=finalization.skill_name,
                 last_reply_preview=build_reply_preview(finalization.partial_reply),
                 context_tokens=(
                     finalization.usage.input_tokens if finalization.usage else None
@@ -90,7 +90,7 @@ class RunPersistenceService:
             session_id=finalization.session_id,
             run_id=finalization.run_id,
             agent_name=finalization.agent_name,
-            skill_name=finalization.skill_name,
+
             user_input=finalization.user_input,
             reply=finalization.partial_reply,
             events=finalization.events,
@@ -108,7 +108,7 @@ class RunPersistenceService:
                 new_events=finalization.events,
             )
             if finalization.update_session_snapshot:
-                self.store.upsert_session_snapshot(
+                self.store.save_state(
                     session_id=finalization.session_id,
                     state=finalization.state,
                 )
@@ -124,7 +124,7 @@ class RunPersistenceService:
                 session_id=finalization.session_id,
                 run_id=finalization.run_id,
                 agent_name=finalization.agent_name,
-                skill_name=finalization.skill_name,
+    
                 user_input=finalization.user_input,
                 partial_reply=finalization.partial_reply,
                 state=finalization.state,
@@ -142,14 +142,16 @@ class RunPersistenceService:
         status: RunFinalStatus,
     ) -> None:
         state = self._ensure_user_message(finalization.state, finalization.user_input)
-
+        for event in finalization.events:
+            if event.tool_result and event.tool_result.metadata.get("state")=="staged":
+                event.tool_result.metadata["state"]=ToolState.ROLLED_BACK.value
         if finalization.append_events:
             self._run_store.append_run_events_partial(
                 run_id=finalization.run_id,
                 new_events=finalization.events,
             )
             if finalization.update_session_snapshot:
-                self.store.upsert_session_snapshot(
+                self.store.save_state(
                     session_id=finalization.session_id,
                     state=state,
                 )
@@ -158,7 +160,7 @@ class RunPersistenceService:
                 session_id=finalization.session_id,
                 run_id=finalization.run_id,
                 agent_name=finalization.agent_name,
-                skill_name=finalization.skill_name,
+    
                 user_input=finalization.user_input,
                 partial_reply=finalization.partial_reply,
                 state=state,

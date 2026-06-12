@@ -8,7 +8,7 @@ from typing import Any, AsyncIterator, Callable, Literal, Optional, Union
 from pydantic import BaseModel
 
 from agent_prototype.core.types import ModelStreamEvent, ModelUsage
-from agent_prototype.execution.persistence.service import RunPersistenceService
+from agent_prototype.execution.persistence.run_recorder import RunRecorder
 from agent_prototype.execution.persistence.types import (
     AgentInput,
     RunContext,
@@ -22,24 +22,24 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class RunExecutionDeps:
+class RunLifecycleParams:
     """执行核心运行所需的最小物料。
 
-    这是 RunExecutionSession 的“动态执行上下文”。
+    这是 RunLifecycle 的“动态执行上下文”。
     相比 RunContext 的稳定背景物料，这里还包含一次执行具体如何启动、如何续跑的控制参数。
     """
 
     # 稳定运行背景：state / definition / adapter / approval_policy / workspace 等。
     ctx: RunContext
     # 已装配好的智能体执行发动机。
-    agent: AgentRunner
+    agent_runner: AgentRunner
     # 终态收口器；执行层只在结束时把 finalization input 交给它。
-    persist: RunPersistenceService
+    persist: RunRecorder
     # 本轮 run 的外部输入。
     agent_input: AgentInput
     # 当前 run 的唯一 ID。
     run_id: str
-    # 工具开始执行时的副作用回调，一般来自 ToolRunObserver。
+    # 工具开始执行时的副作用回调，一般来自 ToolTracer。
     on_tool_start: Optional[Callable[..., Any]] = None
     # 工具结束执行时的副作用回调。
     on_tool_finish: Optional[Callable[..., Any]] = None
@@ -57,7 +57,7 @@ class RunExecutionDeps:
     update_session_snapshot: bool = True
 
 
-class RunExecutionResult(BaseModel):
+class RunLifecycleResult(BaseModel):
     """一次执行会话结束后的统一结果。"""
 
     status: RunFinalStatus
@@ -92,10 +92,10 @@ class FinalResultItem(BaseModel):
     """执行层最终结果项。"""
 
     type: Literal["final_result"] = "final_result"
-    result: RunExecutionResult
+    result: RunLifecycleResult
 
 
-RunExecutionItem = Union[
+RunLifecycleItem = Union[
     TextDeltaItem,
     ThinkingDeltaItem,
     AgentEventItem,
@@ -103,19 +103,19 @@ RunExecutionItem = Union[
 ]
 
 
-class RunExecutionSession:
+class RunLifecycle:
     """执行型 run 的共享生命周期容器。"""
 
-    def __init__(self, deps: RunExecutionDeps):
+    def __init__(self, deps: RunLifecycleParams):
         self.deps = deps
 
-    async def run(self) -> AsyncIterator[RunExecutionItem]:
+    async def iterate(self) -> AsyncIterator[RunLifecycleItem]:
         """执行共享主循环，并实时产出通用执行项。"""
         partial_reply = ""
         thinking_buf = ""
         events: list[AgentEvent] = list(self.deps.initial_events)
 
-        async def _flush_thinking() -> AsyncIterator[RunExecutionItem]:
+        async def _flush_thinking() -> AsyncIterator[RunLifecycleItem]:
             """把累计的 thinking 文本收束成一个正式事件。"""
             nonlocal thinking_buf
             if thinking_buf:
@@ -129,7 +129,7 @@ class RunExecutionSession:
                 yield AgentEventItem(event=event)
 
         try:
-            async for item in self.deps.agent.async_stream_run(
+            async for item in self.deps.agent_runner.async_stream_run(
                 self.deps.agent_input,
                 on_tool_start=self.deps.on_tool_start,
                 on_tool_finish=self.deps.on_tool_finish,
@@ -179,12 +179,12 @@ class RunExecutionSession:
             )
 
             yield FinalResultItem(
-                result=RunExecutionResult(
+                result=RunLifecycleResult(
                     status=status,
                     partial_reply=partial_reply,
                     events=events,
-                    state=self.deps.agent.state,
-                    usage=self.deps.agent.last_usage,
+                    state=self.deps.agent_runner.state,
+                    usage=self.deps.agent_runner.last_usage,
                 )
             )
 
@@ -233,7 +233,7 @@ class RunExecutionSession:
         """把本次执行结果转换成统一终态输入。"""
         resolved_usage = usage if isinstance(usage, ModelUsage) else None
         if resolved_usage is None:
-            candidate = getattr(self.deps.agent, "last_usage", None)
+            candidate = getattr(self.deps.agent_runner, "last_usage", None)
             if isinstance(candidate, ModelUsage):
                 resolved_usage = candidate
         return RunFinalizationInput(
@@ -243,30 +243,29 @@ class RunExecutionSession:
             user_input=self.deps.agent_input.user_input,
             partial_reply=partial_reply,
             agent_name=self.deps.ctx.effective_agent_name,
-            skill_name=self.deps.agent_input.skill_name,
             events=events,
-            state=state or self.deps.agent.state,
+            state=state or self.deps.agent_runner.state,
             usage=resolved_usage,
             session_type=self.deps.ctx.session_type,
             append_events=self.deps.append_events,
             update_session_snapshot=self.deps.update_session_snapshot,
         )
 
-    async def collect_final_result(self) -> RunExecutionResult:
+    async def execute(self) -> RunLifecycleResult:
         """消费执行项流，只返回最终结果。"""
         async for item in self.run():
             if isinstance(item, FinalResultItem):
                 return item.result
-        raise RuntimeError("RunExecutionSession finished without FinalResultItem")
+        raise RuntimeError("RunLifecycle finished without FinalResultItem")
 
-    def collect_final_result_sync(self) -> RunExecutionResult:
+    def execute_sync(self) -> RunLifecycleResult:
         """同步消费入口。
 
-        sync run / child run 仍然优先复用 AgentRunner.run()，
+        sync run / child run 仍然优先复用 AgentRunner.execute()，
         避免把只支持同步 generate 的适配器强行塞进异步流式链路。
         """
         try:
-            output = self.deps.agent.run(
+            output = self.deps.agent_runner.execute(
                 self.deps.agent_input,
                 run_id=self.deps.run_id,
             )
@@ -282,7 +281,7 @@ class RunExecutionSession:
                 usage=output.usage,
             )
         )
-        return RunExecutionResult(
+        return RunLifecycleResult(
             status=RunFinalStatus.COMPLETED,
             partial_reply=output.reply,
             events=output.events,

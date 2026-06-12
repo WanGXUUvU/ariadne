@@ -4,11 +4,11 @@
 - 根据 approval_id 重建 Agent 上下文（恢复消息 + 加载定义 + 构建 Adapter）
 - 执行审批结果（通过 / 拒绝），拼装工具结果事件
 - 拉起 Agent 继续流式运转，yield SSE 帧
-- 运行结束后委托 RunPersistenceService 落库
+- 运行结束后委托 RunRecorder 落库
 
 不负责：感知 HTTP 协议、直接操作 DB 模型。
 上游：approval_routes.py
-下游：RuntimeContextFactory.build_adapter / RunPersistenceService.finalize_run
+下游：RunContextFactory.create_adapter / RunRecorder.finalize_run
 """
 
 # ── 标准库 ────────────────────────────────────────────────────────────────────
@@ -29,28 +29,28 @@ from agent_prototype.execution.runtime.types import AgentEvent, AgentState
 from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.execution.streaming.types import StreamFrame
-from agent_prototype.memory.session.store import SqliteSessionStore
-from agent_prototype.memory.run.store import SqliteRunStore
+from agent_prototype.memory.session.store import SessionStore
+from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.infra.db.orm_models import SessionRunRecord
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.security.middleware.base import MiddlewarePipeline, ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
-from agent_prototype.execution.runtime.execution_session import (
+from agent_prototype.execution.runtime.run_lifecycle import (
     AgentEventItem,
     FinalResultItem,
-    RunExecutionDeps,
-    RunExecutionSession,
+    RunLifecycleParams,
+    RunLifecycle,
     TextDeltaItem,
     ThinkingDeltaItem,
 )
 from agent_prototype.execution.streaming.sse import _sse_frame
 from agent_prototype.agent.definition import AgentDefinitionService
-from agent_prototype.execution.persistence.service import RunPersistenceService
-from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
+from agent_prototype.execution.persistence.run_recorder import RunRecorder
+from agent_prototype.execution.run_context_factory import RunContextFactory
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
-from agent_prototype.observation.tool_run_observer import ToolRunObserver
+from agent_prototype.observation.tool_tracer import ToolTracer
 
 
 class ResumeRunService:
@@ -68,8 +68,8 @@ class ResumeRunService:
         """
         self.db = db
         self.approval_store = SqliteApprovalStore(db)
-        self.persist = RunPersistenceService(db)
-        self.session_store = SqliteSessionStore(db)
+        self.persist = RunRecorder(db)
+        self.session_store = SessionStore(db)
 
     async def resume_run(self, approval_id: str, rejected: bool = False) -> AsyncIterator[str]:
         """执行审批结果并拉起智能体继续运行！
@@ -105,9 +105,9 @@ class ResumeRunService:
             status_checker=lambda ids: {},
             child_waiter=lambda run_id: "",
         )
-        runtime_factory = RuntimeContextFactory(self.db)
-        model_adapter = runtime_factory.build_adapter(approval.session_id)
-        session_record = self.session_store.read_session_record(approval.session_id)
+        runtime_factory = RunContextFactory(self.db)
+        model_adapter = runtime_factory.create_adapter(approval.session_id)
+        session_record = self.session_store.load_record(approval.session_id)
         approval_policy = runtime_factory._resolve_approval_policy(session_record)
 
         # ── 执行审批结果，构造工具结果事件 ────────────────────────────────────
@@ -223,7 +223,6 @@ class ResumeRunService:
                     user_input="",
                     partial_reply="",
                     agent_name=agent_name,
-                    skill_name=run_record.skill_name if run_record else None,
                     events=[tool_result_event],
                     state=state,
                     append_events=True,
@@ -241,9 +240,9 @@ class ResumeRunService:
             return
 
         # ── 构造 AgentRunner，继续流式运转 ────────────────────────────────────
-        agent = AgentRunner(
+        agent_runner = AgentRunner(
             state=state,
-            definition=definition,
+            agent_profile=definition,
             allow_tool_names=definition.tool_names,
             model_adapter=model_adapter,
             tool_registry=tool_registry,
@@ -258,25 +257,25 @@ class ResumeRunService:
         workspace_path = session_record.workspace_path if session_record else None
         ctx = RunContext(
             state=state,
-            definition=definition,
+            agent_profile=definition,
             adapter=model_adapter,
             approval_policy=approval_policy,
             effective_agent_name=agent_name,
             workspace_path=workspace_path or "",
             session_type="coding",
         )
-        observer = ToolRunObserver(
+        observer = ToolTracer(
             self.db,
-            SqliteRunStore(self.db),
+            RunTraceStore(self.db),
             self.approval_store,
             approval.session_id,
             approval.run_id,
             agent_input,
         )
-        session = RunExecutionSession(
-            RunExecutionDeps(
+        session = RunLifecycle(
+            RunLifecycleParams(
                 ctx=ctx,
-                agent=agent,
+                agent_runner=agent_runner,
                 persist=self.persist,
                 agent_input=agent_input,
                 run_id=approval.run_id,
@@ -290,7 +289,7 @@ class ResumeRunService:
             )
         )
 
-        async for item in session.run():
+        async for item in session.iterate():
             if isinstance(item, TextDeltaItem):
                 yield _sse_frame(StreamFrame(type="delta", data={"content": item.content}))
             elif isinstance(item, ThinkingDeltaItem):

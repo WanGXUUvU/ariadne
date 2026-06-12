@@ -10,7 +10,7 @@ from agent_prototype.execution.persistence.types import RunFinalStatus
 from agent_prototype.execution.resume.service import ResumeRunService
 from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.infra.db.orm_models import SessionRunRecord
-from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.tests.helpers.db import make_sqlite_test_db
 
@@ -21,7 +21,7 @@ def _parse_sse(frame: str) -> dict:
 
 
 def _seed_session(db, session_id: str, workspace_path: Path) -> None:
-    SqliteSessionStore(db).upsert_session_snapshot(
+    SessionStore(db).save_state(
         session_id=session_id,
         state=AgentState(),
         workspace_path=str(workspace_path),
@@ -36,7 +36,6 @@ def _seed_run(db, session_id: str, run_id: str) -> None:
             run_id=run_id,
             run_status="paused",
             agent_name="default",
-            skill_name="resume-skill",
             user_input="需要审批",
             reply="",
             event_count=0,
@@ -94,7 +93,7 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
                     ),
                 ),
                 patch(
-                    "agent_prototype.execution.resume.service.RuntimeContextFactory.build_adapter",
+                    "agent_prototype.execution.resume.service.RunContextFactory.create_adapter",
                     return_value=object(),
                 ),
             ):
@@ -150,7 +149,7 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
                     ),
                 ),
                 patch(
-                    "agent_prototype.execution.resume.service.RuntimeContextFactory.build_adapter",
+                    "agent_prototype.execution.resume.service.RunContextFactory.create_adapter",
                     return_value=object(),
                 ),
                 patch.object(

@@ -24,7 +24,7 @@ from agent_prototype.infra.db.orm_models import (
 )
 
 
-class SqliteRunStore:
+class RunTraceStore:
     """围绕 run trace 相关数据的 SQLite store。
 
     这个类是"运行轨迹数据仓库"。它专门负责运行记录、步骤事件和工具调用记录的读写。
@@ -39,7 +39,6 @@ class SqliteRunStore:
         session_id: str,
         run_id: str,
         agent_name: Optional[str],
-        skill_name: Optional[str],
         user_input: str,
         reply: str,
         events: list[AgentEvent],
@@ -51,7 +50,6 @@ class SqliteRunStore:
         - session_id (str): 属于哪个会话。
         - run_id (str): 这一轮运行的唯一 ID。
         - agent_name (str, 可选): 负责干活的 Agent 名字。
-        - skill_name (str, 可选): 触发的技能名字。
         - user_input (str): 用户的输入文本。
         - reply (str): 最终给出的回复文本。
         - events (list[AgentEvent]): 运行过程中发生的所有步骤事件。
@@ -64,7 +62,6 @@ class SqliteRunStore:
             session_id=session_id,
             run_id=run_id,
             agent_name=agent_name,
-            skill_name=skill_name,
             user_input=user_input,
             reply=reply,
             event_count=len(events),
@@ -98,7 +95,6 @@ class SqliteRunStore:
         session_id: str,
         run_id: str,
         agent_name: Optional[str],
-        skill_name: Optional[str],
         user_input: str,
         partial_reply: str,
         state,
@@ -137,7 +133,6 @@ class SqliteRunStore:
             session_id=session_id,
             run_id=run_id,
             agent_name=agent_name,
-            skill_name=skill_name,
             user_input=user_input,
             reply=partial_reply,
             event_count=len(events),

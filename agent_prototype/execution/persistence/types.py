@@ -21,14 +21,14 @@ from agent_prototype.security.policy.types import ApprovalPolicy
 class RunContext:
     """智能体单次运行所需的稳定背景物料。
 
-    这是一份“运行前已经准备好”的静态上下文，RunExecutionSession / AgentRunner
+    这是一份“运行前已经准备好”的静态上下文，RunLifecycle / AgentRunner
     都依赖它，但不会在执行过程中频繁重建。
     """
 
     # 当前会话的聊天状态快照；模型每轮推理都会以它为基础继续推进。
     state: AgentState
     # 本轮实际采用的 agent 定义，包含 system prompt 与允许调用的工具白名单。
-    definition: AgentDefinition
+    agent_profile: AgentDefinition
     # 已经根据 session 绑定模型解析好的大模型适配器。
     adapter: ChatCompletionsAdapter
     # 本轮工具调用所遵守的审批策略，会一路传到 tool_runner。
@@ -49,7 +49,7 @@ class RunContext:
 class AgentInput(BaseModel):
     """`/run` 请求体。"""
 
-    # 用户显式指定的 agent；为空时交给 RuntimeContextFactory 决定默认值。
+    # 用户显式指定的 agent；为空时交给 RunContextFactory 决定默认值。
     agent_name: Optional[str] = None
     # 本轮 run 归属的 session。
     session_id: str = Field(min_length=1)
@@ -67,7 +67,6 @@ class RunMetadata(BaseModel):
     session_id: str
     run_id: str = ""
     agent_name: Optional[str] = None
-    skill_name: Optional[str] = None
 
 
 class AgentOutput(BaseModel):
@@ -86,7 +85,6 @@ class FinalizeRunInput(BaseModel):
     user_input: str
     partial_reply: str
     agent_name: Optional[str] = None
-    skill_name: Optional[str] = None
 
 class RunFinalStatus(str, Enum):
     """一次 run 的统一终态。"""
@@ -100,8 +98,8 @@ class RunFinalStatus(str, Enum):
 class RunFinalizationInput(BaseModel):
     """统一的 run 终态收口输入。
 
-    RunExecutionSession 不直接关心“怎么写库、怎么处理 VFS”，
-    它只在结束时把这张终态收口单交给 RunPersistenceService。
+    RunLifecycle 不直接关心“怎么写库、怎么处理 VFS”，
+    它只在结束时把这张终态收口单交给 RunRecorder。
     """
 
     # 这次 run 属于哪个 session。
@@ -116,8 +114,6 @@ class RunFinalizationInput(BaseModel):
     partial_reply: str
     # 本轮实际执行的 agent 名称；用于 run 摘要和 session 元数据。
     agent_name: Optional[str] = None
-    # 本轮关联的 skill 名称；主要是落库与追踪元信息。
-    skill_name: Optional[str] = None
     # 本轮正式事件账本；注意不包含所有过程噪音，例如 tool_progress。
     events: list[AgentEvent] = Field(default_factory=list)
     # 本轮结束时的最新状态快照。

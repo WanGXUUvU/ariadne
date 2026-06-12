@@ -22,7 +22,7 @@ from agent_prototype.security.policy import (
 from agent_prototype.memory.session.types import CreateSessionInput
 from agent_prototype.memory.session.service import SessionService
 from agent_prototype.infra.db.engine import Base
-from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.session.store import SessionStore
 
 
 class TestPermissionSchema(unittest.TestCase):
@@ -87,8 +87,8 @@ class TestSessionPermission(unittest.TestCase):
         db = self.session_local()
         try:
             summary = SessionService(db).create_session(CreateSessionInput())
-            store = SqliteSessionStore(db)
-            record = store.read_session_record(summary.session_id)
+            store = SessionStore(db)
+            record = store.load_record(summary.session_id)
             self.assertIsNotNone(record)
             self.assertEqual(record.permission_profile, "conservative")
         finally:

@@ -142,7 +142,6 @@ def read_session_api(
         updated_at=record.updated_at,
         last_agent_name=record.last_agent_name,
         last_reply_preview=record.last_reply_preview,
-        last_skill_name=record.last_skill_name,
         message_count=record.message_count,
         state=state,
         permission_profile=record.permission_profile,

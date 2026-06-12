@@ -32,8 +32,8 @@ class TestAgent(unittest.TestCase):
             ]
         )
 
-        agent = AgentRunner(definition=custom_definition, model_adapter=fake_adapter)
-        output = agent.run(AgentInput(session_id="session-a", user_input="你好"))
+        agent = AgentRunner(agent_profile=custom_definition, model_adapter=fake_adapter)
+        output = agent.execute(AgentInput(session_id="session-a", user_input="你好"))
 
         self.assertEqual(output.reply, "mock reply")
         request = fake_adapter.calls[0]
@@ -48,7 +48,7 @@ class TestAgent(unittest.TestCase):
         )
 
         agent = AgentRunner(model_adapter=fake_adapter)
-        output = agent.run(AgentInput(session_id="session-a", user_input="你好"))
+        output = agent.execute(AgentInput(session_id="session-a", user_input="你好"))
 
         self.assertEqual(output.reply, "mock reply")
         self.assertEqual(output.state.step, 1)
@@ -76,7 +76,7 @@ class TestAgent(unittest.TestCase):
         )
 
         agent = AgentRunner(model_adapter=fake_adapter)
-        output = agent.run(AgentInput(session_id="session-a", user_input="帮我测试工具"))
+        output = agent.execute(AgentInput(session_id="session-a", user_input="帮我测试工具"))
 
         self.assertEqual(output.reply, "final reply")
         self.assertEqual(len(fake_adapter.calls), 2)
@@ -103,7 +103,7 @@ class TestAgent(unittest.TestCase):
         )
 
         agent = AgentRunner(model_adapter=fake_adapter)
-        output = agent.run(AgentInput(session_id="session-a", user_input="帮我测试错误 trace"))
+        output = agent.execute(AgentInput(session_id="session-a", user_input="帮我测试错误 trace"))
 
         self.assertEqual(output.reply, "final reply after error")
         self.assertEqual(len(fake_adapter.calls), 2)
@@ -128,7 +128,7 @@ class TestAgent(unittest.TestCase):
         )
 
         agent = AgentRunner(
-            definition=AgentDefinition(
+            agent_profile=AgentDefinition(
                 id="default",
                 name="Default Agent",
                 system_prompt="你是一个助手",
@@ -139,7 +139,7 @@ class TestAgent(unittest.TestCase):
         )
 
         with self.assertRaises(ValueError) as ctx:
-            agent.run(AgentInput(session_id="session-a", user_input="帮我测试权限"))
+            agent.execute(AgentInput(session_id="session-a", user_input="帮我测试权限"))
 
         self.assertIn("Tool not allowed: write_file", str(ctx.exception))
         self.assertEqual(len(fake_adapter.calls), 1)

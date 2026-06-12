@@ -11,9 +11,9 @@ from agent_prototype.execution.persistence.types import AgentInput
 from agent_prototype.execution.runtime.types import AgentState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.service import RunService
-from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
+from agent_prototype.execution.run_context_factory import RunContextFactory
 from agent_prototype.infra.db.orm_models import SessionRunRecord, ToolCallRecord
-from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.tests.helpers.db import make_sqlite_test_db
 from agent_prototype.tests.helpers.factories import build_assistant_response
 
@@ -21,8 +21,8 @@ from agent_prototype.tests.helpers.factories import build_assistant_response
 def _seed_session(session_local, session_id: str, workspace_path: Path) -> None:
     db = session_local()
     try:
-        store = SqliteSessionStore(db)
-        record = store.upsert_session_snapshot(
+        store = SessionStore(db)
+        record = store.save_state(
             session_id,
             state=AgentState(),
             workspace_path=str(workspace_path),
@@ -125,10 +125,10 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        with patch.object(RuntimeContextFactory, "_build_adapter", return_value=adapter):
+        with patch.object(RunContextFactory, "_create_adapter", return_value=adapter):
             db = self.session_local()
             try:
-                output = RunService(db).run_agent(
+                output = RunService(db).run(
                     AgentInput(
                         session_id=session_id,
                         user_input="写一个文件",
@@ -163,12 +163,12 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
         adapter = FakeAsyncAdapter("cancelled.txt", "staged then discarded")
 
         with (
-            patch.object(RuntimeContextFactory, "_build_adapter", return_value=adapter),
-            patch("agent_prototype.execution.streaming.stream_run_session.logger.exception"),
+            patch.object(RunContextFactory, "_create_adapter", return_value=adapter),
+            patch("agent_prototype.execution.streaming.sse_bridge.logger.exception"),
         ):
             db = self.session_local()
             try:
-                stream = RunService(db).async_stream_agent(
+                stream = RunService(db).stream(
                     AgentInput(
                         session_id=session_id,
                         user_input="流式写文件然后取消",
@@ -193,13 +193,12 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(saw_delta)
                 self.assertFalse(target.exists())
 
-                RunService(db).finalize_run(
+                RunService(db).cancel_run(
                     session_id=session_id,
                     run_id=run_id,
                     user_input="流式写文件然后取消",
                     partial_reply="partial",
                     agent_name="software_engineer",
-                    skill_name=None,
                 )
                 stream = None
                 gc.collect()

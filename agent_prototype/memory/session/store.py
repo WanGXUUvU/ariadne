@@ -33,7 +33,7 @@ from agent_prototype.infra.db.orm_models import (
 _UNSET = object()
 
 
-class SqliteSessionStore:
+class SessionStore:
     """围绕 session 相关数据的 SQLite store。"""
 
     def __init__(self, db: Session):
@@ -45,13 +45,12 @@ class SqliteSessionStore:
         """获取一个会话当前的聊天状态。"""
         return self.read_session_state(session_id)
 
-    def upsert_session_snapshot(
+    def save_state(
         self,
         session_id: str,
         state: AgentState,
         session_name: Optional[str] = None,
         last_agent_name=_UNSET,
-        last_skill_name=_UNSET,
         last_reply_preview=_UNSET,
         context_tokens: Optional[int] = None,
         workspace_path=_UNSET,
@@ -77,8 +76,6 @@ class SqliteSessionStore:
 
             record.message_count = message_count
 
-            if last_skill_name is not _UNSET:
-                record.last_skill_name = last_skill_name
             if workspace_name is not _UNSET:
                 record.workspace_name = workspace_name
             if workspace_path is not _UNSET:
@@ -92,7 +89,6 @@ class SqliteSessionStore:
                 session_name=session_name or session_id,
                 state_json=state_json,
                 last_agent_name=None if last_agent_name is _UNSET else last_agent_name,
-                last_skill_name=None if last_skill_name is _UNSET else last_skill_name,
                 message_count=message_count,
                 last_reply_preview=None if last_reply_preview is _UNSET else last_reply_preview,
                 context_tokens=context_tokens,
@@ -142,13 +138,13 @@ class SqliteSessionStore:
             .all()
         )
 
-    def read_session_record(self, session_id: str) -> Optional[SessionRecord]:
+    def load_record(self, session_id: str) -> Optional[SessionRecord]:
         """读取 session 主记录。"""
         return self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
 
     def read_session_state(self, session_id: str) -> Optional[AgentState]:
         """读取并反序列化 session 状态快照。"""
-        record = self.read_session_record(session_id)
+        record = self.load_record(session_id)
         if not record:
             return None
         return AgentState.model_validate(json.loads(record.state_json))

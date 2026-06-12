@@ -52,7 +52,6 @@ def read_session_trace_api(
                 run_id=run_record.run_id,
                 session_id=run_record.session_id,
                 agent_name=run_record.agent_name,
-                skill_name=run_record.skill_name,
                 user_input=run_record.user_input,
                 reply=run_record.reply,
                 event_count=run_record.event_count,

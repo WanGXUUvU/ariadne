@@ -6,11 +6,11 @@
 - 将压缩后的状态快照写回 session，并收缩历史 run 的活跃范围。
 
 上游：
-- RuntimeContextFactory
+- RunContextFactory
 - compact API route
 
 下游：
-- SqliteSessionStore / SqliteRunStore
+- SessionStore / RunTraceStore
 - HistoryCompactor / compaction helpers
 
 不负责：
@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session
 
 from agent_prototype.infra.db.orm_models import SessionRecord, ModelSetting
 from agent_prototype.memory.summary.types import CompactInput, CompactOutput
-from agent_prototype.memory.session.store import SqliteSessionStore
-from agent_prototype.memory.run.store import SqliteRunStore
+from agent_prototype.memory.session.store import SessionStore
+from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.context.compaction import (
     compact_state_with_summary,
     split_messages_for_compaction,
@@ -39,8 +39,8 @@ class CompactService:
     def __init__(self, db: Session):
         """使用当前 DB session 装配压缩服务。"""
         self.db = db
-        self.store = SqliteSessionStore(db)
-        self._run_store = SqliteRunStore(db)
+        self.store = SessionStore(db)
+        self._run_store = RunTraceStore(db)
 
     def auto_compact_in_memory(
         self,
@@ -57,14 +57,6 @@ class CompactService:
                 return CompactOutput(state=state, did_compact=False, removed_count=0)
             if context_tokens / context_length < 0.7:
                 return CompactOutput(state=state, did_compact=False, removed_count=0)
-
-        _, middle_messages, _ = split_messages_for_compaction(
-            state.messages,
-            keep_recent_count=keep_recent_count,
-        )
-
-        if not middle_messages:
-            return CompactOutput(state=state, did_compact=False, removed_count=0)
 
         summary_text = compactor.compact(state.messages, keep_recent=keep_recent_count)
 
@@ -113,9 +105,9 @@ class CompactService:
             state.messages
         ) >= payload.trigger_threshold
 
-        from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
+        from agent_prototype.execution.run_context_factory import RunContextFactory
 
-        adapter = RuntimeContextFactory(self.db).build_adapter(payload.session_id)
+        adapter = RunContextFactory(self.db).create_adapter(payload.session_id)
         compactor = HistoryCompactor(adapter)
 
         compact_result = self.auto_compact_in_memory(
@@ -130,7 +122,7 @@ class CompactService:
         if not compact_result.did_compact:
             return compact_result
 
-        record = self.store.read_session_record(payload.session_id)
+        record = self.store.load_record(payload.session_id)
         try:
             if compact_result.compact_tokens is not None:
                 new_context_tokens = compact_result.compact_tokens
@@ -139,12 +131,11 @@ class CompactService:
                     sum(len(m.content or "") for m in compact_result.state.messages) // 4
                 )
 
-            self.store.upsert_session_snapshot(
+            self.store.save_state(
                 payload.session_id,
                 state=compact_result.state,
                 session_name=record.session_name if record else payload.session_id,
                 last_agent_name=record.last_agent_name if record else None,
-                last_skill_name=record.last_skill_name if record else None,
                 last_reply_preview=record.last_reply_preview if record else None,
                 context_tokens=new_context_tokens,
             )

@@ -1,4 +1,4 @@
-"""流式运行会话 (StreamRunSession)
+"""流式运行会话 (RunSSEBridge)
 
 职责：
 - 作为 stream run 的外层 adapter，把通用执行层结果翻译成 SSE。
@@ -14,49 +14,49 @@ from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
-from agent_prototype.execution.persistence.service import RunPersistenceService
+from agent_prototype.execution.persistence.run_recorder import RunRecorder
 from agent_prototype.execution.persistence.types import AgentInput, RunContext, RunFinalStatus, RunMetadata
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
-from agent_prototype.execution.runtime.execution_session import (
+from agent_prototype.execution.runtime.run_lifecycle import (
     AgentEventItem,
     FinalResultItem,
-    RunExecutionDeps,
-    RunExecutionSession,
+    RunLifecycleParams,
+    RunLifecycle,
     TextDeltaItem,
     ThinkingDeltaItem,
 )
 from agent_prototype.execution.streaming.sse import _sse_frame
 from agent_prototype.execution.streaming.types import StreamFrame
-from agent_prototype.observation.tool_run_observer import ToolRunObserver
+from agent_prototype.observation.tool_tracer import ToolTracer
 
 
-class StreamRunSession:
+class RunSSEBridge:
     """stream run 的协议适配壳层。"""
 
     def __init__(
         self,
         ctx: RunContext,
-        observer: ToolRunObserver,
-        agent: AgentRunner,
+        observer: ToolTracer,
+        agent_runner: AgentRunner,
         run_id: str,
         agent_input: AgentInput,
-        persist: RunPersistenceService,
+        persist: RunRecorder,
     ):
         self.ctx = ctx
         self.observer = observer
-        self.agent = agent
+        self.agent_runner = agent_runner
         self.run_id = run_id
         self.agent_input = agent_input
         self.persist = persist
 
-    async def run(self) -> AsyncIterator[str]:
+    async def stream(self) -> AsyncIterator[str]:
         """消费通用执行项，并实时翻译成 SSE。"""
         yield self._start_frame()
 
-        session = RunExecutionSession(
-            RunExecutionDeps(
+        session = RunLifecycle(
+            RunLifecycleParams(
                 ctx=self.ctx,
-                agent=self.agent,
+                agent_runner=self.agent_runner,
                 persist=self.persist,
                 agent_input=self.agent_input,
                 run_id=self.run_id,
@@ -67,7 +67,7 @@ class StreamRunSession:
         )
 
         try:
-            async for item in session.run():
+            async for item in session.iterate():
                 if isinstance(item, TextDeltaItem):
                     yield _sse_frame(
                         StreamFrame(
@@ -111,7 +111,6 @@ class StreamRunSession:
                                         session_id=self.agent_input.session_id,
                                         run_id=self.run_id,
                                         agent_name=self.ctx.effective_agent_name,
-                                        skill_name=self.agent_input.skill_name,
                                     ).model_dump(),
                                 },
                             )
@@ -133,7 +132,6 @@ class StreamRunSession:
                     "session_id": self.agent_input.session_id,
                     "run_id": self.run_id,
                     "agent_name": self.ctx.effective_agent_name,
-                    "skill_name": self.agent_input.skill_name,
                 },
             )
         )

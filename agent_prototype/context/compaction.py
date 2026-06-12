@@ -137,11 +137,6 @@ def compact_state_with_summary(
         )
     )
 
-    if len(middle_messages) < 2:  # 中段消息少于 2 条时，内容太短，没有压缩价值，直接跳过
-        return CompactOutput(
-            state=state, did_compact=False, removed_count=0
-        )  # 说明这次不需要 compact 原样返回
-
     summary_message = build_compact_summary_message(summary_text)
     compacted_messages = anchor_messages + [summary_message] + recent_messages
     compacted_state = state.model_copy(
@@ -151,8 +146,7 @@ def compact_state_with_summary(
     return CompactOutput(
         state=compacted_state,  # 返回 compact 后的新状态
         did_compact=True,  # 标记这次确实发生了 compact
-        removed_count=len(state.messages)
-        - len(compacted_messages),  # 计算这次一共折叠掉了多少条原始消息
+        removed_count=len(state.messages)- len(compacted_messages),  # 计算这次一共折叠掉了多少条原始消息
     )
 
 

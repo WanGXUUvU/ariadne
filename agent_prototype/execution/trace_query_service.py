@@ -16,16 +16,16 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from agent_prototype.execution.runtime.types import AgentEvent
-from agent_prototype.memory.run.store import SqliteRunStore
+from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.tools.result_types import ToolResult
 
 
 class TraceQueryService:
     """读取并组装会话 trace。"""
 
-    def __init__(self, db: Session, run_store: Optional[SqliteRunStore] = None):
+    def __init__(self, db: Session, run_store: Optional[RunTraceStore] = None):
         self.db = db
-        self.run_store = run_store or SqliteRunStore(db)
+        self.run_store = run_store or RunTraceStore(db)
 
     def get_session_trace(self, session_id: str, run_id: Optional[str] = None):
         """返回指定 session 的 run_records 和 events_map。"""

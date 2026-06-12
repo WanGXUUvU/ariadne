@@ -16,7 +16,7 @@
 
 不负责：
 - 不做具体安全策略的评估与拦截拦截（由安全中间件负责）。
-- 不持久化工具调用 Trace（由 ToolRunObserver 负责）。
+- 不持久化工具调用 Trace（由 ToolTracer 负责）。
 """
 
 import json  # 解析工具参数 JSON

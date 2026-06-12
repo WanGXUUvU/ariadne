@@ -32,7 +32,7 @@ from agent_prototype.memory.session.types import (
 )
 
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig,PendingApproval,ToolCallRecord,SessionRunRecord,SessionRunEventRecord
-from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.session.store import SessionStore
 
 
 class SessionService:
@@ -48,7 +48,7 @@ class SessionService:
         - db (Session): 数据库会话连接，也就是操作数据库的“钥匙”。
         """
         self.db = db
-        self.store = SqliteSessionStore(db)
+        self.store = SessionStore(db)
 
     # ── 会话生命周期 ────────────────────────────────────────────────────────────
 
@@ -85,12 +85,11 @@ class SessionService:
             default_model_id = default_model.model_id if default_model else None
 
         try:
-            record = self.store.upsert_session_snapshot(
+            record = self.store.save_state(
                 session_id,
                 state=state,
                 session_name=payload.session_name,
                 last_agent_name=None,
-                last_skill_name=None,
                 last_reply_preview=None,
                 workspace_path=payload.workspace_path,
                 workspace_name=payload.workspace_name,
@@ -110,7 +109,6 @@ class SessionService:
             created_at=record.created_at,
             updated_at=record.updated_at,
             last_agent_name=record.last_agent_name,
-            last_skill_name=record.last_skill_name,
             message_count=record.message_count,
             last_reply_preview=record.last_reply_preview,
             permission_profile=record.permission_profile,
@@ -128,19 +126,18 @@ class SessionService:
         会给出来的结果：
         - dict[str, bool]: 重置成功后返回一个表示搞定的字典，例如 `{"ok": True}`。
         """
-        record = self.store.read_session_record(payload.session_id)
+        record = self.store.load_record(payload.session_id)
         if not record:
             raise ValueError("Session not found")
 
         empty_state = AgentState()
         try:
-            self.store.upsert_session_snapshot(
+            self.store.save_state(
                 payload.session_id,
                 state=empty_state,
                 session_name=record.session_name,
                 last_agent_name=None,
                 last_reply_preview=None,
-                last_skill_name=None,
             )
             # 👇 A-2 联动：将该 session 对应的所有历史运行标记为 inactive
             self.store.reset_session_runs(payload.session_id)
@@ -159,7 +156,7 @@ class SessionService:
         会给出来的结果：
         - dict[str, bool]: 删完之后返回一个表示搞定的字典，例如 `{"ok": True}`。
         """
-        record = self.store.read_session_record(session_id)
+        record = self.store.load_record(session_id)
         if record is None:
             raise ValueError("Session not found")
 
@@ -184,7 +181,7 @@ class SessionService:
         if not new_name or not new_name.strip():
             raise ValueError("Session name cannot be empty")
 
-        record = self.store.read_session_record(session_id)
+        record = self.store.load_record(session_id)
         if record is None:
             raise ValueError("Session not found")
 
@@ -206,7 +203,7 @@ class SessionService:
         会给出来的结果：
         - dict[str, bool]: 更新成功后返回一个表示搞定的字典，例如 `{"ok": True}`。
         """
-        record = self.store.read_session_record(session_id)
+        record = self.store.load_record(session_id)
         if record is None:
             raise ValueError("Session not found")
 
@@ -250,7 +247,6 @@ class SessionService:
                 created_at=record.created_at,
                 updated_at=record.updated_at,
                 last_agent_name=record.last_agent_name,
-                last_skill_name=record.last_skill_name,
                 message_count=record.message_count,
                 last_reply_preview=record.last_reply_preview,
                 permission_profile=record.permission_profile,
@@ -270,7 +266,7 @@ class SessionService:
         会给出来的结果：
         - 一个元组 (record, state)，如果找不到则返回 (None, None)。
         """
-        record = self.store.read_session_record(session_id)
+        record = self.store.load_record(session_id)
         if record is None:
             return None, None
         state = self.store.read_session_state(session_id)
@@ -280,7 +276,7 @@ class SessionService:
         """截断指定会话的历史。
         根据message_index物理阶段后续所有消息，以及相关的所有表记录"""
 
-        record=self.store.read_session_record(session_id)
+        record=self.store.load_record(session_id)
         if record is None:
             raise ValueError("Session not found")
         
@@ -293,7 +289,7 @@ class SessionService:
         
         try:
             state.messages=state.messages[:message_index]
-            self.store.upsert_session_snapshot(
+            self.store.save_state(
                 session_id,
                 state=state,
                 session_name=record.session_name,
@@ -328,7 +324,7 @@ class SessionService:
     def fork_session(self,session_id:str,payload:ForkSessionInput)->SessionSummary:
         """从指定截断点派生出一个新的分支会话"""
 
-        parent_record=self.store.read_session_record(session_id)
+        parent_record=self.store.load_record(session_id)
         if parent_record is None:
             raise ValueError("Parent session not found")
         
@@ -350,12 +346,11 @@ class SessionService:
         forked_session_id=uuid.uuid4().hex
 
         try:
-            record=self.store.upsert_session_snapshot(
+            record=self.store.save_state(
                 forked_session_id,
                 state=forked_state,
                 session_name=forked_name,
                 last_agent_name=parent_record.last_agent_name,
-                last_skill_name=parent_record.last_skill_name,
                 workspace_path=parent_record.workspace_path,
                 workspace_name=parent_record.workspace_name,
                 session_type=parent_record.session_type,
@@ -393,7 +388,6 @@ class SessionService:
                     parent_run_id=None,
                     run_status=parent_run.run_status,
                     agent_name=parent_run.agent_name,
-                    skill_name=parent_run.skill_name,
                     user_input=parent_run.user_input,
                     reply=parent_run.reply,
                     event_count=parent_run.event_count,
@@ -443,7 +437,6 @@ class SessionService:
                         parent_run_id=new_run_id,  # 关联到克隆出来的父运行 ID
                         run_status=child_run.run_status,
                         agent_name=child_run.agent_name,
-                        skill_name=child_run.skill_name,
                         user_input=child_run.user_input,
                         reply=child_run.reply,
                         event_count=child_run.event_count,
@@ -489,7 +482,6 @@ class SessionService:
             created_at=record.created_at,
             updated_at=record.updated_at,
             last_agent_name=record.last_agent_name,
-            last_skill_name=record.last_skill_name,
             message_count=record.message_count,
             last_reply_preview=record.last_reply_preview,
             permission_profile=record.permission_profile,

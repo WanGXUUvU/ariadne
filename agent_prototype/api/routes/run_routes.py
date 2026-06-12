@@ -48,7 +48,7 @@ def run_agent_api(
     - AgentOutput 对象，里面包含了 Agent 的回答以及这次运行的一些状态信息。
     """
     try:
-        return service.run_agent(agent_input)
+        return service.run(agent_input)
     except ValueError as exc:
         return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
 
@@ -91,7 +91,7 @@ async def run_stream_api(
     """
     try:
         return StreamingResponse(
-            service.async_stream_agent(agent_input),
+            service.stream(agent_input),
             media_type="text/event-stream",
         )
     except ValueError as exc:
@@ -99,7 +99,7 @@ async def run_stream_api(
 
 
 @router.post("/sessions/{session_id}/runs/{run_id}/finalize")
-def finalize_run_api(
+def cancel_run_api(
     session_id: str,
     run_id: str,
     payload: FinalizeRunInput,
@@ -119,13 +119,12 @@ def finalize_run_api(
     - 归档操作完成后的运行记录结果。
     """
     try:
-        return service.finalize_run(
+        return service.cancel_run(
             session_id=session_id,
             run_id=run_id,
             user_input=payload.user_input,
             partial_reply=payload.partial_reply,
             agent_name=payload.agent_name,
-            skill_name=payload.skill_name,
         )
     except ValueError as exc:
         return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
@@ -157,7 +156,6 @@ def get_run_detail_api(
         user_input=run.user_input,
         reply=run.reply,
         agent_name=run.agent_name,
-        skill_name=run.skill_name,
         created_at=run.created_at,
         tool_calls=[
             ToolCallSummary(

@@ -6,7 +6,7 @@
 - 产出一次运行所需的系统提示词和工作区元信息。
 
 上游：
-- RuntimeContextFactory
+- RunContextFactory
 
 下游：
 - SkillContextService

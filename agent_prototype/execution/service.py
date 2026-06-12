@@ -9,9 +9,9 @@
 - API routes
 
 下游：
-- RuntimeContextFactory
-- AgentRunner / StreamRunSession
-- RunPersistenceService / TraceQueryService / ChildAgentDispatcher
+- RunContextFactory
+- AgentRunner / RunSSEBridge
+- RunRecorder / TraceQueryService / ChildRunLauncher
 
 不负责：
 - 不直接读取低层配置细节。
@@ -26,10 +26,10 @@ from typing import AsyncIterator, Optional
 from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.observation.tool_run_observer import ToolRunObserver
+from agent_prototype.observation.tool_tracer import ToolTracer
 from agent_prototype.security.approval.store import SqliteApprovalStore
-from agent_prototype.memory.session.store import SqliteSessionStore
-from agent_prototype.memory.run.store import SqliteRunStore
+from agent_prototype.memory.session.store import SessionStore
+from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.persistence.types import (
     AgentInput,
@@ -39,15 +39,15 @@ from agent_prototype.execution.persistence.types import (
     RunMetadata,
 )
 from agent_prototype.execution.runtime.agent_runtime import AgentRunner
-from agent_prototype.execution.runtime.execution_session import (
-    RunExecutionDeps,
-    RunExecutionSession,
+from agent_prototype.execution.runtime.run_lifecycle import (
+    RunLifecycleParams,
+    RunLifecycle,
 )
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
-from agent_prototype.execution.child_agent_dispatcher import ChildAgentDispatcher
-from agent_prototype.execution.persistence.service import RunPersistenceService
-from agent_prototype.execution.streaming.stream_run_session import StreamRunSession
-from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
+from agent_prototype.execution.child_run_launcher import ChildRunLauncher
+from agent_prototype.execution.persistence.run_recorder import RunRecorder
+from agent_prototype.execution.streaming.sse_bridge import RunSSEBridge
+from agent_prototype.execution.run_context_factory import RunContextFactory
 from agent_prototype.execution.trace_query_service import TraceQueryService
 
 
@@ -57,51 +57,51 @@ class RunService:
     def __init__(self, db: Session):
         """使用当前 DB session 装配运行期协作者。"""
         self.db = db
-        self.store = SqliteSessionStore(db)
-        self._run_store = SqliteRunStore(db)
+        self.store = SessionStore(db)
+        self._run_store = RunTraceStore(db)
         self.approval_store = SqliteApprovalStore(db)
-        self.persist = RunPersistenceService(db)
-        self.context_factory = RuntimeContextFactory(db)
-        self.child_dispatcher = ChildAgentDispatcher(db)
+        self.persist = RunRecorder(db)
+        self.context_factory = RunContextFactory(db)
+        self.child_dispatcher = ChildRunLauncher(db)
         self.trace_query = TraceQueryService(db, self._run_store)
 
-    def _build_agent_runner(self, ctx, run_id: str, agent_input: AgentInput) -> AgentRunner:
+    def _create_agent_runner(self, ctx, run_id: str, agent_input: AgentInput) -> AgentRunner:
         """基于运行物料和协作者构造 AgentRunner。"""
         return AgentRunner(
             state=ctx.state,
-            definition=ctx.definition,
-            allow_tool_names=ctx.definition.tool_names,
+            agent_profile=ctx.agent_profile,
+            allow_tool_names=ctx.agent_profile.tool_names,
             model_adapter=ctx.adapter,
             tool_registry=build_run_registry(
-                child_dispatcher=self.child_dispatcher.make_child_dispatcher(
+                child_dispatcher=self.child_dispatcher.create_launcher(
                     run_id, agent_input.session_id
                 ),
-                status_checker=self.child_dispatcher.make_status_checker(),
-                child_waiter=self.child_dispatcher.make_child_waiter(),
+                status_checker=self.child_dispatcher.create_status_checker(),
+                child_waiter=self.child_dispatcher.create_waiter(),
             ),
             approval_policy=ctx.approval_policy,
         )
 
     # ── 公开方法 ──────────────────────────────────────────────────────────────
 
-    def run_agent(self, agent_input: AgentInput) -> AgentOutput:
+    def run(self, agent_input: AgentInput) -> AgentOutput:
         """执行一次同步 run，并在结束后持久化结果。"""
         run_id = uuid.uuid4().hex
         RunVfsRegistry.create(run_id)
 
         try:
-            ctx = self.context_factory.build(agent_input)
-            agent = self._build_agent_runner(ctx, run_id, agent_input)
+            ctx = self.context_factory.assemble(agent_input)
+            agent_runner = self._create_agent_runner(ctx, run_id, agent_input)
 
-            result = RunExecutionSession(
-                RunExecutionDeps(
+            result = RunLifecycle(
+                RunLifecycleParams(
                     ctx=ctx,
-                    agent=agent,
+                    agent_runner=agent_runner,
                     persist=self.persist,
                     agent_input=agent_input,
                     run_id=run_id,
                 )
-            ).collect_final_result_sync()
+            ).execute_sync()
             result.state.agent_name = ctx.effective_agent_name
             return AgentOutput(
                 reply=result.partial_reply,
@@ -111,7 +111,6 @@ class RunService:
                     session_id=agent_input.session_id,
                     run_id=run_id,
                     agent_name=ctx.effective_agent_name,
-                    skill_name=agent_input.skill_name,
                 ),
                 usage=result.usage,
             )
@@ -119,14 +118,14 @@ class RunService:
             RunVfsRegistry.discard(run_id)
             raise
 
-    async def async_stream_agent(self, agent_input: AgentInput) -> AsyncIterator[str]:
+    async def stream(self, agent_input: AgentInput) -> AsyncIterator[str]:
         """执行一次流式 run，逐帧产出 SSE 数据。"""
         run_id = uuid.uuid4().hex
         RunVfsRegistry.create(run_id)
 
         try:
-            ctx = self.context_factory.build(agent_input)
-            observer = ToolRunObserver(
+            ctx = self.context_factory.assemble(agent_input)
+            observer = ToolTracer(
                 self.db,
                 self._run_store,
                 self.approval_store,
@@ -134,29 +133,28 @@ class RunService:
                 run_id=run_id,
                 agent_input=agent_input,
             )
-            agent = self._build_agent_runner(ctx, run_id, agent_input)
+            agent_runner = self._create_agent_runner(ctx, run_id, agent_input)
 
-            async for frame in StreamRunSession(
+            async for frame in RunSSEBridge(
                 ctx,
                 observer,
-                agent,
+                agent_runner,
                 run_id,
                 agent_input,
                 self.persist,
-            ).run():
+            ).stream():
                 yield frame
         except Exception:
             RunVfsRegistry.discard(run_id)
             raise
 
-    def finalize_run(
+    def cancel_run(
         self,
         session_id: str,
         run_id: str,
         user_input: str,
         partial_reply: str,
         agent_name: Optional[str],
-        skill_name: Optional[str],
     ) -> dict:
         """保存被中止 run 的当前状态。"""
         self.persist.finalize_run(
@@ -167,7 +165,6 @@ class RunService:
                 user_input=user_input,
                 partial_reply=partial_reply,
                 agent_name=agent_name,
-                skill_name=skill_name,
             )
         )
         return {"ok": True}

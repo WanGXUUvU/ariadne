@@ -47,7 +47,6 @@ class SessionSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_agent_name: Optional[str] = None
-    last_skill_name: Optional[str] = None
     message_count: int = 0
     last_reply_preview: Optional[str] = None
     permission_profile: str = "conservative"

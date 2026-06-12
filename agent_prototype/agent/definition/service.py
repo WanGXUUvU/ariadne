@@ -5,7 +5,7 @@
 - 充当 Agent 静态预设定义的 CRUD 服务（AgentDefinitionService）。
 - 统筹 Built-in 内置智能体人设（从 .md 中解析）与 SQLite 数据库自定义智能体人设的查询与合并。
 
-上游依赖：L8 执行层 (RuntimeContextFactory)、L10 API 接口层。
+上游依赖：L8 执行层 (RunContextFactory)、L10 API 接口层。
 下游依赖：L10 助理定义仓储层 (SqliteAgentDefinitionStore)、L0 基础设施 (db)。
 """
 

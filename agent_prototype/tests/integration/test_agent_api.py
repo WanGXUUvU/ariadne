@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.execution.runtime.types import AgentState
-from agent_prototype.memory.session.store import SqliteSessionStore
+from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.agent.definition import SqliteAgentDefinitionStore
 from agent_prototype.api.app import app
 from agent_prototype.skills.types import SkillSummary
@@ -33,24 +33,24 @@ class TestAgentApi(unittest.TestCase):
         self.client = build_test_client(app, get_db, self.session_local)
         reset_skill_loader_cache()
 
-        # Mock RuntimeContextFactory._build_adapter 绕过物理数据库配置校验，直接返回一个 mock 好的 ChatCompletionsAdapter
-        from agent_prototype.execution.runtime_context_factory import RuntimeContextFactory
+        # Mock RunContextFactory._create_adapter 绕过物理数据库配置校验，直接返回一个 mock 好的 ChatCompletionsAdapter
+        from agent_prototype.execution.run_context_factory import RunContextFactory
         from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
 
-        self.build_adapter_patcher = patch.object(
-            RuntimeContextFactory,
-            "_build_adapter",
+        self.create_adapter_patcher = patch.object(
+            RunContextFactory,
+            "_create_adapter",
             return_value=ChatCompletionsAdapter(
                 api_key="mock-api-key",
                 base_url="mock-base-url",
                 model="mock-model",
             ),
         )
-        self.mock_build_adapter = self.build_adapter_patcher.start()
+        self.mock_create_adapter = self.create_adapter_patcher.start()
 
     def tearDown(self):
-        if hasattr(self, "build_adapter_patcher"):
-            self.build_adapter_patcher.stop()
+        if hasattr(self, "create_adapter_patcher"):
+            self.create_adapter_patcher.stop()
         app.dependency_overrides.clear()
         self.engine.dispose()
         self.temp_dir.cleanup()
@@ -76,7 +76,6 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["metadata"]["session_id"], "session-a")
         self.assertTrue(data["metadata"]["run_id"])
         self.assertEqual(data["metadata"]["agent_name"], "default")
-        self.assertIsNone(data["metadata"]["skill_name"])
         self.assertEqual(
             data["state"]["messages"],
             [
@@ -154,14 +153,13 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["metadata"]["session_id"], "session-with-metadata")
         self.assertTrue(data["metadata"]["run_id"])
         self.assertEqual(data["metadata"]["agent_name"], "reviewer")
-        self.assertEqual(data["metadata"]["skill_name"], "openai-docs")
 
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_compact_endpoint_returns_compacted_state(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="中段历史摘要")
         db = self.session_local()
         try:
-            store = SqliteSessionStore(db)
+            store = SessionStore(db)
             state = AgentState(
                 messages=[
                     {"role": "user", "content": "最初任务目标"},
@@ -180,7 +178,7 @@ class TestAgentApi(unittest.TestCase):
                     {"role": "user", "content": "现在开始做 compact"},
                 ]
             )
-            store.upsert_session_snapshot("compact-session", state=state)
+            store.save_state("compact-session", state=state)
             db.commit()
         finally:
             db.close()
@@ -212,7 +210,7 @@ class TestAgentApi(unittest.TestCase):
         ]
         db = self.session_local()
         try:
-            store = SqliteSessionStore(db)
+            store = SessionStore(db)
             state = AgentState(
                 messages=[
                     {"role": "user", "content": "最初任务目标"},
@@ -231,7 +229,7 @@ class TestAgentApi(unittest.TestCase):
                     {"role": "user", "content": "现在开始做 compact"},
                 ]
             )
-            store.upsert_session_snapshot("auto-compact-session", state=state, context_tokens=90000)
+            store.save_state("auto-compact-session", state=state, context_tokens=90000)
             db.commit()
         finally:
             db.close()
@@ -284,9 +282,9 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            store = SqliteSessionStore(db)
+            store = SessionStore(db)
             state = AgentState(messages=original_messages)
-            store.upsert_session_snapshot(
+            store.save_state(
                 "auto-compact-fail-session", state=state, context_tokens=90000
             )
             db.commit()
@@ -307,7 +305,7 @@ class TestAgentApi(unittest.TestCase):
 
         db = self.session_local()
         try:
-            store = SqliteSessionStore(db)
+            store = SessionStore(db)
             persisted_state = store.read_session_state("auto-compact-fail-session")
             self.assertIsNotNone(persisted_state)
             self.assertEqual(
@@ -337,7 +335,6 @@ class TestAgentApi(unittest.TestCase):
             self.assertEqual(record.session_id, "session-meta")
             self.assertEqual(record.session_name, "session-meta")
             self.assertEqual(record.last_agent_name, "default")
-            self.assertIsNone(record.last_skill_name)
             self.assertEqual(record.message_count, 2)
             self.assertEqual(record.last_reply_preview, "mock reply with preview")
             self.assertIsNotNone(record.created_at)
@@ -423,9 +420,7 @@ class TestAgentApi(unittest.TestCase):
             )
 
             self.assertIsNotNone(record)
-            self.assertEqual(record.last_skill_name, "openai-docs")
             self.assertIsNotNone(run_record)
-            self.assertEqual(run_record.skill_name, "openai-docs")
         finally:
             db.close()
 
@@ -481,9 +476,7 @@ class TestAgentApi(unittest.TestCase):
             )
 
             self.assertIsNotNone(record)
-            self.assertIsNone(record.last_skill_name)
             self.assertIsNotNone(run_record)
-            self.assertIsNone(run_record.skill_name)
         finally:
             db.close()
 
@@ -547,7 +540,6 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["session_name"], "新会话")
         self.assertEqual(data["message_count"], 0)
         self.assertIsNone(data["last_agent_name"])
-        self.assertIsNone(data["last_skill_name"])
         self.assertIsNone(data["last_reply_preview"])
         self.assertIn("created_at", data)
         self.assertIn("updated_at", data)
@@ -575,7 +567,6 @@ class TestAgentApi(unittest.TestCase):
             self.assertEqual(record.session_name, "新会话")
             self.assertEqual(record.message_count, 0)
             self.assertIsNone(record.last_agent_name)
-            self.assertIsNone(record.last_skill_name)
             self.assertIsNone(record.last_reply_preview)
         finally:
             db.close()
@@ -604,7 +595,6 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(detail_data["session_name"], "session-reset")
         self.assertEqual(detail_data["message_count"], 0)
         self.assertIsNone(detail_data["last_agent_name"])
-        self.assertIsNone(detail_data["last_skill_name"])
         self.assertIsNone(detail_data["last_reply_preview"])
         self.assertEqual(detail_data["state"]["messages"], [])
         self.assertEqual(detail_data["state"]["step"], 0)
@@ -619,7 +609,6 @@ class TestAgentApi(unittest.TestCase):
             self.assertEqual(record.session_name, "session-reset")
             self.assertEqual(record.message_count, 0)
             self.assertIsNone(record.last_agent_name)
-            self.assertIsNone(record.last_skill_name)
             self.assertIsNone(record.last_reply_preview)
         finally:
             db.close()

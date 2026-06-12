@@ -40,7 +40,7 @@ class AgentRunner:
     def __init__(
         self,
         state: Optional[AgentState] = None,
-        definition: Optional[AgentDefinition] = None,
+        agent_profile: Optional[AgentDefinition] = None,
         tool_registry: Optional[ToolRegistry] = None,
         allow_tool_names: Optional[list[str]] = None,
         model_adapter: Optional[ModelAdapter] = None,
@@ -59,10 +59,10 @@ class AgentRunner:
         - session_type: 会话类型（默认是写代码模式 "coding"）。
         """
         self.state = state or AgentState()
-        self.definition = definition or DEFAULT_AGENT_DEFINITION
+        self.agent_profile = agent_profile or DEFAULT_AGENT_DEFINITION
         self.tool_registry = tool_registry or DEFAULT_TOOL_REGISTRY
         self.allow_tool_names = (
-            allow_tool_names if allow_tool_names is not None else self.definition.tool_names
+            allow_tool_names if allow_tool_names is not None else self.agent_profile.tool_names
         )
         self.model_adapter = model_adapter
         self.approval_policy = approval_policy
@@ -71,7 +71,7 @@ class AgentRunner:
 
     # ── 非流式（保留备用） ────────────────────────────────────────────────────
 
-    def run(self, agent_input: AgentInput, run_id: Optional[str] = None) -> AgentOutput:
+    def execute(self, agent_input: AgentInput, run_id: Optional[str] = None) -> AgentOutput:
         """同步普通运行模式：让发动机一口气轰鸣运转到结束！
         把用户输入塞进历史，然后在大模型和工具调用之间来回循环，直到大模型给出最终文字回答，最后把整个运行包成一个 AgentOutput 吐出来。
         这个方法是“同步阻塞”的，会一直等完全部过程。
@@ -90,7 +90,7 @@ class AgentRunner:
 
         while True:
             request = build_model_request(
-                self.definition,
+                self.agent_profile,
                 self.state,
                 self.tool_registry,
                 self.allow_tool_names,
@@ -152,7 +152,7 @@ class AgentRunner:
 
         while True:
             request = build_model_request(
-                self.definition,
+                self.agent_profile,
                 self.state,
                 self.tool_registry,
                 self.allow_tool_names,
@@ -261,7 +261,7 @@ class AgentRunner:
 
         while True:
             request = build_model_request(
-                self.definition,
+                self.agent_profile,
                 self.state,
                 self.tool_registry,
                 self.allow_tool_names,

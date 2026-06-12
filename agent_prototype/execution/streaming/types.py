@@ -15,7 +15,7 @@ class StreamFrame(BaseModel):
     """一条 SSE 推送帧的结构。
 
     type 取值：
-    - start          : 运行开始，包含 session_id / run_id / agent_name / skill_name
+    - start          : 运行开始，包含 session_id / run_id / agent_name
     - agent_event    : 一个语义事件（工具调用 / 工具结果 / 工具错误）
     - delta          : 最终回答阶段的 token 级增量内容
     - end            : 运行完成，包含完整 reply / state / metadata

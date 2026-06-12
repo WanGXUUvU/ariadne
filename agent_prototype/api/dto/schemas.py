@@ -44,7 +44,6 @@ class RunDetailResponse(BaseModel):
     user_input: str
     reply: str
     agent_name: Optional[str] = None
-    skill_name: Optional[str] = None
     created_at: datetime
     tool_calls: list[ToolCallSummary]
 
@@ -76,7 +75,6 @@ class TraceRunSummary(BaseModel):
     run_id: str
     session_id: str
     agent_name: Optional[str] = None
-    skill_name: Optional[str] = None
     user_input: str
     reply: str
     event_count: int

@@ -40,7 +40,7 @@ class TestSessionFork(unittest.TestCase):
             ChatMessage(role="user", content="Tell me a joke"),
             ChatMessage(role="assistant", content="Why did the scarecrow win an award?"),
         ]
-        self.service.store.upsert_session_snapshot(parent_id, state)
+        self.service.store.save_state(parent_id, state)
 
         # 2. 在原会话中注入 Runs、Events 和 Tool Calls 数据以验证深度拷贝
         run1 = SessionRunRecord(session_id=parent_id, run_id="r1", user_input="Hello", reply="Hi", parent_run_id=None)
@@ -103,7 +103,7 @@ class TestSessionFork(unittest.TestCase):
 
         # 7. 验证独立隔离性 (向新分支添加消息，不会影响父会话)
         forked_state.messages.append(ChatMessage(role="user", content="New query in child"))
-        self.service.store.upsert_session_snapshot(forked_id, forked_state)
+        self.service.store.save_state(forked_id, forked_state)
 
         # 重读验证
         _, final_original_state = self.service.get_session(parent_id)
