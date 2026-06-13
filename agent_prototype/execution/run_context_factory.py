@@ -30,8 +30,8 @@ from agent_prototype.agent.definition import AgentDefinitionService
 from agent_prototype.context.assembler import ContextAssembler
 from agent_prototype.context.compaction import HistoryCompactor
 from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
-from agent_prototype.execution.persistence.types import AgentInput, RunContext
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.persistence.types import RunInput, RunContext
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig, SessionRecord
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.memory.summary.service import CompactService
@@ -50,18 +50,18 @@ class RunContextFactory:
         self.db = db
         self.store = SessionStore(db)
 
-    def assemble(self, agent_input: AgentInput) -> RunContext:
+    def assemble(self, run_input: RunInput) -> RunContext:
         """构建一次运行所需的完整上下文。
 
         这一步的产物就是 RunContext。它是 run 开始前最关键的稳定背景物料，
         后面的 RunService / RunLifecycle / AgentRunner 都默认依赖它。
         """
-        session_id = agent_input.session_id
+        session_id = run_input.session_id
         record = self._load_record(session_id)
         # 先根据 session 绑定的 provider/model 准备好模型适配器。
         adapter = self._create_adapter(session_id, record)
         # 读取 session 最新状态快照，作为本轮运行起点。
-        state = self.store.get(session_id) or AgentState()
+        state = self.store.get(session_id) or RunState()
 
         context_tokens = record.context_tokens if record and record.context_tokens else 0
         session_type = record.session_type if record else "assistant"
@@ -81,7 +81,7 @@ class RunContextFactory:
             )
             state = compact_result.state
 
-        effective_agent_name = self._resolve_effective_agent_name(agent_input, session_type)
+        effective_agent_name = self._resolve_effective_agent_name(run_input, session_type)
         definition = AgentDefinitionService(self.db).load_definition(effective_agent_name)
 
         assembler = ContextAssembler(
@@ -90,7 +90,7 @@ class RunContextFactory:
             build_runtime_system_prompt=build_runtime_system_prompt,
         )
         assembled_ctx = assembler.assemble(
-            agent_input=agent_input,
+            run_input=run_input,
             session_type=session_type,
             workspace_path=workspace_path,
             definition=definition,
@@ -142,13 +142,13 @@ class RunContextFactory:
 
     def _resolve_effective_agent_name(
         self,
-        agent_input: AgentInput,
+        run_input: RunInput,
         session_type: str,
     ) -> str:
         """解析本轮实际使用的 agent 名称。"""
         if session_type == "coding":
             return "software_engineer"
-        return agent_input.agent_name or "default"
+        return run_input.agent_name or "default"
 
     def _resolve_approval_policy(self, record: Optional[SessionRecord]):
         """根据 session 权限档位选择审批策略。"""

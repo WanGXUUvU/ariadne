@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Optional
 
 from agent_prototype.core.types import ChatMessage, ToolCall
-from agent_prototype.execution.runtime.types import AgentEvent
+from agent_prototype.execution.runtime.types import RunEvent
 
 
 ToolBatchStatus = Literal[
@@ -35,7 +35,7 @@ class ToolBatchItem:
 
     approval_id: Optional[str] = None
     result_message: Optional[ChatMessage] = None
-    result_event: Optional[AgentEvent] = None
+    result_event: Optional[RunEvent] = None
 
     def is_terminal(self) -> bool:
         """终态 = 已完成 / 已拒绝 / 已失败。"""

@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
-from agent_prototype.execution.runtime.types import AgentEvent, AgentState
+from agent_prototype.execution.runtime.types import RunEvent, RunState
 from agent_prototype.memory.session.types import SessionSummary
 
 
@@ -56,7 +56,7 @@ class RunDetailResponse(BaseModel):
 class SessionDetail(SessionSummary):
     """session 详情，继承摘要信息并补上完整 state。"""
 
-    state: AgentState
+    state: RunState
     model_id: Optional[str] = None
     model_provider_id: Optional[int] = None
     thinking_enabled: bool = False
@@ -80,7 +80,7 @@ class TraceRunSummary(BaseModel):
     event_count: int
     created_at: datetime
     finished_at: datetime
-    events: list[AgentEvent]
+    events: list[RunEvent]
 
 
 class TraceResponse(BaseModel):

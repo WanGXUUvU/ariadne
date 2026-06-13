@@ -9,7 +9,7 @@ from agent_prototype.infra.db.orm_models import (
     SessionRunEventRecord,
     ToolCallRecord,
 )
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.memory.session.service import SessionService
 from agent_prototype.memory.session.types import CreateSessionInput, ForkSessionInput

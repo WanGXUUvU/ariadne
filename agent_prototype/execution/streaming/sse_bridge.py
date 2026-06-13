@@ -2,7 +2,7 @@
 
 职责：
 - 作为 stream run 的外层 adapter，把通用执行层结果翻译成 SSE。
-- 负责 start / delta / thinking_delta / agent_event / paused / end 帧输出。
+- 负责 start / delta / thinking_delta / run_event / paused / end 帧输出。
 
 不负责：
 - 不负责执行主循环。
@@ -15,11 +15,11 @@ from typing import AsyncIterator
 logger = logging.getLogger(__name__)
 
 from agent_prototype.execution.persistence.run_recorder import RunRecorder
-from agent_prototype.execution.persistence.types import AgentInput, RunContext, RunFinalStatus, RunMetadata
-from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.execution.persistence.types import RunInput, RunContext, RunFinalStatus
+from agent_prototype.execution.runtime.agent_runner import AgentRunner
 from agent_prototype.execution.runtime.run_lifecycle import (
-    AgentEventItem,
-    FinalResultItem,
+    RunEventItem,
+    RunStatusItem,
     RunLifecycleParams,
     RunLifecycle,
     TextDeltaItem,
@@ -39,14 +39,14 @@ class RunSSEBridge:
         observer: ToolTracer,
         agent_runner: AgentRunner,
         run_id: str,
-        agent_input: AgentInput,
+        run_input: RunInput,
         persist: RunRecorder,
     ):
         self.ctx = ctx
         self.observer = observer
         self.agent_runner = agent_runner
         self.run_id = run_id
-        self.agent_input = agent_input
+        self.run_input = run_input
         self.persist = persist
 
     async def stream(self) -> AsyncIterator[str]:
@@ -58,7 +58,7 @@ class RunSSEBridge:
                 ctx=self.ctx,
                 agent_runner=self.agent_runner,
                 persist=self.persist,
-                agent_input=self.agent_input,
+                run_input=self.run_input,
                 run_id=self.run_id,
                 on_tool_start=self.observer.on_tool_start,
                 on_tool_finish=self.observer.on_tool_finish,
@@ -84,16 +84,16 @@ class RunSSEBridge:
                         )
                     )
 
-                elif isinstance(item, AgentEventItem):
+                elif isinstance(item, RunEventItem):
                     yield _sse_frame(
                         StreamFrame(
-                            type="agent_event",
+                            type="run_event",
                             data=item.event.model_dump(),
                         )
                     )
 
-                elif isinstance(item, FinalResultItem):
-                    if item.result.status == RunFinalStatus.PAUSED:
+                elif isinstance(item, RunStatusItem):
+                    if item.status == RunFinalStatus.PAUSED:
                         yield _sse_frame(
                             StreamFrame(
                                 type="paused",
@@ -105,20 +105,14 @@ class RunSSEBridge:
                             StreamFrame(
                                 type="end",
                                 data={
-                                    "reply": item.result.reply_text,
-                                    "state": item.result.state.model_dump(),
-                                    "metadata": RunMetadata(
-                                        session_id=self.agent_input.session_id,
-                                        run_id=self.run_id,
-                                        agent_name=self.ctx.effective_agent_name,
-                                    ).model_dump(),
+                                    "state": self.agent_runner.state.model_dump(),
                                 },
                             )
                         )
         except Exception:
             logger.exception(
                 "Stream run failed: session_id=%s run_id=%s",
-                self.agent_input.session_id,
+                self.run_input.session_id,
                 self.run_id,
             )
             raise
@@ -129,7 +123,7 @@ class RunSSEBridge:
             StreamFrame(
                 type="start",
                 data={
-                    "session_id": self.agent_input.session_id,
+                    "session_id": self.run_input.session_id,
                     "run_id": self.run_id,
                     "agent_name": self.ctx.effective_agent_name,
                 },

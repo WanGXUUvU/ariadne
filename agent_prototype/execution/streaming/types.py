@@ -16,7 +16,7 @@ class StreamFrame(BaseModel):
 
     type 取值：
     - start          : 运行开始，包含 session_id / run_id / agent_name
-    - agent_event    : 一个语义事件（工具调用 / 工具结果 / 工具错误）
+    - run_event      : 一个语义事件（工具调用 / 工具结果 / 工具错误）
     - delta          : 最终回答阶段的 token 级增量内容
     - end            : 运行完成，包含完整 reply / state / metadata
     - error          : 运行失败，包含错误码和错误信息
@@ -27,7 +27,7 @@ class StreamFrame(BaseModel):
 
     type: Literal[
         "start",
-        "agent_event",
+        "run_event",
         "delta",
         "end",
         "error",

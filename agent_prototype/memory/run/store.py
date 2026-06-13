@@ -15,7 +15,7 @@ from typing import Optional
 from sqlalchemy import func as sqlfunc
 from sqlalchemy.orm import Session
 from agent_prototype.core.types import ChatMessage
-from agent_prototype.execution.runtime.types import AgentEvent
+from agent_prototype.execution.runtime.types import RunEvent
 from agent_prototype.infra.db.orm_models import (
     SessionRecord,
     SessionRunEventRecord,
@@ -41,7 +41,7 @@ class RunTraceStore:
         agent_name: Optional[str],
         user_input: str,
         reply: str,
-        events: list[AgentEvent],
+        events: list[RunEvent],
     ) -> SessionRunRecord:
         """保存一次完整的运行轨迹（Trace）。
         把这次运行的基本信息存入主表，然后把运行中发生的所有"事件"按顺序存入事件子表中。
@@ -52,7 +52,7 @@ class RunTraceStore:
         - agent_name (str, 可选): 负责干活的 Agent 名字。
         - user_input (str): 用户的输入文本。
         - reply (str): 最终给出的回复文本。
-        - events (list[AgentEvent]): 运行过程中发生的所有步骤事件。
+        - events (list[RunEvent]): 运行过程中发生的所有步骤事件。
 
         会给出来的结果：
         - SessionRunRecord: 新建并保存好的运行记录对象。
@@ -191,7 +191,7 @@ class RunTraceStore:
             .all()
         )
 
-    def append_run_events(self, *, run_id, new_events: list[AgentEvent], final_reply: str) -> None:
+    def append_run_events(self, *, run_id, new_events: list[RunEvent], final_reply: str) -> None:
         """给一次运行追加新的步骤事件，并更新它的最终答复。"""
         run_record = (
             self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
@@ -293,7 +293,7 @@ class RunTraceStore:
         agent_name: Optional[str],
         user_input: str,
         reply: str,
-        events: list[AgentEvent],
+        events: list[RunEvent],
     ) -> SessionRunRecord:
         """为子 Agent 创建一条关联的子运行记录。"""
         run_record = SessionRunRecord(
@@ -337,7 +337,7 @@ class RunTraceStore:
             .all()
         )
 
-    def append_run_events_partial(self, *, run_id: str, new_events: list[AgentEvent]) -> None:
+    def append_run_events_partial(self, *, run_id: str, new_events: list[RunEvent]) -> None:
         """给一次 run 追加事件，但不修改 completed 状态和最终 reply。"""
         run_record = (
             self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()

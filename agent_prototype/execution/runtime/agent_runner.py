@@ -1,6 +1,6 @@
 """Agent 执行器。
 
-职责：给定 AgentInput，驱动 LLM + 工具循环，产出 events 与最终 reply。
+职责：给定 RunInput，驱动 LLM + 工具循环，产出 events 与最终 reply。
 不负责数据库持久化，持久化由 service 层处理。
 """
 
@@ -11,12 +11,13 @@ from typing import AsyncIterator, Iterator, Optional, Union
 from agent_prototype.agent.types import AgentDefinition, DEFAULT_AGENT_DEFINITION
 from agent_prototype.core.types import (
     ChatMessage,
+    StreamChunk,
     ToolCall,
     ToolCallFunction,
     ModelAdapter,
 )
-from agent_prototype.execution.persistence.types import AgentInput, AgentOutput, RunMetadata
-from agent_prototype.execution.runtime.types import AgentEvent, AgentState
+from agent_prototype.execution.persistence.types import RunInput, RunOutput, RunMetadata
+from agent_prototype.execution.runtime.types import RunEvent, RunState
 from agent_prototype.security.policy.types import ApprovalPolicy
 from agent_prototype.tools.registry import DEFAULT_TOOL_REGISTRY, ToolRegistry
 from agent_prototype.execution.runtime.message_builder import build_model_request
@@ -39,10 +40,9 @@ class AgentRunner:
 
     def __init__(
         self,
-        state: Optional[AgentState] = None,
+        state: Optional[RunState] = None,
         agent_profile: Optional[AgentDefinition] = None,
         tool_registry: Optional[ToolRegistry] = None,
-        allow_tool_names: Optional[list[str]] = None,
         model_adapter: Optional[ModelAdapter] = None,
         approval_policy: ApprovalPolicy = ApprovalPolicy.NEVER,
         session_type: str = "coding",
@@ -58,12 +58,9 @@ class AgentRunner:
         - approval_policy: 审批策略，决定调用工具时需不需要人类手动审批（默认从不审批）。
         - session_type: 会话类型（默认是写代码模式 "coding"）。
         """
-        self.state = state or AgentState()
+        self.state = state or RunState()
         self.agent_profile = agent_profile or DEFAULT_AGENT_DEFINITION
         self.tool_registry = tool_registry or DEFAULT_TOOL_REGISTRY
-        self.allow_tool_names = (
-            allow_tool_names if allow_tool_names is not None else self.agent_profile.tool_names
-        )
         self.model_adapter = model_adapter
         self.approval_policy = approval_policy
         self.last_usage = None
@@ -71,21 +68,21 @@ class AgentRunner:
 
     # ── 非流式（保留备用） ────────────────────────────────────────────────────
 
-    def execute(self, agent_input: AgentInput, run_id: Optional[str] = None) -> AgentOutput:
+    def execute(self, run_input: RunInput, run_id: Optional[str] = None) -> RunOutput:
         """同步普通运行模式：让发动机一口气轰鸣运转到结束！
-        把用户输入塞进历史，然后在大模型和工具调用之间来回循环，直到大模型给出最终文字回答，最后把整个运行包成一个 AgentOutput 吐出来。
+        把用户输入塞进历史，然后在大模型和工具调用之间来回循环，直到大模型给出最终文字回答，最后把整个运行包成一个 RunOutput 吐出来。
         这个方法是“同步阻塞”的，会一直等完全部过程。
 
         需要拿到的东西：
-        - agent_input: 用户的本轮输入参数对象。
+        - run_input: 用户的本轮输入参数对象。
 
         会给出来的结果：
-        - 一个完整的 AgentOutput 运行结果对象，包含最终文本回答、所有产生过的事件、最新的状态等。
+        - 一个完整的 RunOutput 运行结果对象，包含最终文本回答、所有产生过的事件、最新的状态等。
         """
-        events: list[AgentEvent] = []
+        events: list[RunEvent] = []
         event_index = 0
 
-        self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
+        self.state.messages.append(ChatMessage(role="user", content=run_input.user_input))
         self.state.step += 1
 
         while True:
@@ -93,8 +90,6 @@ class AgentRunner:
                 self.agent_profile,
                 self.state,
                 self.tool_registry,
-                self.allow_tool_names,
-                agent_input.session_id,
             )
             response = self.model_adapter.generate(request)
             assistant_message = response.assistant_message
@@ -105,11 +100,11 @@ class AgentRunner:
                 tool_turn = handle_tool_calls(
                     self.tool_registry,
                     tool_calls,
-                    self.allow_tool_names,
+                    self.agent_profile.tool_names,
                     event_index,
-                    session_id=agent_input.session_id,
+                    session_id=run_input.session_id,
                     run_id=run_id,
-                    workspace_path=getattr(agent_input, "workspace_path", None),
+                    workspace_path=getattr(run_input, "workspace_path", None),
                 )
                 events.extend(tool_turn.events)
                 event_index = tool_turn.next_event_index
@@ -122,32 +117,32 @@ class AgentRunner:
             events.append(final_event)
             self.state.messages.append(assistant_message)
 
-            return AgentOutput(
+            return RunOutput(
                 reply=reply,
                 state=self.state,
                 events=events,
                 usage=response.usage,
-                metadata=RunMetadata(session_id=agent_input.session_id),
+                metadata=RunMetadata(session_id=run_input.session_id),
             )
 
     # ── 同步流式 ──────────────────────────────────────────────────────────────
 
     def stream_run(
         self,
-        agent_input: AgentInput,
+        run_input: RunInput,
         run_id: Optional[str] = None,
-    ) -> Iterator[Union[AgentEvent, str]]:
+    ) -> Iterator[Union[RunEvent, str, StreamChunk]]:
         """同步流式运行模式：像挤牙膏一样，实时把大模型吐出的每一个字和工具调用事件 yield 出来。
         适合在同步 SSE 场景下使用。
 
         需要拿到的东西：
-        - agent_input: 用户的本轮输入参数对象。
+        - run_input: 用户的本轮输入参数对象。
 
         会给出来的结果：
-        - 一个生成器迭代器，逐步产生大模型回答的文本片段（str）或者关键的状态事件（AgentEvent）。
+        - 一个生成器迭代器，逐步产生大模型回答的文本片段（str）或者关键的状态事件（RunEvent）。
         """
         event_index = 0
-        self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
+        self.state.messages.append(ChatMessage(role="user", content=run_input.user_input))
         self.state.step += 1
 
         while True:
@@ -155,30 +150,28 @@ class AgentRunner:
                 self.agent_profile,
                 self.state,
                 self.tool_registry,
-                self.allow_tool_names,
-                agent_input.session_id,
             )
 
             raw_reply_chunks: list[str] = []
             tool_call_buffers: dict[int, dict] = {}
             finish_reason: Optional[str] = None
 
-            for event in self.model_adapter.stream_generate(request):
-                if event.type == "done" and event.usage:
-                    self.last_usage = event.usage
+            for chunk in self.model_adapter.stream_generate(request):
+                if chunk.type == "done" and chunk.usage:
+                    self.last_usage = chunk.usage
                     continue
-                if event.type == "thinking_delta":
-                    yield event
+                if chunk.type == "thinking_delta":
+                    yield chunk
                     continue
 
-                finish_reason = event.finish_reason or finish_reason
+                finish_reason = chunk.finish_reason or finish_reason
 
-                if event.content_delta:
-                    yield event.content_delta
-                    raw_reply_chunks.append(event.content_delta)
+                if chunk.content_delta:
+                    yield chunk.content_delta
+                    raw_reply_chunks.append(chunk.content_delta)
 
-                if event.type == "tool_call_delta" and event.raw_event:
-                    for tc in event.raw_event.get("tool_calls", [{}]):
+                if chunk.type == "tool_call_delta" and chunk.raw_event:
+                    for tc in chunk.raw_event.get("tool_calls", [{}]):
                         idx = tc.get("index", 0)
                         if idx not in tool_call_buffers:
                             tool_call_buffers[idx] = {
@@ -207,11 +200,11 @@ class AgentRunner:
                 tool_turn = handle_tool_calls(
                     self.tool_registry,
                     tool_calls,
-                    self.allow_tool_names,
+                    self.agent_profile.tool_names,
                     event_index,
-                    session_id=agent_input.session_id,
+                    session_id=run_input.session_id,
                     run_id=run_id,
-                    workspace_path=getattr(agent_input, "workspace_path", None),
+                    workspace_path=getattr(run_input, "workspace_path", None),
                 )
                 for event in tool_turn.events:
                     yield event
@@ -230,7 +223,7 @@ class AgentRunner:
 
     async def async_stream_run(
         self,
-        agent_input: AgentInput,
+        run_input: RunInput,
         on_tool_start=None,
         on_tool_finish=None,
         on_approval_required=None,
@@ -238,12 +231,12 @@ class AgentRunner:
         event_index: int = 0,
         run_id: Optional[str] = None,
         workspace_path: Optional[str] = None,
-    ) -> AsyncIterator[Union[AgentEvent, str]]:
+    ) -> AsyncIterator[Union[RunEvent, str, StreamChunk]]:
         """异步流式运行模式（最强大的模式！）：支持异步并发、支持工具调用的审批中断、并且能将思考过程和执行步骤实时吐出。
         在这个模式下，如果大模型调用的工具需要人工审批，它会及时暂停，保留现场并 yield 审批事件，等待人类介入审批通过后，再由 Resume 恢复运行。
 
         需要拿到的东西：
-        - agent_input: 用户的本轮输入参数。
+        - run_input: 用户的本轮输入参数。
         - on_tool_start: 当工具开始执行时的回调函数（可选）。
         - on_tool_finish: 当工具执行结束时的回调函数（可选）。
         - on_approval_required: 当需要审批时的回调函数（可选）。
@@ -253,10 +246,10 @@ class AgentRunner:
         - workspace_path: 工作区物理路径（可选）。
 
         会给出来的结果：
-        - 一个异步迭代器，实时产生大模型吐出的字片段（str）或者执行中产生的关键事件（AgentEvent）。
+        - 一个异步迭代器，实时产生大模型吐出的字片段（str）或者执行中产生的关键事件（RunEvent）。
         """
         if not skip_user_message:
-            self.state.messages.append(ChatMessage(role="user", content=agent_input.user_input))
+            self.state.messages.append(ChatMessage(role="user", content=run_input.user_input))
         self.state.step += 1
 
         while True:
@@ -264,30 +257,28 @@ class AgentRunner:
                 self.agent_profile,
                 self.state,
                 self.tool_registry,
-                self.allow_tool_names,
-                agent_input.session_id,
             )
 
             raw_reply_chunks: list[str] = []
             tool_call_buffers: dict[int, dict] = {}
             finish_reason: Optional[str] = None
 
-            async for event in self.model_adapter.async_stream_generate(request):
-                if event.type == "done" and event.usage:
-                    self.last_usage = event.usage
+            async for chunk in self.model_adapter.async_stream_generate(request):
+                if chunk.type == "done" and chunk.usage:
+                    self.last_usage = chunk.usage
                     continue
-                if event.type == "thinking_delta":
-                    yield event
+                if chunk.type == "thinking_delta":
+                    yield chunk
                     continue
 
-                finish_reason = event.finish_reason or finish_reason
+                finish_reason = chunk.finish_reason or finish_reason
 
-                if event.content_delta:
-                    yield event.content_delta
-                    raw_reply_chunks.append(event.content_delta)
+                if chunk.content_delta:
+                    yield chunk.content_delta
+                    raw_reply_chunks.append(chunk.content_delta)
 
-                if event.type == "tool_call_delta" and event.raw_event:
-                    for tc in event.raw_event.get("tool_calls", [{}]):
+                if chunk.type == "tool_call_delta" and chunk.raw_event:
+                    for tc in chunk.raw_event.get("tool_calls", [{}]):
                         idx = tc.get("index", 0)
                         if idx not in tool_call_buffers:
                             tool_call_buffers[idx] = {
@@ -318,9 +309,9 @@ class AgentRunner:
                 async for item in async_handle_tool_calls(
                     self.tool_registry,
                     tool_calls,
-                    self.allow_tool_names,
+                    self.agent_profile.tool_names,
                     event_index,
-                    session_id=agent_input.session_id,
+                    session_id=run_input.session_id,
                     on_tool_start=on_tool_start,
                     on_tool_finish=on_tool_finish,
                     approval_policy=self.approval_policy,
@@ -330,7 +321,7 @@ class AgentRunner:
                     workspace_path=workspace_path,
                     session_type=getattr(self, "session_type", "coding"),
                 ):
-                    if isinstance(item, AgentEvent):
+                    if isinstance(item, RunEvent):
                         yield item
                     else:
                         tool_turn = item

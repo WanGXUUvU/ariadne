@@ -9,7 +9,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 
 
 class CompactInput(BaseModel):
@@ -24,7 +24,7 @@ class CompactInput(BaseModel):
 class CompactOutput(BaseModel):
     """压缩结果（领域语义，非 HTTP 形状）。"""
 
-    state: AgentState
+    state: RunState
     did_compact: bool
     removed_count: int = 0
     compact_tokens: Optional[int] = None

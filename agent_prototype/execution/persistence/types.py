@@ -2,7 +2,7 @@
 [L8 执行层 - 持久化子模块类型定义]
 
 执行层数据载体：RunContext + Run I/O 类型。
-原先 AgentInput/AgentOutput/FinalizeRunInput/RunMetadata 在 core/types.py，现归位至本模块。
+原先 RunInput/RunOutput/FinalizeRunInput/RunMetadata 在 core/types.py，现归位至本模块。
 """
 
 from dataclasses import dataclass
@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
 from agent_prototype.core.types import ModelUsage
-from agent_prototype.execution.runtime.types import AgentEvent, AgentState
+from agent_prototype.execution.runtime.types import RunEvent, RunState
 from agent_prototype.security.policy.types import ApprovalPolicy
 
 @dataclass
@@ -26,7 +26,7 @@ class RunContext:
     """
 
     # 当前会话的聊天状态快照；模型每轮推理都会以它为基础继续推进。
-    state: AgentState
+    state: RunState
     # 本轮实际采用的 agent 定义，包含 system prompt 与允许调用的工具白名单。
     agent_profile: AgentDefinition
     # 已经根据 session 绑定模型解析好的大模型适配器。
@@ -46,7 +46,7 @@ class RunContext:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-class AgentInput(BaseModel):
+class RunInput(BaseModel):
     """`/run` 请求体。"""
 
     # 用户显式指定的 agent；为空时交给 RunContextFactory 决定默认值。
@@ -69,11 +69,11 @@ class RunMetadata(BaseModel):
     agent_name: Optional[str] = None
 
 
-class AgentOutput(BaseModel):
+class RunOutput(BaseModel):
     """`/run` 响应体。"""
 
     reply: str
-    state: AgentState
+    state: RunState
     events: list
     metadata: RunMetadata
     usage: Optional[Any] = None
@@ -115,9 +115,9 @@ class RunFinalizationInput(BaseModel):
     # 本轮实际执行的 agent 名称；用于 run 摘要和 session 元数据。
     agent_name: Optional[str] = None
     # 本轮正式事件账本；注意不包含所有过程噪音，例如 tool_progress。
-    events: list[AgentEvent] = Field(default_factory=list)
+    events: list[RunEvent] = Field(default_factory=list)
     # 本轮结束时的最新状态快照。
-    state: AgentState = Field(default_factory=AgentState)
+    state: RunState = Field(default_factory=RunState)
     # 模型用量；只有支持用量统计的适配器才会提供。
     usage: Optional[ModelUsage] = None
     # 会话类型，会影响 session snapshot 的落库字段。

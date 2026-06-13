@@ -218,7 +218,7 @@ request Hearder:
         └── 含义：在流结束前额外返回 token 使用量
 ~~~
 
-1拼接一次run的上下文
+1.拼接一次run的上下文
 
 -----ctx 返回的是runcontext
 
@@ -241,7 +241,7 @@ request Hearder:
   - 根据agent_input是否传入skill选择加载skill的content 默认加入content的概要
 - effective agent name:本轮实际用的agent
 
-2.observer:构建一个工具观测类 给后面具体执行工具时使用 包含三个方法on_tool_start，on_tool_end，on_tool_approval
+2.observer:构建一个工具trace类 ToolTracer 给后面具体执行工具时使用 包含三个方法on_tool_start，on_tool_end，on_tool_approval
 
 - 需要的属性
   - db 统一service的db
@@ -279,5 +279,66 @@ request Hearder:
 4.开始跑流式循环 RunSSEBridge，返回一个个frame 展示到前端
 
 - 需要把上面的ctx agent_runner observer agent_input 传进去
-- 以及runId最开始生成的 持久化方法persist
-- 进入之后RunSSEBridge之后 首先要做的就是
+- 以及最开始生成的 run_Id持久化方法persist
+- 进入之后RunSSEBridge之后stream
+  - 第一步yield出去一个开始frame
+  - 构建run执行的生命周期 将run所有需要的物料放进去 返回一个Runlifecyle 类
+    - 包含了 ctx上下文、agent_input、agent_runner、persist、run_id、observer的三个方法
+    - skip user input只有resume的时候才需要
+    - event_index默认是0 但是resume需要传入
+    - intial_events 默认是空的只有执行resume 才会吧工具执行结果放进去
+    - append_events 默认false 新建runrecord 加写入event。resume时候是在已经有的run 追加event
+    - update_session_snapshot 控制更新session的state 给子agent用的防止污染主会话state_json
+  - 根据构建的runlifecycle类 开始执行它的iterate()方法 也就是一步步产生item 然后判断item的类型包装成SSeSTREAM不断yield出去 
+    - 包含这几种类型 正常文本、thinking内容、agentevent 可以是tool call。toolresult thinking
+    - 但是最终如果是yield出来的finalresultitem 他会包含一个RunLifeCycleResult 
+      - RunLifeCycleResult包含了status、部分回复、events、usage、state
+    - 如果他的status事暂停 那么就yield出去一个暂停frame
+    - 否则就yield 出去一个end
+
+5.进入Runlifecycle实际执行 iterate 返回RunLifecycleItem包括了上层所需要的四种item
+
+- 新准备好三个列表 首先是str的 然后是thinking的。然后是 agent event
+- 构建一个刷新thinking列表的 如果thinking列表不是空的 几句返回一个agent_event item 保存为event 同时yield出去
+- 然后开始真正的循环async_stream_run 用的是物料里的a gent_runner发动机 然后传入物料中各种需要
+  - 传入agent_input、三个工具tracer、工作区、是否跳过userinput（用于恢复）event_index 默认是0 恢复才追加 run id workspacepath
+  - 返回 RunEvent 或者是str 或者是ModelStreamEvent
+  - 如果返回的是str 就先保存在str列表 然后yieldTextDeltaItem
+  - 如果返回的是agentevent 调用thinking刷新列表 thinking 然后就落库 并yield出去 再把agentevent yield 出去并保存到event
+  - 如果返回的是 modelstream 证明是下层传出来的 thinking 片段 一边yield出去一边保存到thinking列表里
+  - 最后补充一次刷新thinking列表
+  - 执行完这次循环就是落库环节 
+    - 首先判断run status 如果event的types里面包含approval_required那么就是暂停否则就是完成
+    - 并且把status和 events 以及最终回复 调用finalize_run方法落库
+    - 并且yiled出去一个status 供外层接受
+    - 如果try失败捕获取消异常 先刷新一次thinking status=cancelled落库
+    - 如果失败 同样刷新一次thinking  status=failed 落库
+
+6.开始真正的执行agentrunner里面的循环，在上面构建agentrunner时 已经有了足够的物料
+
+默认在构建agentrunner时已经准备好的物料：
+
+- state 经过压缩后的state
+- approval_policy 审批策略
+- 工具注册中心
+- agent_profile
+- Model_adapter 选择用哪种通讯器通讯
+- session type
+
+agentrunner包含了三种方法：execute 非流式 stream_run同步流式 async_stream_run异步流式
+
+- 执行async_stream_run循环
+  - 需要的额外参数 在runlifecycle 物料中获取
+    - Tool tracer 
+    - 是否跳过用户输入 主要是resume
+    - run_input 一次run的请求体
+    - event_index 用于resume 之后恢复后保持event 的 index 默认0
+    - run_id
+    - workspace path 作为透传 只有在执行工具时生效
+  - 先判断是否跳过用户输入 如果不跳过 就是state 先增一条 role =user content = run_input.user_input
+  - 正式循环进入循环
+    - 拿到agent_profile、state、tool registry 构建request
+      - 构建message。role=system content=agent_profile.system_prompt
+      - 构建tools 把agent_profile中的tools 给到toolregitsty 构建出工具说明书
+    - 把request交给adpater 去和大模型联络并返回 用模型返回的response包装成 stream chunk返回
+    - 我们用这些chunk的type对比包装成

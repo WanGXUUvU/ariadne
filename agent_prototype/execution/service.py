@@ -32,13 +32,13 @@ from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.persistence.types import (
-    AgentInput,
-    AgentOutput,
+    RunInput,
+    RunOutput,
     RunFinalizationInput,
     RunFinalStatus,
     RunMetadata,
 )
-from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.execution.runtime.agent_runner import AgentRunner
 from agent_prototype.execution.runtime.run_lifecycle import (
     RunLifecycleParams,
     RunLifecycle,
@@ -65,16 +65,15 @@ class RunService:
         self.child_dispatcher = ChildRunLauncher(db)
         self.trace_query = TraceQueryService(db, self._run_store)
 
-    def _create_agent_runner(self, ctx, run_id: str, agent_input: AgentInput) -> AgentRunner:
+    def _create_agent_runner(self, ctx, run_id: str, run_input: RunInput) -> AgentRunner:
         """基于运行物料和协作者构造 AgentRunner。"""
         return AgentRunner(
             state=ctx.state,
             agent_profile=ctx.agent_profile,
-            allow_tool_names=ctx.agent_profile.tool_names,
             model_adapter=ctx.adapter,
             tool_registry=build_run_registry(
                 child_dispatcher=self.child_dispatcher.create_launcher(
-                    run_id, agent_input.session_id
+                    run_id, run_input.session_id
                 ),
                 status_checker=self.child_dispatcher.create_status_checker(),
                 child_waiter=self.child_dispatcher.create_waiter(),
@@ -84,31 +83,31 @@ class RunService:
 
     # ── 公开方法 ──────────────────────────────────────────────────────────────
 
-    def run(self, agent_input: AgentInput) -> AgentOutput:
+    def run(self, run_input: RunInput) -> RunOutput:
         """执行一次同步 run，并在结束后持久化结果。"""
         run_id = uuid.uuid4().hex
         RunVfsRegistry.create(run_id)
 
         try:
-            ctx = self.context_factory.assemble(agent_input)
-            agent_runner = self._create_agent_runner(ctx, run_id, agent_input)
+            ctx = self.context_factory.assemble(run_input)
+            agent_runner = self._create_agent_runner(ctx, run_id, run_input)
 
             result = RunLifecycle(
                 RunLifecycleParams(
                     ctx=ctx,
                     agent_runner=agent_runner,
                     persist=self.persist,
-                    agent_input=agent_input,
+                    run_input=run_input,
                     run_id=run_id,
                 )
             ).execute_sync()
             result.state.agent_name = ctx.effective_agent_name
-            return AgentOutput(
+            return RunOutput(
                 reply=result.reply_text,
                 state=result.state,
                 events=result.events,
                 metadata=RunMetadata(
-                    session_id=agent_input.session_id,
+                    session_id=run_input.session_id,
                     run_id=run_id,
                     agent_name=ctx.effective_agent_name,
                 ),
@@ -118,29 +117,29 @@ class RunService:
             RunVfsRegistry.discard(run_id)
             raise
 
-    async def stream(self, agent_input: AgentInput) -> AsyncIterator[str]:
+    async def stream(self, run_input: RunInput) -> AsyncIterator[str]:
         """执行一次流式 run，逐帧产出 SSE 数据。"""
         run_id = uuid.uuid4().hex
         RunVfsRegistry.create(run_id)
 
         try:
-            ctx = self.context_factory.assemble(agent_input)
+            ctx = self.context_factory.assemble(run_input)
             observer = ToolTracer(
                 self.db,
                 self._run_store,
                 self.approval_store,
-                agent_input.session_id,
+                run_input.session_id,
                 run_id=run_id,
-                agent_input=agent_input,
+                run_input=run_input,
             )
-            agent_runner = self._create_agent_runner(ctx, run_id, agent_input)
+            agent_runner = self._create_agent_runner(ctx, run_id, run_input)
 
             async for frame in RunSSEBridge(
                 ctx,
                 observer,
                 agent_runner,
                 run_id,
-                agent_input,
+                run_input,
                 self.persist,
             ).stream():
                 yield frame

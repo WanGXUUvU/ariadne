@@ -15,7 +15,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from agent_prototype.execution.runtime.types import AgentEvent
+from agent_prototype.execution.runtime.types import RunEvent
 from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.tools.result_types import ToolResult
 
@@ -33,7 +33,7 @@ class TraceQueryService:
         if not run_records:
             return [], {}
 
-        events_map: dict[str, list[AgentEvent]] = {}
+        events_map: dict[str, list[RunEvent]] = {}
         for run_record in run_records:
             event_rows = self.run_store.list_run_events(run_record.run_id)
             events = []
@@ -42,7 +42,7 @@ class TraceQueryService:
                 if row.tool_result_json:
                     tool_result = ToolResult.model_validate(json.loads(row.tool_result_json))
                 events.append(
-                    AgentEvent(
+                    RunEvent(
                         index=row.event_index,
                         type=row.type,
                         content=row.content,

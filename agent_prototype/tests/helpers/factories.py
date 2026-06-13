@@ -3,8 +3,8 @@
 from typing import List, Optional
 
 from agent_prototype.core.types import ChatMessage, ModelResponse
-from agent_prototype.execution.persistence.types import AgentOutput, RunMetadata
-from agent_prototype.execution.runtime.types import AgentEvent, AgentState
+from agent_prototype.execution.persistence.types import RunOutput, RunMetadata
+from agent_prototype.execution.runtime.types import RunEvent, RunState
 
 
 def build_assistant_response(content=None, tool_calls=None) -> ModelResponse:
@@ -18,18 +18,18 @@ def build_assistant_response(content=None, tool_calls=None) -> ModelResponse:
     )
 
 
-def build_agent_output(
+def build_run_output(
     reply: str,
     *,
-    state: Optional[AgentState] = None,
-    events: Optional[List[AgentEvent]] = None,
+    state: Optional[RunState] = None,
+    events: Optional[List[RunEvent]] = None,
     session_id: str = "s",
     run_id: str = "r",
-) -> AgentOutput:
-    """构造一个最小 AgentOutput。"""
-    return AgentOutput(
+) -> RunOutput:
+    """构造一个最小 RunOutput。"""
+    return RunOutput(
         reply=reply,
-        state=state or AgentState(),
+        state=state or RunState(),
         events=events or [],
         metadata=RunMetadata(session_id=session_id, run_id=run_id),
     )

@@ -21,7 +21,7 @@ import sys
 from typing import Optional, Callable
 
 from agent_prototype.agent.types import AgentDefinition
-from agent_prototype.execution.persistence.types import AgentInput
+from agent_prototype.execution.persistence.types import RunInput
 from agent_prototype.skills.loader import (
     list_skills as default_list_skills,
     load_skill_content as default_load_skill_content,
@@ -70,7 +70,7 @@ class SkillContextService:
     def build_runtime_definition_with_skills(
         self,
         definition: AgentDefinition,
-        agent_input: AgentInput,
+        run_input: RunInput,
         session_type: str = "coding",
         local_rules_text: Optional[str] = None,
         agent_soul_text: Optional[str] = None,
@@ -81,9 +81,9 @@ class SkillContextService:
         skill_catalog_prompt = self._build_skill_catalog_prompt(skills)
         selected_skill_content = None
 
-        if agent_input.skill_name:
-            self._get_selected_skill_or_raise(agent_input.skill_name, skills)
-            selected_skill_content = self._load_skill_content(agent_input.skill_name)
+        if run_input.skill_name:
+            self._get_selected_skill_or_raise(run_input.skill_name, skills)
+            selected_skill_content = self._load_skill_content(run_input.skill_name)
 
         runtime_system_prompt = self._build_runtime_system_prompt(
             definition.system_prompt,

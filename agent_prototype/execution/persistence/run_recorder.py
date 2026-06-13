@@ -6,7 +6,7 @@ from agent_prototype.execution.persistence.types import (
     RunFinalStatus,
     RunMetadata,
 )
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.streaming.sse import build_reply_preview
 from agent_prototype.memory.run.store import RunTraceStore
@@ -183,7 +183,7 @@ class RunRecorder:
         if finalization.status in (RunFinalStatus.CANCELLED, RunFinalStatus.FAILED):
             RunVfsRegistry.discard(finalization.run_id)
 
-    def _ensure_user_message(self, state: AgentState, user_input: str) -> AgentState:
+    def _ensure_user_message(self, state: RunState, user_input: str) -> RunState:
         if user_input and (
             not state.messages
             or state.messages[-1].role != "user"

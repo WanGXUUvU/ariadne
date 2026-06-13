@@ -215,7 +215,7 @@ export function useWorkspace() {
     set: (val) => { if (activeSessionId.value) getSessionState(activeSessionId.value).pendingSkillName = val; }
   });
 
-  const { childAgentsBySession, onLiveAgentEvent, extractChildAgents, clearChildAgents } = useChildAgentTracker();
+  const { childAgentsBySession, onLiveRunEvent, extractChildAgents, clearChildAgents } = useChildAgentTracker();
   const { workspaces, isWorkspacesLoading, loadWorkspaces, selectWorkspaceDialog } = useWorkspaceCatalog(errorMsg);
   const resources = useWorkspaceResources({ activeSessionId, errorMsg });
 
@@ -258,7 +258,7 @@ export function useWorkspace() {
     activeSessionId,
     getSessionState,
     activeAgent: resources.activeAgent,
-    onLiveAgentEvent,
+    onLiveRunEvent,
     extractChildAgents,
   });
 
@@ -277,7 +277,7 @@ export function useWorkspace() {
     pendingApprovalInfo,
     pendingApprovalInfos,
     isResolvingApproval,
-    onLiveAgentEvent,
+    onLiveRunEvent,
     extractChildAgents,
     updatePermissionProfile,
   });

@@ -11,7 +11,7 @@
 数据流向：
 - 输入：ToolCall 列表入参及执行上下文。
 - 输出：包含所有工具返回消息与事件的 ToolTurnResult。
-- 上游来源：agent_prototype/execution/runtime/agent_runtime.py。
+- 上游来源：agent_prototype/execution/runtime/agent_runner.py。
 - 下游流向：传递到拦截器中间件管道，并最终分发至 agent_prototype/tools/* 底层方法。
 """
 
@@ -22,7 +22,7 @@ from typing import AsyncIterator, Optional, Union
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
 from agent_prototype.core.types import ChatMessage, ToolCall
-from agent_prototype.execution.runtime.types import AgentEvent
+from agent_prototype.execution.runtime.types import RunEvent
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.security.policy.types import ApprovalPolicy
 from agent_prototype.tools.registry import ToolRegistry
@@ -106,13 +106,13 @@ def handle_tool_calls(
     会给出来的结果：
     - 一个结算账单 ToolTurnResult 对象。
     """
-    events: list[AgentEvent] = []
+    events: list[RunEvent] = []
     tool_messages: list[ChatMessage] = []
     current_index = event_index
 
     for tool_call in tool_calls:
         events.append(
-            AgentEvent(
+            RunEvent(
                 index=current_index,
                 type="assistant_tool_call",
                 tool_name=tool_call.function.name,
@@ -148,7 +148,7 @@ def handle_tool_calls(
 
         if tool_result.ok:
             events.append(
-                AgentEvent(
+                RunEvent(
                     index=current_index,
                     type="tool_result",
                     tool_name=tool_call.function.name,
@@ -165,7 +165,7 @@ def handle_tool_calls(
         else:
             error_message = tool_result.error.message if tool_result.error else "Tool failed"
             events.append(
-                AgentEvent(
+                RunEvent(
                     index=current_index,
                     type="tool_error",
                     tool_name=tool_call.function.name,
@@ -207,7 +207,7 @@ async def async_handle_tool_calls(
     on_approval_required=None,
     saved_messages: Optional[list[ChatMessage]] = None,
     session_type: str = "coding",
-) -> AsyncIterator[Union[AgentEvent, ToolTurnResult]]:
+) -> AsyncIterator[Union[RunEvent, ToolTurnResult]]:
     """异步流式工具执行引擎。
 
     支持多工具基于 asyncio.gather 并发调度、中间件链执行拦截、
@@ -256,7 +256,7 @@ async def async_handle_tool_calls(
 
     # 2. 播报工具启动通知事件
     for item in batch.items:
-        yield AgentEvent(
+        yield RunEvent(
             index=current_index,
             type="assistant_tool_call",
             tool_name=item.tool_name,
@@ -271,7 +271,7 @@ async def async_handle_tool_calls(
     async def make_progress_callback(tc_id: str, t_name: str):
         async def on_progress(text: str) -> None:
             await event_queue.put(
-                AgentEvent(
+                RunEvent(
                     index=0,
                     type="tool_progress",
                     tool_name=t_name,
@@ -389,7 +389,7 @@ async def async_handle_tool_calls(
         if tool_result is None:
             error_message = f"Tool timed out after {TOOL_TIMEOUT}s"
             item.status = "failed"
-            yield AgentEvent(
+            yield RunEvent(
                 index=current_index,
                 type="tool_error",
                 tool_name=item.tool_name,
@@ -405,7 +405,7 @@ async def async_handle_tool_calls(
             tool_messages.append(tool_message)
         elif tool_result.ok:
             item.status = "completed"
-            yield AgentEvent(
+            yield RunEvent(
                 index=current_index,
                 type="tool_result",
                 tool_name=item.tool_name,
@@ -423,7 +423,7 @@ async def async_handle_tool_calls(
         else:
             error_message = tool_result.error.message if tool_result.error else "Tool failed"
             item.status = "failed"
-            yield AgentEvent(
+            yield RunEvent(
                 index=current_index,
                 type="tool_error",
                 tool_name=item.tool_name,
@@ -442,7 +442,7 @@ async def async_handle_tool_calls(
 
     if pending_items:
         for item in pending_items:
-            yield AgentEvent(
+            yield RunEvent(
                 index=current_index,
                 type="approval_required",
                 tool_name=item.tool_name,

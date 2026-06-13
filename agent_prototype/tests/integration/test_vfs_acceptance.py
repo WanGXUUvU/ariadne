@@ -6,9 +6,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from agent_prototype.core.types import ModelStreamEvent, ToolCall, ToolCallFunction
-from agent_prototype.execution.persistence.types import AgentInput
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.core.types import StreamChunk, ToolCall, ToolCallFunction
+from agent_prototype.execution.persistence.types import RunInput
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.service import RunService
 from agent_prototype.execution.run_context_factory import RunContextFactory
@@ -24,7 +24,7 @@ def _seed_session(session_local, session_id: str, workspace_path: Path) -> None:
         store = SessionStore(db)
         record = store.save_state(
             session_id,
-            state=AgentState(),
+            state=RunState(),
             workspace_path=str(workspace_path),
             session_type="coding",
         )
@@ -57,7 +57,7 @@ class FakeAsyncAdapter:
     async def async_stream_generate(self, request):
         self.call_count += 1
         if self.call_count == 1:
-            yield ModelStreamEvent(
+            yield StreamChunk(
                 type="tool_call_delta",
                 finish_reason="tool_calls",
                 raw_event={
@@ -80,7 +80,7 @@ class FakeAsyncAdapter:
             )
             return
 
-        yield ModelStreamEvent(type="delta", content_delta="partial")
+        yield StreamChunk(type="delta", content_delta="partial")
         await self.blocker.wait()
 
 
@@ -129,7 +129,7 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
             db = self.session_local()
             try:
                 output = RunService(db).run(
-                    AgentInput(
+                    RunInput(
                         session_id=session_id,
                         user_input="写一个文件",
                         workspace_path=str(self.workspace),
@@ -169,7 +169,7 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
             db = self.session_local()
             try:
                 stream = RunService(db).stream(
-                    AgentInput(
+                    RunInput(
                         session_id=session_id,
                         user_input="流式写文件然后取消",
                         workspace_path=str(self.workspace),
@@ -183,7 +183,7 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
 
                 for _ in range(8):
                     frame = _parse_sse(await stream.__anext__())
-                    if frame["type"] == "agent_event" and frame["data"]["type"] == "tool_result":
+                    if frame["type"] == "run_event" and frame["data"]["type"] == "tool_result":
                         saw_tool_result = True
                     if frame["type"] == "delta":
                         saw_delta = True

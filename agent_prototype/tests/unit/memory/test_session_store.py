@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.tests.helpers.db import make_sqlite_test_db
 
@@ -24,7 +24,7 @@ class TestSessionStore(unittest.TestCase):
             store = SessionStore(db)
             store.save_state(
                 "session-keep-metadata",
-                state=AgentState(messages=[{"role": "user", "content": "你好"}]),
+                state=RunState(messages=[{"role": "user", "content": "你好"}]),
                 last_agent_name="default",
                 last_reply_preview="上一次回复摘要",
             )
@@ -32,7 +32,7 @@ class TestSessionStore(unittest.TestCase):
 
             store.save_state(
                 "session-keep-metadata",
-                state=AgentState(messages=[{"role": "user", "content": "新的消息"}]),
+                state=RunState(messages=[{"role": "user", "content": "新的消息"}]),
             )
             db.commit()
 
@@ -49,7 +49,7 @@ class TestSessionStore(unittest.TestCase):
             store = SessionStore(db)
             store.save_state(
                 "session-clear-metadata",
-                state=AgentState(messages=[{"role": "user", "content": "你好"}]),
+                state=RunState(messages=[{"role": "user", "content": "你好"}]),
                 last_agent_name="default",
                 last_reply_preview="上一次回复摘要",
             )
@@ -57,7 +57,7 @@ class TestSessionStore(unittest.TestCase):
 
             store.save_state(
                 "session-clear-metadata",
-                state=AgentState(),
+                state=RunState(),
                 last_agent_name=None,
                 last_reply_preview=None,
             )

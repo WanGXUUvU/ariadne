@@ -67,7 +67,6 @@ class ModelRequest(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     tools: list[dict[str, Any]] = Field(default_factory=list)
     config: ModelConfig
-    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ModelUsage(BaseModel):
@@ -111,7 +110,7 @@ class ModelResponse(BaseModel):
         return self.assistant_message.tool_calls or []
 
 
-class ModelStreamEvent(BaseModel):
+class StreamChunk(BaseModel):
     """streaming 统一事件对象"""
 
     type: str
@@ -134,10 +133,10 @@ class ModelAdapter(Protocol):
         """输入统一请求，输出统一响应"""
         ...
 
-    def stream_generate(self, request: ModelRequest) -> Iterator[ModelStreamEvent]:
+    def stream_generate(self, request: ModelRequest) -> Iterator[StreamChunk]:
         """输入统一请求，逐个 yield delta token 字符串"""
         ...
 
-    async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+    async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[StreamChunk]:
         """用 async for 循环消费——每次迭代都是一个 await 点。"""
         ...

@@ -52,8 +52,8 @@ def make_tool_call(name: str = "fake_tool") -> ToolCall:
 
 
 async def collect_events(registry, tool_calls, policy, on_approval_required=None):
-    """运行 async_handle_tool_calls，收集所有 AgentEvent，返回事件列表。"""
-    from agent_prototype.execution.runtime.types import AgentEvent
+    """运行 async_handle_tool_calls，收集所有 RunEvent，返回事件列表。"""
+    from agent_prototype.execution.runtime.types import RunEvent
 
     events = []
     async for item in async_handle_tool_calls(
@@ -66,7 +66,7 @@ async def collect_events(registry, tool_calls, policy, on_approval_required=None
         approval_policy=policy,
         on_approval_required=on_approval_required,
     ):
-        if isinstance(item, AgentEvent):
+        if isinstance(item, RunEvent):
             events.append(item)
     return events
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { ApprovalInfo, AgentEvent } from '../../types';
+import type { ApprovalInfo, RunEvent } from '../../types';
 import type { MergedTimelineItem } from './types';
 import { findPendingApprovalForTool } from '../../utils/approvalQueue';
 import ToolCard from './ToolCard.vue';
@@ -15,6 +15,7 @@ interface GroupedToolExecution {
   duration: string;
   groupCount?: number;
   approvalInfo?: ApprovalInfo | null;
+  vfsState?: string;
 }
 
 const props = defineProps<{
@@ -54,8 +55,8 @@ const getGroupedToolExecutions = (items: MergedTimelineItem[]): GroupedToolExecu
   for (const item of items) {
     if (item.kind === 'event_group') {
       // 连续重复调用：摘要卡
-      const firstCall = item.raw_events.find((e: AgentEvent) => e.type === 'assistant_tool_call');
-      const firstResult = item.raw_events.find((e: AgentEvent) => e.type === 'tool_result' || e.type === 'tool_error');
+      const firstCall = item.raw_events.find((e: RunEvent) => e.type === 'assistant_tool_call');
+      const firstResult = item.raw_events.find((e: RunEvent) => e.type === 'tool_result' || e.type === 'tool_error');
       let args: any = {};
       if (firstCall?.content) { try { args = JSON.parse(firstCall.content); } catch { args = firstCall.content; } }
       
@@ -98,11 +99,17 @@ const getGroupedToolExecutions = (items: MergedTimelineItem[]): GroupedToolExecu
 
       let errorMsg = '';
       let resContent: any = null;
+      let vfsState: string | undefined;
       if (result && status !== 'awaiting_approval') {
         if (result.type === 'tool_error') { status = 'error'; errorMsg = result.content || 'error'; }
         else if (result.type === 'tool_result') {
           const tr = result.tool_result;
-          if (tr) { status = tr.ok ? 'success' : 'error'; resContent = tr.ok ? tr.content : null; errorMsg = tr.ok ? '' : (tr.error?.message || tr.content || 'failed'); }
+          if (tr) {
+            status = tr.ok ? 'success' : 'error';
+            resContent = tr.ok ? tr.content : null;
+            errorMsg = tr.ok ? '' : (tr.error?.message || tr.content || 'failed');
+            vfsState = tr.metadata?.state;
+          }
           else { status = 'success'; resContent = result.content; }
         }
       }
@@ -116,7 +123,7 @@ const getGroupedToolExecutions = (items: MergedTimelineItem[]): GroupedToolExecu
         const ms = result.tool_result.metadata.duration_ms;
         duration = ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
       }
-      output.push({ id: cid, tool_name, status, args, result: resContent, error: errorMsg, duration, approvalInfo });
+      output.push({ id: cid, tool_name, status, args, result: resContent, error: errorMsg, duration, approvalInfo, vfsState });
     }
   }
   return output;
