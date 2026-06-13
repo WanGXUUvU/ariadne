@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentMessage, StreamingItem, TraceRunSummary } from '../../types';
+import type { RunEvent, AgentMessage, StreamingItem, TraceRunSummary } from '../../types';
 
 const RESET_HISTORY_STORAGE_KEY = 'agent-build-reset-history-v1';
 const TIMELINE_STORAGE_KEY = 'agent-build-timelines-v1';
@@ -68,7 +68,7 @@ export function clearSessionResetHistory(sessionId: string) {
   writeResetHistoryStore(store);
 }
 
-export function reconstructTimelineFromEvents(events: AgentEvent[], reply?: string | null): StreamingItem[] {
+export function reconstructTimelineFromEvents(events: RunEvent[], reply?: string | null): StreamingItem[] {
   const timeline: StreamingItem[] = [];
   let hasText = false;
   for (const e of events) {

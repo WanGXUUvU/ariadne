@@ -12,7 +12,7 @@ from agent_prototype.core.types import ChatMessage
 from agent_prototype.tools.result_types import ToolResult
 
 
-class AgentState(BaseModel):
+class RunState(BaseModel):
     """某个 session 的最新状态快照。"""
 
     messages: list[ChatMessage] = Field(default_factory=list)
@@ -20,7 +20,7 @@ class AgentState(BaseModel):
     agent_name: Optional[str] = None
 
 
-class AgentEvent(BaseModel):
+class RunEvent(BaseModel):
     """一次 run 中的结构化事件。"""
 
     index: int
@@ -43,7 +43,7 @@ class AgentEvent(BaseModel):
 class ToolTurnResult(BaseModel):
     """一次工具批次执行结束后的统一账单。"""
 
-    events: list[AgentEvent] = Field(default_factory=list)
+    events: list[RunEvent] = Field(default_factory=list)
     tool_messages: list[ChatMessage] = Field(default_factory=list)
     next_event_index: int
     paused_for_approval: bool = False

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { AgentEvent } from '../types';
+import type { RunEvent } from '../types';
 
 const props = defineProps<{
-  events: AgentEvent[];
+  events: RunEvent[];
   autoExpand?: boolean;   // live 模式下传 true，自动展开
 }>();
 
@@ -14,7 +14,7 @@ watch(() => props.autoExpand, (val) => {
   if (val) expanded.value = true;
 });
 
-const eventIcon = (event: AgentEvent) => {
+const eventIcon = (event: RunEvent) => {
   if (event.type === 'assistant_tool_call') return '🔧';
   if (event.type === 'tool_result') return '✅';
   if (event.type === 'tool_error') return '❌';
@@ -22,7 +22,7 @@ const eventIcon = (event: AgentEvent) => {
   return '·';
 };
 
-const eventLabel = (event: AgentEvent) => {
+const eventLabel = (event: RunEvent) => {
   if (event.type === 'assistant_tool_call') return event.tool_name ?? 'tool';
   if (event.type === 'tool_result') return event.tool_name ? `${event.tool_name} 返回` : '工具返回';
   if (event.type === 'tool_error') return event.tool_name ? `${event.tool_name} 出错` : '工具出错';
@@ -38,11 +38,11 @@ const truncate = (s: string | null | undefined, max = 80) => {
 };
 
 // 判断是否是 spawn_child_agent 的派发事件
-const isSpawnEvent = (event: AgentEvent) =>
+const isSpawnEvent = (event: RunEvent) =>
   event.type === 'tool_result' && event.tool_name === 'spawn_child_agent' && event.tool_result?.ok;
 
 // 从 spawn 事件提取 agent_name 和 run_id
-const getSpawnInfo = (event: AgentEvent) => ({
+const getSpawnInfo = (event: RunEvent) => ({
   agent_name: (event.tool_result?.metadata?.agent_name as string) ?? '子Agent',
   run_id: event.tool_result?.content ?? '',
 });

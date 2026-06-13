@@ -1,8 +1,8 @@
-import type { AgentEvent } from '../../types';
+import type { RunEvent } from '../../types';
 
 export type MergedTimelineItem = 
-  | { kind: 'event'; event: AgentEvent }
-  | { kind: 'event_group'; tool_name: string; count: number; raw_events: AgentEvent[] };
+  | { kind: 'event'; event: RunEvent }
+  | { kind: 'event_group'; tool_name: string; count: number; raw_events: RunEvent[] };
 
 // 思考过程内部的有序片段：思考文字 或 工具调用组
 export type ThinkingSegment =

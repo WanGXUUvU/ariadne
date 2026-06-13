@@ -18,7 +18,7 @@
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
-from agent_prototype.execution.persistence.types import AgentInput, AgentOutput, FinalizeRunInput
+from agent_prototype.execution.persistence.types import RunInput, RunOutput, FinalizeRunInput
 from agent_prototype.memory.session.types import ResetInput
 from agent_prototype.api.dto.schemas import RunDetailResponse, ToolCallSummary
 from agent_prototype.execution.service import RunService
@@ -32,23 +32,23 @@ from agent_prototype.api.routes.dependencies import (
 router = APIRouter()  # 创建本文件路由器
 
 
-@router.post("/run", response_model=AgentOutput)
+@router.post("/run", response_model=RunOutput)
 def run_agent_api(
-    agent_input: AgentInput, service: RunService = Depends(get_run_service)
-) -> AgentOutput:
+    run_input: RunInput, service: RunService = Depends(get_run_service)
+) -> RunOutput:
     """这个函数是用来让指定的 Agent 跑起来并立刻给出完整答复的（非流式）。
 
     就像发微信消息一样，你发一句话，它在后台默默思考、查工具，等全部想好之后一次性把完整答案回给你。
 
     需要拿到的东西：
-    - agent_input: AgentInput 对象，里面包含当前在哪个会话聊天、用户发了什么、用哪个 Agent 模板等。
+    - run_input: RunInput 对象，里面包含当前在哪个会话聊天、用户发了什么、用哪个 Agent 模板等。
     - service: RunService 实例，由依赖注入提供。
 
     会给出来的结果：
-    - AgentOutput 对象，里面包含了 Agent 的回答以及这次运行的一些状态信息。
+    - RunOutput 对象，里面包含了 Agent 的回答以及这次运行的一些状态信息。
     """
     try:
-        return service.run(agent_input)
+        return service.run(run_input)
     except ValueError as exc:
         return error_response(status.HTTP_400_BAD_REQUEST, "bad_request", str(exc))
 
@@ -76,14 +76,14 @@ def reset_session_api(
 
 @router.post("/run/stream")
 async def run_stream_api(
-    agent_input: AgentInput, service: RunService = Depends(get_run_service)
+    run_input: RunInput, service: RunService = Depends(get_run_service)
 ) -> StreamingResponse:
     """这个函数是用来让指定的 Agent 跑起来并像"打字机"一样源源不断地实时流式返回它的思考和回答的（SSE 协议）。
 
     当你要做聊天界面，希望用户能实时看到 Agent 正在一个字一个字蹦出来答案时，就用这个接口。
 
     需要拿到的东西：
-    - agent_input: AgentInput 对象，包含了会话、用户输入和 Agent 配置。
+    - run_input: RunInput 对象，包含了会话、用户输入和 Agent 配置。
     - service: RunService 实例，由依赖注入提供。
 
     会给出来的结果：
@@ -91,7 +91,7 @@ async def run_stream_api(
     """
     try:
         return StreamingResponse(
-            service.stream(agent_input),
+            service.stream(run_input),
             media_type="text/event-stream",
         )
     except ValueError as exc:

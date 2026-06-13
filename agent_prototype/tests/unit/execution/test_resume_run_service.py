@@ -8,7 +8,7 @@ from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.execution.persistence.types import RunFinalStatus
 from agent_prototype.execution.resume.service import ResumeRunService
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.infra.db.orm_models import SessionRunRecord
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.security.approval.store import SqliteApprovalStore
@@ -23,7 +23,7 @@ def _parse_sse(frame: str) -> dict:
 def _seed_session(db, session_id: str, workspace_path: Path) -> None:
     SessionStore(db).save_state(
         session_id=session_id,
-        state=AgentState(),
+        state=RunState(),
         workspace_path=str(workspace_path),
         session_type="coding",
     )

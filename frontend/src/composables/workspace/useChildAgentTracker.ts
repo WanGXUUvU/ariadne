@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 
 import { api } from '../../api/client';
-import type { AgentEvent, AgentMessage, ChildAgentInfo, TraceRunSummary } from '../../types';
+import type { RunEvent, AgentMessage, ChildAgentInfo, TraceRunSummary } from '../../types';
 
 export function useChildAgentTracker() {
   const childAgentsBySession = ref<Record<string, ChildAgentInfo[]>>({});
@@ -34,7 +34,7 @@ export function useChildAgentTracker() {
     }, 2000);
   }
 
-  function onLiveAgentEvent(sessionId: string, ev: AgentEvent) {
+  function onLiveRunEvent(sessionId: string, ev: RunEvent) {
     if (ev.type !== 'tool_result' || ev.tool_name !== 'spawn_child_agent' || !ev.tool_result?.ok) return;
     const runId = ev.tool_result.content ?? '';
     const agentName = (ev.tool_result.metadata?.agent_name as string) ?? '子Agent';
@@ -91,7 +91,7 @@ export function useChildAgentTracker() {
 
   return {
     childAgentsBySession,
-    onLiveAgentEvent,
+    onLiveRunEvent,
     extractChildAgents,
     clearChildAgents,
   };

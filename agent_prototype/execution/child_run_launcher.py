@@ -19,15 +19,15 @@ from sqlalchemy.orm import Session
 
 from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.execution.persistence.run_recorder import RunRecorder
-from agent_prototype.execution.persistence.types import AgentInput, RunContext
+from agent_prototype.execution.persistence.types import RunInput, RunContext
 from agent_prototype.execution.runtime.agent_executor import _executor, _global_futures
-from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.execution.runtime.agent_runner import AgentRunner
 from agent_prototype.execution.runtime.run_lifecycle import (
     RunLifecycleParams,
-    RunLifecycleResult,
+    RunLifecycleResultItem,
     RunLifecycle,
 )
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
 from agent_prototype.execution.run_context_factory import RunContextFactory
 from agent_prototype.infra.db.engine import SessionLocal
@@ -74,7 +74,7 @@ class ChildRunLauncher:
                     result[run_id] = {"status": "not_found"}
                     continue
 
-                future: Future[RunLifecycleResult] = _global_futures[run_id]
+                future: Future[RunLifecycleResultItem] = _global_futures[run_id]
                 if future.done():
                     if future.exception():
                         result[run_id] = {"status": "error", "error": str(future.exception())}
@@ -138,7 +138,7 @@ class ChildRunLauncher:
                     workspace_path = path_val
 
             adapter = RunContextFactory(db).create_adapter(session_id)
-            child_state = AgentState()
+            child_state = RunState()
             definition = AgentDefinition(id=child_run_id, name=agent_name)
             agent_runner = AgentRunner(
                 state=child_state,
@@ -150,7 +150,7 @@ class ChildRunLauncher:
                     child_waiter=self.create_waiter(),
                 ),
             )
-            agent_input = AgentInput(
+            run_input = RunInput(
                 session_id=session_id,
                 user_input=task,
                 workspace_path=workspace_path,
@@ -169,7 +169,7 @@ class ChildRunLauncher:
                     ctx=ctx,
                     agent_runner=agent_runner,
                     persist=RunRecorder(db),
-                    agent_input=agent_input,
+                    run_input=run_input,
                     run_id=child_run_id,
                     update_session_snapshot=False,
                 )

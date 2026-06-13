@@ -59,7 +59,7 @@ export interface ApiError {
 export interface RunResponse {
   reply: string;
   state: SessionState;
-  events: AgentEvent[];
+  events: RunEvent[];
   metadata: any;
   error?: ApiError;
 }
@@ -77,7 +77,7 @@ export interface ToolResult {
   metadata?: Record<string, any>;
 }
 
-export interface AgentEvent {
+export interface RunEvent {
   index: number;
   type: 'assistant_tool_call' | 'tool_result' | 'tool_error' | 'final_answer' | 'approval_required' | 'approval_rejected' | 'thinking' | 'tool_progress';
   content?: string | null;
@@ -105,7 +105,7 @@ export interface TraceRunSummary {
   event_count: number;
   created_at: string;
   finished_at: string;
-  events: AgentEvent[];
+  events: RunEvent[];
   is_active?: number;          // 后端返回：是否在模型活跃记忆中 (1为活跃，0为非活跃)
 }
 
@@ -161,7 +161,7 @@ export interface StreamPausedData {
 
 export type StreamFrame =
   | { type: 'start';          data: StreamStartData }
-  | { type: 'agent_event';    data: AgentEvent }
+  | { type: 'run_event';    data: RunEvent }
   | { type: 'delta';          data: StreamDeltaData }
   | { type: 'thinking_delta'; data: StreamThinkingDeltaData }
   | { type: 'end';            data: StreamEndData }
@@ -173,4 +173,4 @@ export type StreamFrame =
 export type StreamingItem =
   | { kind: 'text';     content: string }
   | { kind: 'thinking'; content: string }
-  | { kind: 'event';    event: AgentEvent };
+  | { kind: 'event';    event: RunEvent };

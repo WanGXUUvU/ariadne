@@ -1,13 +1,13 @@
 # STATUS
 
 ## Current Status
-- Phase: planning
-- Task: TASK-094B 统一 Run 执行生命周期层重构教学卡 (Unified Run Execution Session Refactor - Coaching Slice)
-- Gate: design / planning
-- Allowed Now: review / plan
+- Phase: verify
+- Task: TASK-094C 工具状态语义拆分
+- Gate: Verify / Review
+- Allowed Now: review / verify
 - Lane: Fast
 - Blocked: None
-- Next action: 以 Coach 模式依次推进 L1-L5 层重构，抽取通用 RunExecutionSession 并彻底解耦 SSE 协议与 VFS 控制。
+- Next action: 收口验证 → 切回 TASK-031
 
 
 ## 读取规则
@@ -23,6 +23,8 @@
 
 | Date | Event | Gate / Phase | Notes |
 |------|-------|--------------|-------|
+| 2026-06-10 | `TASK-094C` 收口 | Verify / Review | 完成 ToolState 三层枚举（staged/committed/rolled_back），write_file 返回紧凑确认格式并填充 metadata.state；_finalize_completed 将 staged 改为 committed，_finalize_interrupted 将 staged 改为 rolled_back；前端 ToolCard 展示 "staged" 徽章。117 单测 + 前端构建全绿。 |
+| 2026-06-10 | `TASK-094C` 建卡并从 `TASK-031` 切换 | planning | TASK-094 剩余工作（工具语义拆分、低 Token 协议、failed 独立语义、DB/VFS 原子性）独立为子卡 094C，暂停 031 先收此债。 |
 | 2026-06-07 | `TASK-094A` 归档并切换至 `TASK-094B` | Verify / planning | 成功统一流式、恢复与同步运行终态持久化接口，通过 RunPersistenceService.finalize_run 统一分发 DB 状态与 VFS 落盘事务，单元与集成测试全绿。 |
 | 2026-06-06 | `TASK-092` / `TASK-093` 主线验收完成并切换到 `TASK-094` | Verify / planning | 补充 VFS 主线验收测试：同步写入仅在 run completed 后落盘，流式取消会回滚 staged 写入且 run 记为 cancelled。 |
 | 2026-06-04 | 智能体被打断排队机制与工具实时自动展开完成 | Verify / Review | 成功实现流式打断消息排队（Up/Down/Trash三向选项），工具在运行时自动展开显示发光呼吸灯，修复了打断时工具回复在DB快照中丢失的Bug，后端单测与集成测试100%通过。 |

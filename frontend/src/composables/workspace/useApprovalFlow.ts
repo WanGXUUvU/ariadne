@@ -20,7 +20,7 @@ interface ApprovalFlowOptions {
   pendingApprovalInfo: Ref<ApprovalInfo | null>;
   pendingApprovalInfos: Ref<ApprovalInfo[]>;
   isResolvingApproval: Ref<boolean>;
-  onLiveAgentEvent: (sessionId: string, ev: any) => void;
+  onLiveRunEvent: (sessionId: string, ev: any) => void;
   extractChildAgents: (sessionId: string, msgs: AgentMessage[], traceRuns: TraceRunSummary[]) => void;
   updatePermissionProfile: (profile: string) => Promise<void>;
 }
@@ -41,7 +41,7 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
     pendingApprovalInfo,
     pendingApprovalInfos,
     isResolvingApproval,
-    onLiveAgentEvent,
+    onLiveRunEvent,
     extractChildAgents,
     updatePermissionProfile,
   } = options;
@@ -117,12 +117,12 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
           } else {
             streamingTimeline.value = [...tl, { kind: 'thinking', content: frame.data.content }];
           }
-        } else if (frame.type === 'agent_event') {
+        } else if (frame.type === 'run_event') {
           if (frame.data.type !== 'final_answer') {
             streamingTimeline.value = [...streamingTimeline.value, { kind: 'event', event: frame.data }];
           }
           if (activeSessionId.value) {
-            onLiveAgentEvent(activeSessionId.value, frame.data);
+            onLiveRunEvent(activeSessionId.value, frame.data);
           }
         } else if (frame.type === 'paused') {
           stillAwaitingApproval = true;

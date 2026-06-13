@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from agent_prototype.agent.types import AgentDefinition
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.agent.definition import SqliteAgentDefinitionStore
 from agent_prototype.api.app import app
@@ -160,7 +160,7 @@ class TestAgentApi(unittest.TestCase):
         db = self.session_local()
         try:
             store = SessionStore(db)
-            state = AgentState(
+            state = RunState(
                 messages=[
                     {"role": "user", "content": "最初任务目标"},
                     {"role": "assistant", "content": "好的，我们先拆任务"},
@@ -211,7 +211,7 @@ class TestAgentApi(unittest.TestCase):
         db = self.session_local()
         try:
             store = SessionStore(db)
-            state = AgentState(
+            state = RunState(
                 messages=[
                     {"role": "user", "content": "最初任务目标"},
                     {"role": "assistant", "content": "好的，我们先拆任务"},
@@ -283,7 +283,7 @@ class TestAgentApi(unittest.TestCase):
         db = self.session_local()
         try:
             store = SessionStore(db)
-            state = AgentState(messages=original_messages)
+            state = RunState(messages=original_messages)
             store.save_state(
                 "auto-compact-fail-session", state=state, context_tokens=90000
             )

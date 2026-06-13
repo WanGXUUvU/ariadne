@@ -30,7 +30,7 @@ from agent_prototype.context.compaction import (
     split_messages_for_compaction,
     HistoryCompactor,
 )
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 
 
 class CompactService:
@@ -44,7 +44,7 @@ class CompactService:
 
     def auto_compact_in_memory(
         self,
-        state: AgentState,
+        state: RunState,
         context_tokens: int,
         context_length: int,
         keep_recent_count: int,

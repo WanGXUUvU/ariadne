@@ -12,13 +12,13 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch, MagicMock
 
 from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig
-from agent_prototype.execution.runtime.types import AgentState, AgentEvent
+from agent_prototype.execution.runtime.types import RunState, RunEvent
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.service import RunService
 from agent_prototype.tests.helpers.db import make_sqlite_test_db
-from agent_prototype.tests.helpers.factories import build_agent_output
+from agent_prototype.tests.helpers.factories import build_run_output
 
 
 def _seed_session_model(session_local, session_id: str, model_id: str = "test-model") -> None:
@@ -48,7 +48,7 @@ def _seed_session_model(session_local, session_id: str, model_id: str = "test-mo
         db.flush()
 
         store = SessionStore(db)
-        record = store.save_state(session_id, state=AgentState())
+        record = store.save_state(session_id, state=RunState())
         record.model_provider_id = provider.id
         record.model_id = model_id
         db.commit()
@@ -100,9 +100,9 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         parent_run_id = "parent-run-abc"
         session_id = "session-with-model"
         _seed_session_model(self.session_local, session_id)
-        fake_output = build_agent_output(
+        fake_output = build_run_output(
             "子任务完成",
-            events=[AgentEvent(index=0, type="final_answer", content="子任务完成")],
+            events=[RunEvent(index=0, type="final_answer", content="子任务完成")],
         )
 
         db = self.session_local()
@@ -214,7 +214,7 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         parent_run_id = "parent-run-multi"
         session_id = "session-with-model-multi"
         _seed_session_model(self.session_local, session_id)
-        fake_output = build_agent_output("完成")
+        fake_output = build_run_output("完成")
 
         db = self.session_local()
         run_service = RunService(db)

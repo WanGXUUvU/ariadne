@@ -1,4 +1,4 @@
-import type { AgentEvent, ApprovalInfo, TraceRunSummary } from '../types';
+import type { RunEvent, ApprovalInfo, TraceRunSummary } from '../types';
 
 const sameApproval = (left: ApprovalInfo, right: ApprovalInfo) => {
   if (left.approval_id && right.approval_id) return left.approval_id === right.approval_id;
@@ -93,9 +93,9 @@ export const extractPendingApprovalsFromTraceRuns = (
 };
 
 const findMatchingCallEvent = (
-  callEvents: AgentEvent[],
-  approvalEvent: AgentEvent,
-): AgentEvent | undefined => {
+  callEvents: RunEvent[],
+  approvalEvent: RunEvent,
+): RunEvent | undefined => {
   if (approvalEvent.tool_call_id) {
     return callEvents.find(call => call.tool_call_id === approvalEvent.tool_call_id);
   }

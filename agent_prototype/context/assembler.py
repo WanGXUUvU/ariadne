@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from agent_prototype.agent.types import AgentDefinition
 from agent_prototype.context.types import AssembledContext
 from agent_prototype.context.skill_context import SkillContextService
-from agent_prototype.execution.persistence.types import AgentInput
+from agent_prototype.execution.persistence.types import RunInput
 
 
 class ContextAssembler:
@@ -52,7 +52,7 @@ class ContextAssembler:
 
     def assemble(
         self,
-        agent_input: AgentInput,
+        run_input: RunInput,
         session_type: str,
         workspace_path: Optional[str],
         definition: AgentDefinition,
@@ -65,7 +65,7 @@ class ContextAssembler:
 
         runtime_definition = self.skill_service.build_runtime_definition_with_skills(
             definition=definition,
-            agent_input=agent_input,
+            run_input=run_input,
             session_type=session_type,
             local_rules_text=local_rules_text,
             agent_soul_text=agent_soul_text,

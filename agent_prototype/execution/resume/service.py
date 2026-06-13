@@ -20,12 +20,12 @@ from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
 from agent_prototype.execution.persistence.types import (
-    AgentInput,
+    RunInput,
     RunFinalizationInput,
     RunFinalStatus,
     RunContext,
 )
-from agent_prototype.execution.runtime.types import AgentEvent, AgentState
+from agent_prototype.execution.runtime.types import RunEvent, RunState
 from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.execution.streaming.types import StreamFrame
@@ -36,10 +36,10 @@ from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.security.middleware.base import MiddlewarePipeline, ToolCallContext
 from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.tools.registry import build_run_registry
-from agent_prototype.execution.runtime.agent_runtime import AgentRunner
+from agent_prototype.execution.runtime.agent_runner import AgentRunner
 from agent_prototype.execution.runtime.run_lifecycle import (
-    AgentEventItem,
-    FinalResultItem,
+    RunEventItem,
+    RunStatusItem,
     RunLifecycleParams,
     RunLifecycle,
     TextDeltaItem,
@@ -87,7 +87,7 @@ class ResumeRunService:
         """
         approval = self.approval_store.get(approval_id)
         messages = self.approval_store.restore_messages(approval)
-        state = AgentState(messages=messages)
+        state = RunState(messages=messages)
         batch_id = approval.batch_id or approval.run_id
 
         # ── 加载 Agent 定义 ───────────────────────────────────────────────────
@@ -97,7 +97,7 @@ class ResumeRunService:
             .first()
         )
         agent_name = run_record.agent_name if run_record else "default"
-        definition = AgentDefinitionService(self.db).load_definition(agent_name)
+        agent_profile = AgentDefinitionService(self.db).load_definition(agent_name)
 
         # ── 构建 tool registry & adapter ─────────────────────────────────────
         tool_registry = build_run_registry(
@@ -121,17 +121,17 @@ class ResumeRunService:
             pipeline = MiddlewarePipeline([SandboxMiddleware()])
             extra = {
                 "workspace_path": workspace_path,
-                "allow_tool_names": definition.tool_names,
+                "allow_tool_names": agent_profile.tool_names,
             }
             vfs = RunVfsRegistry.get(approval.run_id)
             if vfs is not None:
                 extra["vfs"] = vfs
 
-            progress_queue: asyncio.Queue[AgentEvent] = asyncio.Queue()
+            progress_queue: asyncio.Queue[RunEvent] = asyncio.Queue()
 
             async def on_progress(text: str) -> None:
                 await progress_queue.put(
-                    AgentEvent(
+                    RunEvent(
                         index=0,  # 占位，真正序号由恢复链主循环统一赋值
                         type="tool_progress",
                         content=text,
@@ -177,7 +177,7 @@ class ResumeRunService:
                     progress_event.index = event_index
                     event_index += 1
                     yield _sse_frame(
-                        StreamFrame(type="agent_event", data=progress_event.model_dump())
+                        StreamFrame(type="run_event", data=progress_event.model_dump())
                     )
                 else:
                     queue_get_task.cancel()
@@ -190,7 +190,7 @@ class ResumeRunService:
             )
             tr = ToolResult(ok=tool_result.ok, content=content)
 
-        tool_result_event = AgentEvent(
+        tool_result_event = RunEvent(
             index=event_index,
             type="tool_result",
             content=content,
@@ -203,7 +203,7 @@ class ResumeRunService:
             ChatMessage(role="tool", tool_call_id=approval.tool_call_id, content=content)
         )
         yield _sse_frame(StreamFrame(type="resume", data={"run_id": approval.run_id}))
-        yield _sse_frame(StreamFrame(type="agent_event", data=tool_result_event.model_dump()))
+        yield _sse_frame(StreamFrame(type="run_event", data=tool_result_event.model_dump()))
 
         # ── 关键：刷新剩余 pending approvals 的 saved_messages ──────────────
         self.approval_store.refresh_pending_saved_messages_for_batch(
@@ -242,13 +242,12 @@ class ResumeRunService:
         # ── 构造 AgentRunner，继续流式运转 ────────────────────────────────────
         agent_runner = AgentRunner(
             state=state,
-            agent_profile=definition,
-            allow_tool_names=definition.tool_names,
+            agent_profile=agent_profile,
             model_adapter=model_adapter,
             tool_registry=tool_registry,
             approval_policy=approval_policy,
         )
-        agent_input = AgentInput.model_construct(
+        run_input = RunInput.model_construct(
             session_id=approval.session_id,
             user_input="",
             agent_name=None,
@@ -257,7 +256,7 @@ class ResumeRunService:
         workspace_path = session_record.workspace_path if session_record else None
         ctx = RunContext(
             state=state,
-            agent_profile=definition,
+            agent_profile=agent_profile,
             adapter=model_adapter,
             approval_policy=approval_policy,
             effective_agent_name=agent_name,
@@ -270,14 +269,14 @@ class ResumeRunService:
             self.approval_store,
             approval.session_id,
             approval.run_id,
-            agent_input,
+            run_input,
         )
         lifecycle = RunLifecycle(
             RunLifecycleParams(
                 ctx=ctx,
                 agent_runner=agent_runner,
                 persist=self.persist,
-                agent_input=agent_input,
+                run_input=run_input,
                 run_id=approval.run_id,
                 on_tool_start=observer.on_tool_start,
                 on_tool_finish=observer.on_tool_finish,
@@ -296,12 +295,12 @@ class ResumeRunService:
                 yield _sse_frame(
                     StreamFrame(type="thinking_delta", data={"content": item.content})
                 )
-            elif isinstance(item, AgentEventItem):
+            elif isinstance(item, RunEventItem):
                 yield _sse_frame(
-                    StreamFrame(type="agent_event", data=item.event.model_dump())
+                    StreamFrame(type="run_event", data=item.event.model_dump())
                 )
-            elif isinstance(item, FinalResultItem):
-                if item.result.status == RunFinalStatus.PAUSED:
+            elif isinstance(item, RunStatusItem):
+                if item.status == RunFinalStatus.PAUSED:
                     next_pending = self.approval_store.get_next_pending_for_batch(batch_id)
                     yield _sse_frame(
                         StreamFrame(
@@ -317,9 +316,8 @@ class ResumeRunService:
                         StreamFrame(
                             type="end",
                             data={
-                                "reply": item.result.reply_text,
                                 "run_id": approval.run_id,
-                                "state": item.result.state.model_dump(),
+                                "state": agent_runner.state.model_dump(),
                             },
                         )
                     )

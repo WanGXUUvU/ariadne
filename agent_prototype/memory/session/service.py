@@ -22,7 +22,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.memory.session.types import (
     CreateSessionInput,
     RenameSessionInput,
@@ -63,7 +63,7 @@ class SessionService:
         - SessionSummary: 一个精简的会话信息包，里面包含了这个新会话的 ID、名字、创建时间、更新时间、包含的消息数量、工作空间等各种常用属性。
         """
         session_id = uuid.uuid4().hex
-        state = AgentState()
+        state = RunState()
 
         # 尝试填入默认提供商与启用模型
         default_provider = (
@@ -130,7 +130,7 @@ class SessionService:
         if not record:
             raise ValueError("Session not found")
 
-        empty_state = AgentState()
+        empty_state = RunState()
         try:
             self.store.save_state(
                 payload.session_id,
@@ -339,7 +339,7 @@ class SessionService:
         
         forked_messages = parent_state.messages[:message_index]
 
-        forked_state=AgentState()
+        forked_state=RunState()
         forked_state.messages=forked_messages
 
         forked_name = getattr(payload, "session_name", None) or f"fork: {parent_record.session_name or 'Untitled'}"

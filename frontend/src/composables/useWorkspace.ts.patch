@@ -7,7 +7,7 @@
 -  const messages = ref<AgentMessage[]>([]);
 +  const currentMessages = ref<AgentMessage[]>([]);
 +  const historyMessages = ref<AgentMessage[]>([]);
-   const events = ref<AgentEvent[]>([]);
+   const events = ref<RunEvent[]>([]);
    const skills = ref<SkillMetadata[]>([]);
    
 @@ -32,6 +33,8 @@

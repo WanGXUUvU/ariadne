@@ -12,7 +12,7 @@
 
 from typing import Optional
 from agent_prototype.core.types import ChatMessage, ModelAdapter, ModelRequest, ModelConfig
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.memory.summary.types import CompactOutput
 
 DEFAULT_COMPACT_THRESHOLD = 12  # 默认超过12条消息时触发 compact
@@ -114,7 +114,7 @@ def build_compact_summary_message(summary_text: str) -> ChatMessage:
 
 
 def compact_state_with_summary(
-    state: AgentState,  # 输入当前完整会话状态
+    state: RunState,  # 输入当前完整会话状态
     summary_text: str,  # 输入模型已经完整好的 compact 摘要文本
     keep_recent_count: int = DEFAULT_KEEP_RECENT_COUNT,
 ) -> CompactOutput:

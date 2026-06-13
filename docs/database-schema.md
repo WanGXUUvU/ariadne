@@ -43,7 +43,7 @@ session_records
 │   ├── 类型：text (JSON 字符串)
 │   ├── 示例：{"messages": [{"role":"user","content":"你好"}, {"role":"assistant","content":"你好！"}], "step": 2, "agent_name": null}
 │   ├── 含义：会话最新聊天状态快照。每次 run 结束后更新
-│   ├── 来源：AgentState.model_dump() 序列化
+│   ├── 来源：RunState.model_dump() 序列化
 │   └── 子结构：
 │       ├── messages: list[ChatMessage] — 完整对话历史
 │       │   ├── role: "user" | "assistant" | "system" | "tool"
@@ -202,7 +202,7 @@ session_runs
 ├── user_input
 │   ├── 类型：text
 │   ├── 示例："帮我写一个 Python 脚本"
-│   ├── 来源：AgentInput.user_input
+│   ├── 来源：RunInput.user_input
 │   └── 含义：用户本轮输入的原始文本
 │
 ├── reply
@@ -263,7 +263,7 @@ session_run_events
 │
 ├── type
 │   ├── 类型：string
-│   ├── 定义位置：execution/runtime/types.py AgentEvent.type (Literal)
+│   ├── 定义位置：execution/runtime/types.py RunEvent.type (Literal)
 │   ├── 可选值及含义：
 │   │   ├── "assistant_tool_call"  → AI 决定调用一个工具
 │   │   │   ├── 生成点：tool_runner.py handle_tool_calls() / async_handle_tool_calls()

@@ -12,6 +12,7 @@ interface GroupedToolExecution {
   duration: string;
   groupCount?: number;
   approvalInfo?: ApprovalInfo | null;
+  vfsState?: string;
 }
 
 const props = defineProps<{
@@ -146,6 +147,9 @@ const statusText = computed(() => {
       <span v-if="exec.status === 'running'" class="running-indicator">
         <span class="pulse-dot"></span>
       </span>
+
+      <!-- VFS 暂存状态徽章 -->
+      <span v-if="exec.vfsState === 'staged' && exec.status === 'success'" class="vfs-staged-badge">staged</span>
 
       <!-- 审批挂起微章 -->
       <span v-else-if="isThisWaitingApproval" class="approval-pulse-badge">
@@ -387,6 +391,18 @@ body.theme-amber .tool-exec-icon-box {
   background-color: var(--accent-emerald, #34c759);
   box-shadow: 0 0 8px var(--accent-emerald, #34c759);
   animation: pulse 1.6s infinite ease-in-out;
+}
+
+.vfs-staged-badge {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  color: var(--warning-amber, #FBBF24);
+  background: rgba(251, 191, 36, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: lowercase;
+  letter-spacing: 0.3px;
 }
 
 .tool-exec-meta {

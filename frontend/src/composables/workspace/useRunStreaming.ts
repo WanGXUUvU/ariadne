@@ -38,7 +38,7 @@ interface RunStreamingOptions {
   activeSessionId: Ref<string | null>;
   getSessionState: (sessionId: string) => SessionSpecificState;
   activeAgent: ComputedRef<UiAgentOption | null>;
-  onLiveAgentEvent: (sessionId: string, ev: any) => void;
+  onLiveRunEvent: (sessionId: string, ev: any) => void;
   extractChildAgents: (sessionId: string, msgs: AgentMessage[], traceRuns: TraceRunSummary[]) => void;
 }
 
@@ -48,7 +48,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
     activeSessionId,
     getSessionState,
     activeAgent,
-    onLiveAgentEvent,
+    onLiveRunEvent,
     extractChildAgents,
   } = options;
 
@@ -106,7 +106,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
           } else {
             state.streamingTimeline = [...tl, { kind: 'thinking', content: frame.data.content }];
           }
-        } else if (frame.type === 'agent_event') {
+        } else if (frame.type === 'run_event') {
           if (frame.data.type !== 'final_answer') {
             state.streamingTimeline = [...state.streamingTimeline, { kind: 'event', event: frame.data }];
           }
@@ -155,7 +155,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
               state.pendingApprovalInfo = state.pendingApprovalInfos[0] ?? null;
             }).catch(() => {});
           }
-          onLiveAgentEvent(targetSessionId, frame.data);
+          onLiveRunEvent(targetSessionId, frame.data);
         } else if (frame.type === 'paused') {
           state.isAwaitingApproval = true;
           state.pendingApprovalInfo = state.pendingApprovalInfos[0] ?? state.pendingApprovalInfo;

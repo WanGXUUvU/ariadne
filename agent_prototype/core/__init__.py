@@ -3,7 +3,7 @@
 
 职责：
 - 定义 LLM 通信协议原语（消息、工具调用、请求/响应/流式事件）
-- 定义运行时状态与事件（AgentState, AgentEvent）
+- 定义运行时状态与事件（RunState, RunEvent）
 - 定义模型适配器协议与实现
 
 规则：仅依赖标准库 + pydantic + requests/httpx。本模块不依赖任何上层业务模块。

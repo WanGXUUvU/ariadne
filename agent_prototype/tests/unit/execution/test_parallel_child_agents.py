@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.service import RunService
 from agent_prototype.tests.helpers.db import make_sqlite_test_db
-from agent_prototype.tests.helpers.factories import build_agent_output
+from agent_prototype.tests.helpers.factories import build_run_output
 
 
 class TestSpawnReturnsRunIdImmediately(unittest.TestCase):
@@ -53,7 +53,7 @@ class TestSpawnReturnsRunIdImmediately(unittest.TestCase):
             patch(_MOCK_PATH) as MockAgent,
         ):
 
-            MockAgent.return_value.execute.return_value = build_agent_output("done")
+            MockAgent.return_value.execute.return_value = build_run_output("done")
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.create_launcher(
                     "parent-1", "session-id"
@@ -99,7 +99,7 @@ class TestCheckChildStatus(unittest.TestCase):
             patch(_MOCK_PATH) as MockAgent,
         ):
 
-            MockAgent.return_value.execute.return_value = build_agent_output("结果X")
+            MockAgent.return_value.execute.return_value = build_run_output("结果X")
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.create_launcher(
                     "parent-2", "session-id"
@@ -175,7 +175,7 @@ class TestWaitChildAgent(unittest.TestCase):
             patch(_MOCK_PATH) as MockAgent,
         ):
 
-            MockAgent.return_value.execute.return_value = build_agent_output("最终答案")
+            MockAgent.return_value.execute.return_value = build_run_output("最终答案")
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.create_launcher(
                     "parent-4", "session-id"
@@ -252,7 +252,7 @@ class TestParallelSpawn(unittest.TestCase):
         ):
 
             MockAgent.return_value.execute.side_effect = [
-                build_agent_output(f"结果{i}") for i in range(len(tasks))
+                build_run_output(f"结果{i}") for i in range(len(tasks))
             ]
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.create_launcher(

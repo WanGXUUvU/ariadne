@@ -22,7 +22,7 @@ from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from agent_prototype.execution.runtime.types import AgentState
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.infra.db.orm_models import (
     SessionRecord,
     SessionRunRecord,
@@ -41,14 +41,14 @@ class SessionStore:
 
     # ── Session 快照操作 ───────────────────────────────────────────────────
 
-    def get(self, session_id: str) -> Optional[AgentState]:
+    def get(self, session_id: str) -> Optional[RunState]:
         """获取一个会话当前的聊天状态。"""
         return self.read_session_state(session_id)
 
     def save_state(
         self,
         session_id: str,
-        state: AgentState,
+        state: RunState,
         session_name: Optional[str] = None,
         last_agent_name=_UNSET,
         last_reply_preview=_UNSET,
@@ -142,12 +142,12 @@ class SessionStore:
         """读取 session 主记录。"""
         return self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
 
-    def read_session_state(self, session_id: str) -> Optional[AgentState]:
+    def read_session_state(self, session_id: str) -> Optional[RunState]:
         """读取并反序列化 session 状态快照。"""
         record = self.load_record(session_id)
         if not record:
             return None
-        return AgentState.model_validate(json.loads(record.state_json))
+        return RunState.model_validate(json.loads(record.state_json))
 
     # ── Run 重置 ───────────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
 
 封装大模型的 API 通信接口（如 SenseNova、OpenAI），将通用模型请求（ModelRequest）转换为服务商特定的 HTTP 请求。
 对模型返回的流式 SSE 数据帧进行高内聚的有状态解析。
-转换并输出统一的模型响应结构（ModelResponse / ModelStreamEvent）。
+转换并输出统一的模型响应结构（ModelResponse / StreamChunk）。
 
 上游依赖：L8 执行层 (AgentRunner)、L6 历史压缩层 (HistoryCompactor)。
 下游依赖：物理大模型外部 API 服务。
@@ -18,7 +18,7 @@ import requests
 
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.core.types import ModelAdapter
-from agent_prototype.core.types import ModelRequest, ModelResponse, ModelUsage, ModelStreamEvent
+from agent_prototype.core.types import ModelRequest, ModelResponse, ModelUsage, StreamChunk
 
 
 class ChatCompletionsAdapter(ModelAdapter):
@@ -57,8 +57,8 @@ class ChatCompletionsAdapter(ModelAdapter):
                 return text[-i:]
         return ""
 
-    def _parse_think_content(self, raw: str, finish_reason) -> list[ModelStreamEvent]:
-        events: list[ModelStreamEvent] = []
+    def _parse_think_content(self, raw: str, finish_reason) -> list[StreamChunk]:
+        events: list[StreamChunk] = []
         text = self._tag_buf + raw
         self._tag_buf = ""
 
@@ -69,12 +69,12 @@ class ChatCompletionsAdapter(ModelAdapter):
                     partial = self._partial_suffix(text, "</think_tag>")
                     emit = text[: len(text) - len(partial)] if partial else text
                     if emit:
-                        events.append(ModelStreamEvent(type="thinking_delta", thinking_delta=emit))
+                        events.append(StreamChunk(type="thinking_delta", thinking_delta=emit))
                     self._tag_buf = partial
                     break
                 if close_idx > 0:
                     events.append(
-                        ModelStreamEvent(type="thinking_delta", thinking_delta=text[:close_idx])
+                        StreamChunk(type="thinking_delta", thinking_delta=text[:close_idx])
                     )
                 self._in_think = False
                 text = text[close_idx + len("</think_tag>") :]
@@ -85,7 +85,7 @@ class ChatCompletionsAdapter(ModelAdapter):
                     emit = text[: len(text) - len(partial)] if partial else text
                     if emit:
                         events.append(
-                            ModelStreamEvent(
+                            StreamChunk(
                                 type="delta",
                                 content_delta=emit,
                                 finish_reason=finish_reason,
@@ -94,13 +94,13 @@ class ChatCompletionsAdapter(ModelAdapter):
                     self._tag_buf = partial
                     break
                 if open_idx > 0:
-                    events.append(ModelStreamEvent(type="delta", content_delta=text[:open_idx]))
+                    events.append(StreamChunk(type="delta", content_delta=text[:open_idx]))
                 self._in_think = True
                 text = text[open_idx + len("<think_tag>") :]
 
         return events
 
-    def _parse_delta(self, delta: dict, finish_reason) -> list[ModelStreamEvent]:
+    def _parse_delta(self, delta: dict, finish_reason) -> list[StreamChunk]:
         tool_calls = delta.get("tool_calls")
         content = delta.get("content")
 
@@ -108,7 +108,7 @@ class ChatCompletionsAdapter(ModelAdapter):
             if content:
                 return self._parse_think_content(content, finish_reason)
             return [
-                ModelStreamEvent(
+                StreamChunk(
                     type="tool_call_delta" if tool_calls else "done",
                     finish_reason=finish_reason,
                     raw_event=delta,
@@ -122,11 +122,11 @@ class ChatCompletionsAdapter(ModelAdapter):
         )
         if thinking:
             return [
-                ModelStreamEvent(type="thinking_delta", thinking_delta=thinking, raw_event=delta)
+                StreamChunk(type="thinking_delta", thinking_delta=thinking, raw_event=delta)
             ]
 
         return [
-            ModelStreamEvent(
+            StreamChunk(
                 type="delta" if content else ("tool_call_delta" if tool_calls else "done"),
                 content_delta=content,
                 finish_reason=finish_reason,
@@ -233,7 +233,7 @@ class ChatCompletionsAdapter(ModelAdapter):
             provider_meta={},
         )
 
-    def stream_generate(self, request: ModelRequest) -> Iterator[ModelStreamEvent]:
+    def stream_generate(self, request: ModelRequest) -> Iterator[StreamChunk]:
         if not self.api_key:
             raise RuntimeError("Missing API_KEY")
 
@@ -320,7 +320,7 @@ class ChatCompletionsAdapter(ModelAdapter):
             if not choices:
                 usage_data = chunk.get("usage")
                 if usage_data:
-                    yield ModelStreamEvent(
+                    yield StreamChunk(
                         type="done",
                         usage=ModelUsage(
                             input_tokens=usage_data.get("prompt_tokens"),
@@ -336,7 +336,7 @@ class ChatCompletionsAdapter(ModelAdapter):
             for event in self._parse_delta(delta, finish_reason):
                 yield event
 
-    async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+    async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[StreamChunk]:
         if not self.api_key:
             raise RuntimeError("Missing API_KEY")
 
@@ -411,7 +411,7 @@ class ChatCompletionsAdapter(ModelAdapter):
                     if not choices:
                         usage_data = chunk.get("usage")
                         if usage_data:
-                            yield ModelStreamEvent(
+                            yield StreamChunk(
                                 type="done",
                                 usage=ModelUsage(
                                     input_tokens=usage_data.get("prompt_tokens"),
