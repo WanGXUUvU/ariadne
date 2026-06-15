@@ -34,7 +34,7 @@ def write_file(path: str, content: str, __context__=None) -> ToolResult:  # æŠŠå
     """
     vfs = None
     if __context__ is not None:
-        vfs = __context__.extra.get("vfs")
+        vfs = __context__.vfs
 
     if vfs is not None:
         vfs.write_text(path, content)

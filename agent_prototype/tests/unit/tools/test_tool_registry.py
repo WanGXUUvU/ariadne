@@ -65,7 +65,7 @@ class TestToolRegistry(unittest.TestCase):
             tool_args='{"path":"src"}',
             tool_call_id="call_123",
             session_id="session_123",
-            extra={"workspace_path": str(workspace_path)},
+            workspace_path=str(workspace_path),
         )
 
         result = self.registry.execute_tool_call("list_dir", '{"path":"src"}', context)
@@ -81,7 +81,7 @@ class TestToolRegistry(unittest.TestCase):
             tool_args='{"path":"../../../etc/passwd"}',
             tool_call_id="call_456",
             session_id="session_456",
-            extra={"workspace_path": str(workspace_path)},
+            workspace_path=str(workspace_path),
         )
 
         result = self.registry.execute_tool_call(

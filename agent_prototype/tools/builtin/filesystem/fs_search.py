@@ -43,7 +43,7 @@ def search_text(query: str, path: str = ".", __context__=None) -> str:
     # 🟢 尝试从 context 拿到 VFS 实例
     vfs = None
     if __context__ is not None:
-        vfs = __context__.extra.get("vfs")
+        vfs = __context__.vfs
 
     matches = []
     target_root = target.resolve()

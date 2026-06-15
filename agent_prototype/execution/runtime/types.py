@@ -25,14 +25,13 @@ class RunEvent(BaseModel):
 
     index: int
     type: Literal[
+        "assistant_text",
         "assistant_tool_call",
         "tool_result",
         "tool_error",
         "final_answer",
         "approval_required",
-        "approval_result",
         "thinking",
-        "tool_progress",
     ]
     content: Optional[str] = None
     tool_name: Optional[str] = None
@@ -40,11 +39,10 @@ class RunEvent(BaseModel):
     tool_result: Optional[ToolResult] = None
 
 
-class ToolTurnResult(BaseModel):
+class ToolBatchResult(BaseModel):
     """一次工具批次执行结束后的统一账单。"""
 
     events: list[RunEvent] = Field(default_factory=list)
     tool_messages: list[ChatMessage] = Field(default_factory=list)
     next_event_index: int
     paused_for_approval: bool = False
-

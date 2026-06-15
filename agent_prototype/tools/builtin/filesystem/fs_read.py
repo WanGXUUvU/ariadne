@@ -26,7 +26,7 @@ def read_file(path: str, __context__=None) -> str:
     # 🟢 优先检查 VFS 暂存区（可能有本次 Run 中其他工具刚暂存的新内容）
     vfs = None
     if __context__ is not None:
-        vfs = __context__.extra.get("vfs")
+        vfs = __context__.vfs
     if vfs is not None:
         try:
             # 🟢 委托给 VFS 处理：命中返回暂存内容，标记删除则抛 FileNotFoundError，未暂存则降级读磁盘

@@ -10,7 +10,7 @@
 
 数据流向：
 - 输入：ToolCall 列表入参及执行上下文。
-- 输出：包含所有工具返回消息与事件的 ToolTurnResult。
+- 输出：包含所有工具返回消息与事件的 ToolBatchResult。
 - 上游来源：agent_prototype/execution/runtime/agent_runner.py。
 - 下游流向：传递到拦截器中间件管道，并最终分发至 agent_prototype/tools/* 底层方法。
 """
@@ -45,44 +45,9 @@ TOOL_TIMEOUT = 120  # 单次工具调用最长等待秒数
 
 # ── 数据类 ────────────────────────────────────────────────────────────────────
 
-from agent_prototype.execution.runtime.types import ToolTurnResult
+from agent_prototype.execution.runtime.types import ToolBatchResult
 
 # ── 同步工具执行 ──────────────────────────────────────────────────────────────
-
-
-def _build_tool_extra(
-    *,
-    run_id: Optional[str],
-    workspace_path: Optional[str],
-    allow_tool_names: Optional[list[str]] = None,
-    risk_level=None,
-    on_approval_required=None,
-    saved_messages: Optional[list[ChatMessage]] = None,
-    approval_policy: ApprovalPolicy = ApprovalPolicy.NEVER,
-    batch_id: Optional[str] = None,
-) -> dict:
-    extra: dict = {}
-
-    if workspace_path:
-        extra["workspace_path"] = workspace_path
-    if allow_tool_names is not None:
-        extra["allow_tool_names"] = allow_tool_names
-    if risk_level is not None:
-        extra["risk_level"] = risk_level
-    if on_approval_required is not None:
-        extra["on_approval_required"] = on_approval_required
-    if saved_messages is not None:
-        extra["saved_messages"] = saved_messages
-    extra["approval_policy"] = approval_policy
-    if batch_id is not None:
-        extra["batch_id"] = batch_id
-
-    if run_id:
-        vfs = RunVfsRegistry.get(run_id)
-        if vfs is not None:
-            extra["vfs"] = vfs
-
-    return extra
 
 
 def handle_tool_calls(
@@ -93,7 +58,7 @@ def handle_tool_calls(
     session_id: str = "",
     run_id: Optional[str] = None,
     workspace_path: Optional[str] = None,
-) -> ToolTurnResult:
+) -> ToolBatchResult:
     """同步工具执行器：老老实实、挨个同步去调用大模型想用的那批工具。
     在调用前会进行白名单安全拦截（如果工具不被允许，直接报错）。全部调完后把产生的事件和工具答复包装成结算账单。
 
@@ -104,7 +69,7 @@ def handle_tool_calls(
     - event_index: 序列号起始索引。
 
     会给出来的结果：
-    - 一个结算账单 ToolTurnResult 对象。
+    - 一个结算账单 ToolBatchResult 对象。
     """
     events: list[RunEvent] = []
     tool_messages: list[ChatMessage] = []
@@ -133,11 +98,9 @@ def handle_tool_calls(
             tool_call_id=tool_call.id,
             session_id=session_id,
             run_id=run_id,
-            extra=_build_tool_extra(
-                run_id=run_id,
-                workspace_path=workspace_path,
-                allow_tool_names=allow_tool_names,
-            ),
+            workspace_path=workspace_path,
+            allow_tool_names=allow_tool_names,
+            vfs=RunVfsRegistry.get(run_id) if run_id else None,
         )
 
         tool_result = tool_registry.execute_tool_call(
@@ -183,7 +146,7 @@ def handle_tool_calls(
         current_index += 1
         tool_messages.append(tool_message)
 
-    return ToolTurnResult(
+    return ToolBatchResult(
         events=events,
         tool_messages=tool_messages,
         next_event_index=current_index,
@@ -207,11 +170,11 @@ async def async_handle_tool_calls(
     on_approval_required=None,
     saved_messages: Optional[list[ChatMessage]] = None,
     session_type: str = "coding",
-) -> AsyncIterator[Union[RunEvent, ToolTurnResult]]:
+) -> AsyncIterator[Union[RunEvent, ToolBatchResult]]:
     """异步流式工具执行引擎。
 
-    支持多工具基于 asyncio.gather 并发调度、中间件链执行拦截、
-    跨线程多生产者流式进度实时汇聚（asyncio.Queue）以及阻断性异常（如审批）时的并发安全生命周期回收。
+    支持多工具基于 asyncio.gather 并发调度、中间件链执行拦截，
+    并在工具全部结束后统一产出 tool_result / tool_error。
     """
     tool_messages: list[ChatMessage] = []
     current_index = event_index
@@ -230,31 +193,12 @@ async def async_handle_tool_calls(
     pending_items = []
 
     for item in batch.items:
-        if item.status == "approval_pending":
+        if item.requires_approval:
             pending_items.append(item)
         else:
             ready_items.append(item)
 
-    for item in pending_items:
-        approval_id = None
-        if on_approval_required:
-            approval_id = on_approval_required(
-                item.tool_call_id,
-                item.tool_name,
-                item.arguments,
-                saved_messages,
-                current_index,
-                batch.batch_id,
-            )
-
-        item.approval_id = approval_id or item.arguments
-    # 1. 根据会话模式初始化安全中间件管道
-    if session_type == "coding":
-        pipeline = MiddlewarePipeline([SandboxMiddleware()])
-    else:
-        pipeline = MiddlewarePipeline([])
-
-    # 2. 播报工具启动通知事件
+    # 1. 播报：本轮要调用哪些工具
     for item in batch.items:
         yield RunEvent(
             index=current_index,
@@ -265,49 +209,23 @@ async def async_handle_tool_calls(
         )
         current_index += 1
 
-    # 3. 创建多生产者共享队列，汇聚后台工作线程的实时进度
-    event_queue = asyncio.Queue()
+    # 2. 初始化中间件管道
+    if session_type == "coding":
+        pipeline = MiddlewarePipeline([SandboxMiddleware()])
+    else:
+        pipeline = MiddlewarePipeline([])
 
-    async def make_progress_callback(tc_id: str, t_name: str):
-        async def on_progress(text: str) -> None:
-            await event_queue.put(
-                RunEvent(
-                    index=0,
-                    type="tool_progress",
-                    tool_name=t_name,
-                    tool_call_id=tc_id,
-                    content=text,
-                )
-            )
-
-        return on_progress
-
-    # 4. 定义单个工具的执行协程 Worker
+    # 3. 定义单个工具的执行协程 Worker
     async def run_single_tool(item: ToolBatchItem):
-        if allow_tool_names is not None and item.tool_name not in allow_tool_names:
-            raise ValueError(f"Tool not allowed: {item.tool_name}")
-
-        risk = tool_registry.get_risk_level(item.tool_name)
-        progress_cb = await make_progress_callback(item.tool_call_id, item.tool_name)
-
         context = ToolCallContext(
             tool_name=item.tool_name,
             tool_args=item.arguments,
             tool_call_id=item.tool_call_id,
             session_id=session_id,
             run_id=run_id,
-            extra=_build_tool_extra(
-                run_id=run_id,
-                workspace_path=workspace_path,
-                allow_tool_names=allow_tool_names,
-                risk_level=risk,
-                on_approval_required=on_approval_required,
-                saved_messages=saved_messages,
-                approval_policy=approval_policy,
-                batch_id=batch.batch_id,
-            ),
-            on_progress=progress_cb,
-            loop=asyncio.get_event_loop(),
+            workspace_path=workspace_path,
+            allow_tool_names=allow_tool_names,
+            vfs=RunVfsRegistry.get(run_id) if run_id else None,
         )
 
         async def terminal_execute_call() -> ToolResult:
@@ -345,50 +263,26 @@ async def async_handle_tool_calls(
             return res
 
         res = await pipeline.execute(context, terminal_execute_call)
-        return item, context, res
+        return res
 
-    # 5. 封装并发 Task 集合并启动
+    # 4. 封装并发 Task 集合并启动
     tasks = []
     for item in ready_items:
         task = asyncio.create_task(run_single_tool(item))
         tasks.append(task)
 
-    gather_task = asyncio.ensure_future(asyncio.gather(*tasks))
+    try:
+        results = await asyncio.gather(*tasks)
+    except Exception as exc:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        raise exc
 
-    # 6. 流式事件流捕获主循环
-    while True:
-        if gather_task.done() and event_queue.empty():
-            break
-
-        queue_get_task = asyncio.create_task(event_queue.get())
-        done, pending = await asyncio.wait(
-            [gather_task, queue_get_task], return_when=asyncio.FIRST_COMPLETED
-        )
-
-        if queue_get_task in done:
-            progress_event = queue_get_task.result()
-            progress_event.index = current_index
-            current_index += 1
-            yield progress_event
-        else:
-            queue_get_task.cancel()
-
-        if gather_task.done():
-            try:
-                gather_task.result()
-            except Exception as exc:
-                # 未知异常：强行 cancel 其余活跃任务并向上抛出
-                for t in tasks:
-                    if not t.done():
-                        t.cancel()
-                raise exc
-
-    # 7. 并发结束，按时序合并输出最终卡片
-    results = gather_task.result()
-    for item, context, tool_result in results:
+    # 5. 并发结束，按时序合并输出最终卡片
+    for item, tool_result in zip(ready_items, results):
         if tool_result is None:
             error_message = f"Tool timed out after {TOOL_TIMEOUT}s"
-            item.status = "failed"
             yield RunEvent(
                 index=current_index,
                 type="tool_error",
@@ -404,7 +298,6 @@ async def async_handle_tool_calls(
             item.result_message = tool_message
             tool_messages.append(tool_message)
         elif tool_result.ok:
-            item.status = "completed"
             yield RunEvent(
                 index=current_index,
                 type="tool_result",
@@ -420,9 +313,8 @@ async def async_handle_tool_calls(
             )
             item.result_message = tool_message
             tool_messages.append(tool_message)
-        else:
-            error_message = tool_result.error.message if tool_result.error else "Tool failed"
-            item.status = "failed"
+        elif tool_result.error:
+            error_message = tool_result.error.message if tool_result.error.message else "Tool failed"
             yield RunEvent(
                 index=current_index,
                 type="tool_error",
@@ -441,7 +333,20 @@ async def async_handle_tool_calls(
         current_index += 1
 
     if pending_items:
+        approval_saved_messages = list(saved_messages or []) + tool_messages
+
         for item in pending_items:
+            approval_id = None
+            if on_approval_required:
+                approval_id = on_approval_required(
+                    item.tool_call_id,
+                    item.tool_name,
+                    item.arguments,
+                    approval_saved_messages,
+                    current_index,
+                    batch.batch_id,
+                )
+            item.approval_id = approval_id or item.arguments
             yield RunEvent(
                 index=current_index,
                 type="approval_required",
@@ -451,16 +356,14 @@ async def async_handle_tool_calls(
             )
             current_index += 1
 
-        yield ToolTurnResult(
-            events=[],
+        yield ToolBatchResult(
             tool_messages=tool_messages,  # 这里只含 ready items 的结果
             next_event_index=current_index,
             paused_for_approval=True,
         )
         return
 
-    yield ToolTurnResult(
-        events=[],
+    yield ToolBatchResult(
         tool_messages=tool_messages,
         next_event_index=current_index,
     )

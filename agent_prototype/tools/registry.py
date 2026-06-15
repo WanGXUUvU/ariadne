@@ -79,8 +79,6 @@ class ToolRegistry:  # 工具注册中心
         """安全解析入参并执行指定工具，拦截底层一切异常并包装为统一的 ToolResult。"""
         # 强制从 context 中提取 workspace_path 进行安全和投影改写
         workspace_path = getattr(context, "workspace_path", None)
-        if not workspace_path and hasattr(context, "extra"):
-            workspace_path = context.extra.get("workspace_path")
 
         if workspace_path:
             from agent_prototype.security.sandbox.resolver import SandboxPathResolver

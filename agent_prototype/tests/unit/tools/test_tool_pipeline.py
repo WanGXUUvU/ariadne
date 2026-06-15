@@ -56,8 +56,7 @@ class BlockDangerMiddleware(BaseMiddleware):
     """拦截 risk_level == DANGER 的调用，模拟审批拒绝。"""
 
     async def call(self, context: ToolCallContext, next_call):
-        risk = context.extra.get("risk_level", RiskLevel.SAFE)
-        if risk == RiskLevel.DANGER:
+        if context.tool_name == "danger_tool":
             return ToolResult(
                 ok=False,
                 error=ToolError(
@@ -153,13 +152,11 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
 
     async def _run_pipeline(self, tool_name: str, args: dict, middlewares) -> ToolResult:
         """辅助：构建 context + pipeline，执行并返回结果。"""
-        risk = self.registry.get_risk_level(tool_name)
         context = ToolCallContext(
             tool_name=tool_name,
             tool_args=json.dumps(args),
             tool_call_id="call_test",
             session_id="session_test",
-            extra={"risk_level": risk},
         )
         pipeline = MiddlewarePipeline(middlewares)
 

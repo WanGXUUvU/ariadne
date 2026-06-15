@@ -17,13 +17,12 @@ from agent_prototype.tools.types import RiskLevel
 """
 
 import os, httpx, json
-from typing import Optional, Any
 from agent_prototype.tools.types import ToolDefinition
 from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.tools.types import RiskLevel
 
 
-def web_search(query: str, num_results: int = 5, __context__: Optional[Any] = None) -> ToolResult:
+def web_search(query: str, num_results: int = 5) -> ToolResult:
     """这是“网页搜索引擎”的具体执行函数。
     当你想查一下最新的新闻、最新的代码库用法，或者 AI 的知识库不够新时，这个工具会飞快地跑去 Tavily 搜索引擎发起网络搜索，把查到的核心网页文本和参考链接原封不动拉回来给你看。
 
@@ -43,8 +42,6 @@ def web_search(query: str, num_results: int = 5, __context__: Optional[Any] = No
         )
 
     try:
-        if __context__:
-            __context__.emit_progress(f"正在检索{query}")
         response = httpx.post(
             "https://api.tavily.com/search",
             json={
@@ -57,8 +54,6 @@ def web_search(query: str, num_results: int = 5, __context__: Optional[Any] = No
         response.raise_for_status()
         data = response.json()
         results = data.get("results", [])
-        if __context__:
-            __context__.emit_progress("检索完毕")
         return ToolResult(
             ok=True,
             content=json.dumps(results, ensure_ascii=False),

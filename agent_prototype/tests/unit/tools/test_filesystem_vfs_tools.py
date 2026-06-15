@@ -20,7 +20,7 @@ class TestFilesystemVfsTools(unittest.TestCase):
             tool_call_id="call_test",
             session_id="session_test",
             run_id="run_test",
-            extra={"vfs": self.vfs},
+            vfs=self.vfs,
         )
 
     def tearDown(self):

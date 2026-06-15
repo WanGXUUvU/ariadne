@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import MagicMock
 
 from agent_prototype.tools.types import RiskLevel
-from agent_prototype.core.types import ToolCall, ToolCallFunction
+from agent_prototype.core.types import ChatMessage, ToolCall, ToolCallFunction
 from agent_prototype.security.policy import ApprovalPolicy
 from agent_prototype.security.approval.checker import needs_approval
 from agent_prototype.execution.runtime.tool_runner import async_handle_tool_calls
@@ -44,9 +44,46 @@ def make_registry(risk_level: RiskLevel) -> ToolRegistry:
     return registry
 
 
-def make_tool_call(name: str = "fake_tool") -> ToolCall:
+def make_mixed_registry() -> ToolRegistry:
+    """构造一个 safe 工具和一个 write 工具，用于覆盖混合审批批次。"""
+    registry = ToolRegistry()
+
+    def safe_handler(**kwargs):
+        return "safe-ok"
+
+    def write_handler(**kwargs):
+        return "write-ok"
+
+    registry.register(
+        ToolDefinition(
+            name="safe_tool",
+            schema={
+                "name": "safe_tool",
+                "description": "",
+                "parameters": {"type": "object", "properties": {}},
+            },
+            handler=safe_handler,
+            risk_level=RiskLevel.SAFE,
+        )
+    )
+    registry.register(
+        ToolDefinition(
+            name="write_tool",
+            schema={
+                "name": "write_tool",
+                "description": "",
+                "parameters": {"type": "object", "properties": {}},
+            },
+            handler=write_handler,
+            risk_level=RiskLevel.WRITE,
+        )
+    )
+    return registry
+
+
+def make_tool_call(name: str = "fake_tool", tool_call_id: str = "call_001") -> ToolCall:
     return ToolCall(
-        id="call_001",
+        id=tool_call_id,
         function=ToolCallFunction(name=name, arguments="{}"),
     )
 
@@ -154,8 +191,8 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
             "call_001",
             "fake_tool",
             "{}",
-            None,
-            0,
+            [],
+            1,
             "mock_run:step:0",
         )
 
@@ -173,6 +210,65 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
         )
         approval_event = next(e for e in events if e.type == "approval_required")
         self.assertEqual(approval_event.content, "approval-abc")
+
+    def test_mixed_ready_and_pending_approval_snapshot_includes_ready_result(self):
+        """同批次含 ready + pending 时，审批快照应包含已完成 ready 工具结果。"""
+        registry = make_mixed_registry()
+        base_messages = [ChatMessage(role="user", content="run mixed tools")]
+        captured = {}
+
+        def callback(tool_call_id, tool_name, arguments, saved_messages, event_index, batch_id):
+            captured["tool_call_id"] = tool_call_id
+            captured["tool_name"] = tool_name
+            captured["saved_messages"] = saved_messages
+            captured["event_index"] = event_index
+            captured["batch_id"] = batch_id
+            return "approval-mixed"
+
+        events = []
+
+        async def run():
+            from agent_prototype.execution.runtime.types import RunEvent
+
+            async for item in async_handle_tool_calls(
+                tool_registry=registry,
+                tool_calls=[
+                    make_tool_call("safe_tool", "call_safe"),
+                    make_tool_call("write_tool", "call_write"),
+                ],
+                allow_tool_names=None,
+                event_index=0,
+                session_id="mock_session",
+                run_id="mock_run",
+                approval_policy=ApprovalPolicy.UNTRUSTED,
+                on_approval_required=callback,
+                saved_messages=base_messages,
+            ):
+                if isinstance(item, RunEvent):
+                    events.append(item)
+
+        self._run(run())
+
+        self.assertEqual(captured["tool_call_id"], "call_write")
+        self.assertEqual(captured["tool_name"], "write_tool")
+        self.assertEqual(captured["event_index"], 3)
+        self.assertEqual(captured["batch_id"], "mock_run:step:0")
+
+        snapshot = captured["saved_messages"]
+        self.assertEqual(len(base_messages), 1)
+        self.assertEqual([msg.role for msg in snapshot], ["user", "tool"])
+        self.assertEqual(snapshot[1].tool_call_id, "call_safe")
+        self.assertEqual(snapshot[1].content, "safe-ok")
+
+        self.assertEqual(
+            [event.type for event in events],
+            [
+                "assistant_tool_call",
+                "assistant_tool_call",
+                "tool_result",
+                "approval_required",
+            ],
+        )
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ class DummyMiddleware(BaseMiddleware):
         self.trace_list.append(f"enter:{self.name}")
 
         if isinstance(context, ToolCallContext):
-            context.extra[f"passed_{self.name}"] = True
+            setattr(context, f"passed_{self.name}", True)
 
         if self.short_circuit:
             self.trace_list.append(f"short_circuit:{self.name}")
@@ -92,8 +92,8 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
             "exit:outer",
         ]
         self.assertEqual(self.trace, expected_trace)
-        self.assertTrue(self.context.extra.get("passed_outer"))
-        self.assertTrue(self.context.extra.get("passed_inner"))
+        self.assertTrue(getattr(self.context, "passed_outer"))
+        self.assertTrue(getattr(self.context, "passed_inner"))
 
     async def test_pipeline_short_circuit(self):
         """测试中间件短路保护（不调用 next_call）。"""
@@ -141,7 +141,7 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
             tool_args='{"path": "src/App.vue", "content": "<template></template>"}',
             tool_call_id="call_456",
             session_id="session_xyz",
-            extra={"workspace_path": "/fake/workspace/root"},
+            workspace_path="/fake/workspace/root",
         )
 
         async def terminal():
@@ -161,7 +161,7 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
             tool_args='{"path": "/package.json"}',
             tool_call_id="call_789",
             session_id="session_xyz",
-            extra={"workspace_path": "/fake/workspace/root"},
+            workspace_path="/fake/workspace/root",
         )
 
         async def terminal():
@@ -181,7 +181,7 @@ class TestGeneralMiddleware(unittest.IsolatedAsyncioTestCase):
             tool_args="{}",
             tool_call_id="call_999",
             session_id="session_xyz",
-            extra={"allow_tool_names": ["write_file", "read_file"]},
+            allow_tool_names=["write_file", "read_file"],
         )
 
         async def terminal():

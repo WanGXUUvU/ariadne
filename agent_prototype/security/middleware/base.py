@@ -7,9 +7,8 @@
 """
 
 import logging
-import asyncio
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -33,23 +32,12 @@ class ToolCallContext:
     session_id: str
     # tool call 所属 run；用于 VFS、trace、审批恢复等跨层关联。
     run_id: Optional[str] = None
-    extra: dict[str, Any] = field(default_factory=dict)
-    """元数据字典，用于中间件之间传递共享状态或参数"""
-
-    on_progress: Optional[Callable[[str], Awaitable[None]]] = None
-    """流式进度回调函数，用于实时向主线程投递进度事件"""
-
-    loop: Optional[asyncio.AbstractEventLoop] = None
-    """主事件循环，用以支持多线程/同步物理工具环境下的线程安全进度投递"""
-
-    def emit_progress(self, text: str) -> None:
-        """物理工具在执行期间，通过此接口主动触发上报流式进度。
-
-        如果存在绑定的 on_progress 回调和活动事件循环，将以线程安全的方式提交给主线程执行。
-        """
-        if self.on_progress and self.loop:
-            if self.loop.is_running():
-                asyncio.run_coroutine_threadsafe(self.on_progress(text), self.loop)
+    # 物理工作区路径；registry 基于它做路径解析和沙箱投影。
+    workspace_path: Optional[str] = None
+    # 当前 agent 允许调用的工具白名单；SandboxMiddleware 使用。
+    allow_tool_names: Optional[list[str]] = None
+    # 当前 run 的内存 VFS；文件工具读写会优先走它。
+    vfs: Optional[Any] = None
 
 
 class BaseMiddleware(ABC):
