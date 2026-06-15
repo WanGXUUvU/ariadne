@@ -34,7 +34,7 @@ class RunLifecycleParams:
     # 已装配好的智能体执行发动机。
     agent_runner: AgentRunner
     # 终态收口器；执行层只在结束时把 finalization input 交给它。
-    persist: RunRecorder
+    recorder: RunRecorder
     # 本轮 run 的外部输入。
     run_input: RunInput
     # 当前 run 的唯一 ID。
@@ -51,17 +51,17 @@ class RunLifecycleParams:
     event_index: int = 0
     # 执行开始前就已经存在的正式事件；典型场景是 resume 先补一个 tool_result_event。
     initial_events: list[RunEvent] = field(default_factory=list)
-    # True 表示本轮结束时要往已有 run 上追加事件，而不是新建一条 run trace。
-    append_events: bool = False
-    # 控制本轮 finalization 是否更新主 session snapshot；child run 会关掉。
-    update_session_snapshot: bool = True
+    # True 表示本轮是 resume 续跑，而非新 run。
+    is_resume: bool = False
+    # True 表示本轮拥有 session 快照写入权；child run 会关掉。
+    owns_session: bool = True
 
 
 class RunLifecycleResultItem(BaseModel):
     """一次执行会话结束后的统一结果。"""
 
     status: RunFinalStatus
-    reply_text: str
+    reply: str
     events: list[RunEvent]
     state: RunState
     usage: Optional[ModelUsage] = None
@@ -151,14 +151,12 @@ class RunLifecycle:
                     yield ThinkingDeltaItem(content=chunk)
 
                 elif isinstance(item, RunEvent):
-                    # tool_progress 不进入正式 events 列表，只透传给上层。
-                    if item.type == "tool_progress":
-                        yield RunEventItem(event=item)
-                    else:
-                        async for flushed in _flush_thinking():
-                            yield flushed
-                        events.append(item)
-                        yield RunEventItem(event=item)
+                    if item.type in ("tool_result", "tool_error"):
+                        reply_text = ""
+                    async for flushed in _flush_thinking():
+                        yield flushed
+                    events.append(item)
+                    yield RunEventItem(event=item)
 
             async for flushed in _flush_thinking():
                 yield flushed
@@ -166,15 +164,15 @@ class RunLifecycle:
             # 正常结束后，如果包含 approval_required，则视为 paused。
             status = (
                 RunFinalStatus.PAUSED
-                if any(e.type == "approval_required" for e in events)
+                if any(event.type == "approval_required" for event in events)
                 else RunFinalStatus.COMPLETED
             )
 
-            self.params.persist.finalize_run(
+            self.params.recorder.finalize_run(
                 self._build_finalization(
                     status=status,
                     events=events,
-                    reply_text=reply_text,
+                    reply=reply_text,
                 )
             )
 
@@ -185,11 +183,11 @@ class RunLifecycle:
                 yield flushed
 
             try:
-                self.params.persist.finalize_run(
+                self.params.recorder.finalize_run(
                     self._build_finalization(
                         status=RunFinalStatus.CANCELLED,
                         events=events,
-                        reply_text=reply_text,
+                        reply=reply_text,
                     )
                 )
             except Exception:
@@ -204,11 +202,11 @@ class RunLifecycle:
             async for flushed in _flush_thinking():
                 yield flushed
 
-            self.params.persist.finalize_run(
+            self.params.recorder.finalize_run(
                 self._build_finalization(
                     status=RunFinalStatus.FAILED,
                     events=events,
-                    reply_text=reply_text,
+                    reply=reply_text,
                 )
             )
             raise
@@ -218,29 +216,21 @@ class RunLifecycle:
         *,
         status: RunFinalStatus,
         events: list[RunEvent],
-        reply_text: str,
-        state: Optional[RunState] = None,
-        usage: Optional[ModelUsage] = None,
+        reply: str,
     ) -> RunFinalizationInput:
         """把本次执行结果转换成统一终态输入。"""
-        resolved_usage = usage if isinstance(usage, ModelUsage) else None
-        if resolved_usage is None:
-            candidate = getattr(self.params.agent_runner, "last_usage", None)
-            if isinstance(candidate, ModelUsage):
-                resolved_usage = candidate
         return RunFinalizationInput(
             session_id=self.params.run_input.session_id,
             run_id=self.params.run_id,
             status=status,
             user_input=self.params.run_input.user_input,
-            reply_text=reply_text,
+            reply=reply,
             agent_name=self.params.ctx.effective_agent_name,
             events=events,
-            state=state or self.params.agent_runner.state,
-            usage=resolved_usage,
-            session_type=self.params.ctx.session_type,
-            append_events=self.params.append_events,
-            update_session_snapshot=self.params.update_session_snapshot,
+            state=self.params.agent_runner.state,
+            usage=getattr(self.params.agent_runner, "last_usage", None),
+            is_resume=self.params.is_resume,
+            owns_session=self.params.owns_session,
         )
 
     def execute_sync(self) -> RunLifecycleResultItem:
@@ -257,18 +247,16 @@ class RunLifecycle:
         except Exception:
             raise
 
-        self.params.persist.finalize_run(
+        self.params.recorder.finalize_run(
             self._build_finalization(
                 status=RunFinalStatus.COMPLETED,
                 events=output.events,
-                reply_text=output.reply,
-                state=output.state,
-                usage=output.usage,
+                reply=output.reply,
             )
         )
         return RunLifecycleResultItem(
             status=RunFinalStatus.COMPLETED,
-            reply_text=output.reply,
+            reply=output.reply,
             events=output.events,
             state=output.state,
             usage=output.usage,

@@ -96,7 +96,7 @@ class RunTraceStore:
         run_id: str,
         agent_name: Optional[str],
         user_input: str,
-        reply_text: str,
+        reply: str,
         state,
         events: Optional[list] = None,
     ) -> SessionRunRecord:
@@ -124,8 +124,8 @@ class RunTraceStore:
                         )
                     )
                 existing.event_count = len(events)
-                if reply_text:
-                    existing.reply = reply_text
+                if reply:
+                    existing.reply = reply
                 self.db.flush()
             return existing
 
@@ -134,7 +134,7 @@ class RunTraceStore:
             run_id=run_id,
             agent_name=agent_name,
             user_input=user_input,
-            reply=reply_text,
+            reply=reply,
             event_count=len(events),
             finished_at=datetime.utcnow(),
         )
@@ -158,11 +158,18 @@ class RunTraceStore:
                 )
             )
 
-        if reply_text.strip() or events:
+        last_message = state.messages[-1] if state.messages else None
+        should_append_partial_assistant = bool(reply.strip()) and not (
+            last_message
+            and last_message.role == "assistant"
+            and (last_message.content or "") == reply
+        )
+
+        if should_append_partial_assistant:
             state.messages.append(
                 ChatMessage(
                     role="assistant",
-                    content=reply_text or None,
+                    content=reply,
                 )
             )
 

@@ -40,14 +40,14 @@ class RunSSEBridge:
         agent_runner: AgentRunner,
         run_id: str,
         run_input: RunInput,
-        persist: RunRecorder,
+        recorder: RunRecorder,
     ):
         self.ctx = ctx
         self.observer = observer
         self.agent_runner = agent_runner
         self.run_id = run_id
         self.run_input = run_input
-        self.persist = persist
+        self.recorder = recorder
 
     async def stream(self) -> AsyncIterator[str]:
         """消费通用执行项，并实时翻译成 SSE。"""
@@ -57,7 +57,7 @@ class RunSSEBridge:
             RunLifecycleParams(
                 ctx=self.ctx,
                 agent_runner=self.agent_runner,
-                persist=self.persist,
+                recorder=self.recorder,
                 run_input=self.run_input,
                 run_id=self.run_id,
                 on_tool_start=self.observer.on_tool_start,
@@ -122,10 +122,6 @@ class RunSSEBridge:
         return _sse_frame(
             StreamFrame(
                 type="start",
-                data={
-                    "session_id": self.run_input.session_id,
-                    "run_id": self.run_id,
-                    "agent_name": self.ctx.effective_agent_name,
-                },
+                data={"run_id": self.run_id},
             )
         )

@@ -123,7 +123,7 @@ def cancel_run_api(
             session_id=session_id,
             run_id=run_id,
             user_input=payload.user_input,
-            reply_text=payload.reply_text,
+            reply=payload.reply,
             agent_name=payload.agent_name,
         )
     except ValueError as exc:

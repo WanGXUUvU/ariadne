@@ -18,7 +18,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from agent_prototype.security.approval.service import ApprovalService
+from agent_prototype.security.approval.service import ApprovalRunNotPaused, ApprovalService
 from agent_prototype.execution.resume.service import ResumeRunService
 from agent_prototype.api.routes.dependencies import (
     get_approval_service,
@@ -65,7 +65,10 @@ async def approve(
     会给出来的结果：
     - 一个 StreamingResponse 流式响应，里面源源不断地吐出 Agent 被唤醒后继续执行的日志/事件流。
     """
-    record = service.approve(approval_id)
+    try:
+        record = service.approve(approval_id)
+    except ApprovalRunNotPaused as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if record is None:
         raise HTTPException(status_code=404, detail="Approval not found")
     return StreamingResponse(
@@ -92,7 +95,10 @@ async def reject(
     会给出来的结果：
     - 一个 StreamingResponse 流式响应，里面源源不断地吐出 Agent 被拒绝后继续处理或报错的日志/事件流。
     """
-    record = service.reject(approval_id)
+    try:
+        record = service.reject(approval_id)
+    except ApprovalRunNotPaused as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if record is None:
         raise HTTPException(status_code=404, detail="Approval not found")
     return StreamingResponse(
@@ -119,7 +125,10 @@ async def approve_all(
     会给出来的结果：
     - 一个 StreamingResponse 流式响应，里面源源不断地吐出 Agent 被唤醒后继续执行的日志/事件流。
     """
-    record = service.approve_all(approval_id)
+    try:
+        record = service.approve_all(approval_id)
+    except ApprovalRunNotPaused as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if record is None:
         raise HTTPException(status_code=404, detail="Approval not found")
     return StreamingResponse(

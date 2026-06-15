@@ -83,7 +83,7 @@ class FinalizeRunInput(BaseModel):
     """内部用，run 完成时写库。"""
 
     user_input: str
-    reply_text: str
+    reply: str = Field(validation_alias="partial_reply")
     agent_name: Optional[str] = None
 
 class RunFinalStatus(str, Enum):
@@ -111,18 +111,16 @@ class RunFinalizationInput(BaseModel):
     # 当前 run 对应的用户输入；中断/失败场景补 user message 时要用。
     user_input: str
     # 最终完整 reply，或者中断时的 partial reply。
-    reply_text: str
+    reply: str
     # 本轮实际执行的 agent 名称；用于 run 摘要和 session 元数据。
     agent_name: Optional[str] = None
-    # 本轮正式事件账本；注意不包含所有过程噪音，例如 tool_progress。
+    # 本轮正式事件账本。
     events: list[RunEvent] = Field(default_factory=list)
     # 本轮结束时的最新状态快照。
     state: RunState = Field(default_factory=RunState)
     # 模型用量；只有支持用量统计的适配器才会提供。
     usage: Optional[ModelUsage] = None
-    # 会话类型，会影响 session snapshot 的落库字段。
-    session_type: str = "coding"
-    # True 表示往已有 run 追加事件（典型是 resume），False 表示新建一条完整 run trace。
-    append_events: bool = False
-    # 控制这次终态收口是否更新主 session snapshot；child run 会显式关掉。
-    update_session_snapshot: bool = True
+    # True 表示本次是 resume 续跑，而非新 run。
+    is_resume: bool = False
+    # True 表示本轮拥有 session 快照写入权；child run 会关掉。
+    owns_session: bool = True

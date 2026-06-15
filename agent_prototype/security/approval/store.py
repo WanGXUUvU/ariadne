@@ -132,34 +132,6 @@ class SqliteApprovalStore:
         )
         return pending_count == 0
 
-    def refresh_pending_saved_messages_for_batch(
-        self,
-        batch_id: str,
-        saved_messages: list[ChatMessage],
-        event_index: Optional[int] = None,
-    ) -> int:
-        """把某一批 pending 审批单的现场快照刷新为最新状态。
-
-        返回刷新了多少条记录。
-        """
-        records = (
-            self.db.query(PendingApproval)
-            .filter(
-                PendingApproval.batch_id == batch_id,
-                PendingApproval.status == "pending",
-            )
-            .all()
-        )
-
-        payload = [msg.model_dump(exclude_none=True) for msg in saved_messages]
-
-        for record in records:
-            record.saved_messages = payload
-            if event_index is not None:
-                record.event_index = event_index
-
-        return len(records)
-
     def get_next_pending_for_batch(self, batch_id: str) -> Optional[PendingApproval]:
         """返回同一批 tool_calls 里下一个待处理的审批单。"""
         return (

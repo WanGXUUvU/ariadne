@@ -81,7 +81,7 @@ class ChildRunLauncher:
                     else:
                         result[run_id] = {
                             "status": "done",
-                            "reply": future.result().reply_text,
+                            "reply": future.result().reply,
                         }
                 else:
                     result[run_id] = {"status": "running"}
@@ -97,7 +97,7 @@ class ChildRunLauncher:
             if future is None:
                 raise LookupError(f"child_run_id {child_run_id} not found")
             output = future.result(timeout=120)
-            return output.reply_text
+            return output.reply
 
         return child_waiter
 
@@ -115,7 +115,7 @@ class ChildRunLauncher:
 
         result = future.result()
         del _global_futures[run_id]
-        return {"status": "done", "reply": result.reply_text, "error": None}
+        return {"status": "done", "reply": result.reply, "error": None}
 
     def _execute_child(
         self,
@@ -168,10 +168,10 @@ class ChildRunLauncher:
                 RunLifecycleParams(
                     ctx=ctx,
                     agent_runner=agent_runner,
-                    persist=RunRecorder(db),
+                    recorder=RunRecorder(db),
                     run_input=run_input,
                     run_id=child_run_id,
-                    update_session_snapshot=False,
+                    owns_session=False,
                 )
             ).execute_sync()
 

@@ -21,8 +21,12 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.infra.db.orm_models import PendingApproval, SessionRecord
+from agent_prototype.infra.db.orm_models import PendingApproval, SessionRecord, SessionRunRecord
 from agent_prototype.security.approval.store import SqliteApprovalStore
+
+
+class ApprovalRunNotPaused(RuntimeError):
+    """审批所属 run 尚未完成暂停落库。"""
 
 
 class ApprovalService:
@@ -61,9 +65,10 @@ class ApprovalService:
         会给出来的结果：
         - Optional[PendingApproval]: 批准成功后的审批记录详情，如果压根没查到这笔单子就返回 None。
         """
-        record = self.store.update_status(approval_id, "approved")
+        record = self._get_decidable_approval(approval_id)
         if record is None:
             return None
+        record.status = "approved"
         self.db.commit()
         return record
 
@@ -76,9 +81,10 @@ class ApprovalService:
         会给出来的结果：
         - Optional[PendingApproval]: 驳回成功后的审批记录详情，如果压根没查到这笔单子就返回 None。
         """
-        record = self.store.update_status(approval_id, "rejected")
+        record = self._get_decidable_approval(approval_id)
         if record is None:
             return None
+        record.status = "rejected"
         self.db.commit()
         return record
 
@@ -93,9 +99,10 @@ class ApprovalService:
         - Optional[PendingApproval]: 批准成功后的审批记录详情，如果找不到就返回 None。
         """
 
-        record = self.store.update_status(approval_id, "approved")
+        record = self._get_decidable_approval(approval_id)
         if record is None:
             return None
+        record.status = "approved"
         session_record = (
             self.db.query(SessionRecord)
             .filter(SessionRecord.session_id == record.session_id)
@@ -104,4 +111,20 @@ class ApprovalService:
         if session_record:
             session_record.permission_profile = "full-auto"
         self.db.commit()
+        return record
+
+    def _get_decidable_approval(self, approval_id: str) -> Optional[PendingApproval]:
+        """只有 run 已经 paused 落库后，才允许处理审批决定。"""
+        record = self.store.get(approval_id)
+        if record is None:
+            return None
+
+        run_record = (
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.run_id == record.run_id)
+            .first()
+        )
+        if run_record is None or run_record.run_status != "paused":
+            raise ApprovalRunNotPaused("Run is not paused yet")
+
         return record

@@ -12,7 +12,6 @@ from typing import Optional
 
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.memory.run.store import RunTraceStore
-from agent_prototype.execution.persistence.types import RunInput
 
 
 class ToolTracer:
@@ -25,14 +24,12 @@ class ToolTracer:
         approval_store: SqliteApprovalStore,
         session_id: str,
         run_id: str,
-        run_input: RunInput,
     ):
         self.db = db
         self.run_store = run_store
         self.approval_store = approval_store
         self.session_id = session_id
         self.run_id = run_id
-        self.run_input = run_input
 
     # ── 三个回调，直接挂给 async_stream_run ──────────────────────────────────
 

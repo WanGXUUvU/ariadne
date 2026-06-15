@@ -79,7 +79,7 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
             db.commit()
 
             service = ResumeRunService(db)
-            service.persist.finalize_run = MagicMock()
+            service.recorder.finalize_run = MagicMock()
 
             with (
                 patch(
@@ -91,7 +91,7 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
                         description="test",
                         tool_names=[],
                     ),
-                ),
+                ) as load_definition,
                 patch(
                     "agent_prototype.execution.resume.service.RunContextFactory.create_adapter",
                     return_value=object(),
@@ -101,12 +101,16 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
                 async for frame in service.resume_run(approval.id, rejected=True):
                     frames.append(_parse_sse(frame))
 
+            load_definition.assert_called_once_with("default")
             self.assertEqual(frames[-1]["type"], "paused")
-            self.assertEqual(service.persist.finalize_run.call_count, 1)
-            finalization = service.persist.finalize_run.call_args.args[0]
+            self.assertEqual(service.recorder.finalize_run.call_count, 1)
+            finalization = service.recorder.finalize_run.call_args.args[0]
             self.assertEqual(finalization.status, RunFinalStatus.PAUSED)
-            self.assertTrue(finalization.append_events)
+            self.assertTrue(finalization.is_resume)
             self.assertEqual(finalization.run_id, run_id)
+            self.assertEqual(finalization.state.messages[-1].role, "tool")
+            self.assertEqual(finalization.state.messages[-1].tool_call_id, "call_001")
+            self.assertIn("[TOOL_REJECTED]", finalization.state.messages[-1].content)
         finally:
             db.close()
 
@@ -135,7 +139,7 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
                 yield "done"
 
             service = ResumeRunService(db)
-            service.persist.finalize_run = MagicMock()
+            service.recorder.finalize_run = MagicMock()
 
             with (
                 patch(
@@ -147,7 +151,7 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
                         description="test",
                         tool_names=[],
                     ),
-                ),
+                ) as load_definition,
                 patch(
                     "agent_prototype.execution.resume.service.RunContextFactory.create_adapter",
                     return_value=object(),
@@ -166,13 +170,19 @@ class TestResumeRunService(unittest.IsolatedAsyncioTestCase):
                 async for frame in service.resume_run(approval.id, rejected=True):
                     frames.append(_parse_sse(frame))
 
+            load_definition.assert_called_once_with("default")
             self.assertEqual(frames[-1]["type"], "end")
-            self.assertEqual(service.persist.finalize_run.call_count, 1)
-            finalization = service.persist.finalize_run.call_args.args[0]
+            self.assertEqual(service.recorder.finalize_run.call_count, 1)
+            finalization = service.recorder.finalize_run.call_args.args[0]
             self.assertEqual(finalization.status, RunFinalStatus.COMPLETED)
-            self.assertTrue(finalization.append_events)
-            self.assertEqual(finalization.reply_text, "done")
+            self.assertTrue(finalization.is_resume)
+            self.assertEqual(finalization.reply, "done")
             self.assertEqual(finalization.run_id, run_id)
+
+            persisted_state = SessionStore(db).read_session_state(session_id)
+            self.assertEqual(persisted_state.messages[-1].role, "tool")
+            self.assertEqual(persisted_state.messages[-1].tool_call_id, "call_002")
+            self.assertIn("[TOOL_REJECTED]", persisted_state.messages[-1].content)
         finally:
             db.close()
 

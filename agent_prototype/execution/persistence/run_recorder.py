@@ -4,7 +4,6 @@ from agent_prototype.core.types import ChatMessage
 from agent_prototype.execution.persistence.types import (
     RunFinalizationInput,
     RunFinalStatus,
-    RunMetadata,
 )
 from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
@@ -22,13 +21,8 @@ class RunRecorder:
         self._run_store = RunTraceStore(db)
         self.approval_store = SqliteApprovalStore(db)
 
-    def finalize_run(self, finalization: RunFinalizationInput) -> RunMetadata:
+    def finalize_run(self, finalization: RunFinalizationInput) -> None:
         """统一收口一次 run 的终态，并根据终态执行 DB/VFS 动作。"""
-        metadata = RunMetadata(
-            session_id=finalization.session_id,
-            run_id=finalization.run_id,
-            agent_name=finalization.agent_name,
-        )
         try:
             if finalization.status == RunFinalStatus.COMPLETED:
                 self._finalize_completed(finalization)
@@ -44,89 +38,73 @@ class RunRecorder:
         except Exception:
             self.db.rollback()
             raise
-        return metadata
-
-    def get_run_detail(self, session_id: str, run_id: str):
-        run, tool_calls = self._run_store.get_run_detail(run_id)
-        if not run or run.session_id != session_id:
-            return None, []
-        return run, tool_calls
 
     def _finalize_completed(self, finalization: RunFinalizationInput) -> None:
         for event in finalization.events:
             if event.tool_result and event.tool_result.metadata.get("state")=="staged":
                 event.tool_result.metadata["state"]=ToolState.COMMITTED.value
-        if finalization.append_events:
-            self._run_store.append_run_events(
-                run_id=finalization.run_id,
-                new_events=finalization.events,
-                final_reply=finalization.reply_text,
-            )
-            if finalization.update_session_snapshot:
+        if finalization.is_resume:
+            if finalization.owns_session:
                 self.store.save_state(
                     session_id=finalization.session_id,
                     state=finalization.state,
                     last_agent_name=finalization.agent_name,
-                    last_reply_preview=build_reply_preview(finalization.reply_text),
+                    last_reply_preview=build_reply_preview(finalization.reply),
                 )
+            self._run_store.append_run_events(
+                run_id=finalization.run_id,
+                new_events=finalization.events,
+                final_reply=finalization.reply,
+            )
             self._run_store.update_run_status(
                 run_id=finalization.run_id,
                 status=RunFinalStatus.COMPLETED.value,
             )
             return
-
-        if finalization.update_session_snapshot:
-            self.store.save_state(
-                finalization.session_id,
-                state=finalization.state,
-                last_agent_name=finalization.agent_name,
-                last_reply_preview=build_reply_preview(finalization.reply_text),
-                context_tokens=(
-                    finalization.usage.input_tokens if finalization.usage else None
-                ),
-                session_type=finalization.session_type,
+        if finalization.is_resume is False:
+            if finalization.owns_session:
+                self.store.save_state(
+                    finalization.session_id,
+                    state=finalization.state,
+                    last_agent_name=finalization.agent_name,
+                    last_reply_preview=build_reply_preview(finalization.reply),
+                    context_tokens=(
+                        finalization.usage.input_tokens if finalization.usage else None
+                    ),
+                )
+            self._run_store.save_run_trace(
+                session_id=finalization.session_id,
+                run_id=finalization.run_id,
+                agent_name=finalization.agent_name,
+                user_input=finalization.user_input,
+                reply=finalization.reply,
+                events=finalization.events,
             )
-        self._run_store.save_run_trace(
-            session_id=finalization.session_id,
-            run_id=finalization.run_id,
-            agent_name=finalization.agent_name,
-
-            user_input=finalization.user_input,
-            reply=finalization.reply_text,
-            events=finalization.events,
-        )
-        self.db.flush()
-        self._run_store.update_run_status(
-            run_id=finalization.run_id,
-            status=RunFinalStatus.COMPLETED.value,
-        )
+            self.db.flush()
+            self._run_store.update_run_status(
+                run_id=finalization.run_id,
+                status=RunFinalStatus.COMPLETED.value,
+            )
 
     def _finalize_paused(self, finalization: RunFinalizationInput) -> None:
-        if finalization.append_events:
-            self._run_store.append_run_events_partial(
-                run_id=finalization.run_id,
-                new_events=finalization.events,
-            )
-            if finalization.update_session_snapshot:
+        if finalization.is_resume:
+            if finalization.owns_session:
                 self.store.save_state(
                     session_id=finalization.session_id,
                     state=finalization.state,
                 )
+            self._run_store.append_run_events_partial(
+                run_id=finalization.run_id,
+                new_events=finalization.events,
+            )
         else:
-            pending = self.approval_store.get_next_pending_for_run(finalization.run_id)
-            if pending is not None:
-                self.approval_store.refresh_pending_saved_messages_for_batch(
-                    batch_id=pending.batch_id or pending.run_id,
-                    saved_messages=finalization.state.messages,
-                )
-
             self._run_store.save_partial_run(
                 session_id=finalization.session_id,
                 run_id=finalization.run_id,
                 agent_name=finalization.agent_name,
     
                 user_input=finalization.user_input,
-                reply_text=finalization.reply_text,
+                reply=finalization.reply,
                 state=finalization.state,
                 events=finalization.events,
             )
@@ -145,16 +123,16 @@ class RunRecorder:
         for event in finalization.events:
             if event.tool_result and event.tool_result.metadata.get("state")=="staged":
                 event.tool_result.metadata["state"]=ToolState.ROLLED_BACK.value
-        if finalization.append_events:
-            self._run_store.append_run_events_partial(
-                run_id=finalization.run_id,
-                new_events=finalization.events,
-            )
-            if finalization.update_session_snapshot:
+        if finalization.is_resume:
+            if finalization.owns_session:
                 self.store.save_state(
                     session_id=finalization.session_id,
                     state=state,
                 )
+            self._run_store.append_run_events_partial(
+                run_id=finalization.run_id,
+                new_events=finalization.events,
+            )
         else:
             self._run_store.save_partial_run(
                 session_id=finalization.session_id,
@@ -162,7 +140,7 @@ class RunRecorder:
                 agent_name=finalization.agent_name,
     
                 user_input=finalization.user_input,
-                reply_text=finalization.reply_text,
+                reply=finalization.reply,
                 state=state,
                 events=finalization.events,
             )

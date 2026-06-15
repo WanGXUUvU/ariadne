@@ -60,7 +60,7 @@ class RunService:
         self.store = SessionStore(db)
         self._run_store = RunTraceStore(db)
         self.approval_store = SqliteApprovalStore(db)
-        self.persist = RunRecorder(db)
+        self.recorder = RunRecorder(db)
         self.context_factory = RunContextFactory(db)
         self.child_dispatcher = ChildRunLauncher(db)
         self.trace_query = TraceQueryService(db, self._run_store)
@@ -96,14 +96,14 @@ class RunService:
                 RunLifecycleParams(
                     ctx=ctx,
                     agent_runner=agent_runner,
-                    persist=self.persist,
+                    recorder=self.recorder,
                     run_input=run_input,
                     run_id=run_id,
                 )
             ).execute_sync()
             result.state.agent_name = ctx.effective_agent_name
             return RunOutput(
-                reply=result.reply_text,
+                reply=result.reply,
                 state=result.state,
                 events=result.events,
                 metadata=RunMetadata(
@@ -130,7 +130,6 @@ class RunService:
                 self.approval_store,
                 run_input.session_id,
                 run_id=run_id,
-                run_input=run_input,
             )
             agent_runner = self._create_agent_runner(ctx, run_id, run_input)
 
@@ -140,7 +139,7 @@ class RunService:
                 agent_runner,
                 run_id,
                 run_input,
-                self.persist,
+                self.recorder,
             ).stream():
                 yield frame
         except Exception:
@@ -152,17 +151,17 @@ class RunService:
         session_id: str,
         run_id: str,
         user_input: str,
-        reply_text: str,
+        reply: str,
         agent_name: Optional[str],
     ) -> dict:
         """保存被中止 run 的当前状态。"""
-        self.persist.finalize_run(
+        self.recorder.finalize_run(
             RunFinalizationInput(
                 session_id=session_id,
                 run_id=run_id,
                 status=RunFinalStatus.CANCELLED,
                 user_input=user_input,
-                reply_text=reply_text,
+                reply=reply,
                 agent_name=agent_name,
             )
         )
@@ -170,7 +169,10 @@ class RunService:
 
     def get_run_detail(self, session_id: str, run_id: str):
         """返回某次 run 的回复和工具调用详情。"""
-        return self.persist.get_run_detail(session_id, run_id)
+        run, tool_calls = self._run_store.get_run_detail(run_id)
+        if not run or run.session_id != session_id:
+            return None, []
+        return run, tool_calls
 
     def get_child_run_status(self, run_id: str) -> dict:
         """查询单个子 Agent 的运行状态。"""
