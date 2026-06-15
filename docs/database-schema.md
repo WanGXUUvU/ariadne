@@ -242,8 +242,6 @@ session_runs
 
 一行代表 run 内部的一个步骤事件，按 event_index 严格有序。
 
-> 注意：`tool_progress` 类型事件**不落此表**，仅通过 SSE 实时透传给前端。
-
 ```
 session_run_events
 │
@@ -297,32 +295,21 @@ session_run_events
 │   │   │   ├── content = approval_id（审批单号 UUID）
 │   │   │   └── tool_name / tool_call_id 均有值
 │   │   │
-│   │   ├── "approval_result"  → [预留] 审批结果通知
-│   │   │   ├── 定义于 types.py 类型枚举中
-│   │   │   └── ⚠️ 当前生产代码中从未创建此类型事件，为预留枚举值
-│   │   │
-│   │   ├── "thinking"  → AI 的推理/思考过程
+│   │   └── "thinking"  → AI 的推理/思考过程
 │   │   │   ├── 生成点：execution_session.py RunExecutionSession.run()
 │   │   │   ├── 时机：AgentRunner 产出 thinking_delta 流式片段后，由 execution_session 收集并收束为一个正式事件
 │   │   │   ├── content = 完整思考文本
 │   │   │   └── tool_name / tool_call_id / tool_result 均为 null
-│   │   │
-│   │   └── "tool_progress"  → 工具执行中的实时进度
-│   │       ├── 生成点：tool_runner.py async_handle_tool_calls() 中的 make_progress_callback
-│   │       ├── 时机：工具执行过程中（如大文件写入进度）
-│   │       ├── ⚠️ **不落库**，仅通过 SSE 实时 yield 给前端
-│   │       └── execution_session.py 中明确过滤："tool_progress" 不进入 events 列表
 │   │
 │   └── 定义代码：
 │       type: Literal[
+│           "assistant_text",
 │           "assistant_tool_call",
 │           "tool_result",
 │           "tool_error",
 │           "final_answer",
 │           "approval_required",
-│           "approval_result",
 │           "thinking",
-│           "tool_progress",
 │       ]
 │
 ├── content
