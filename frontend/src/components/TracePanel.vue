@@ -143,24 +143,6 @@ watch(
                   <pre class="payload-code error">{{ event.content }}</pre>
                 </div>
 
-                <div v-else-if="event.type === 'tool_progress'" class="event-payload">
-                  <div class="tool-name text-muted" style="font-size: 11px;">
-                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="var(--text-muted)" stroke-width="2" fill="none" class="spin" style="margin-right:6px">
-                      <line x1="12" y1="2" x2="12" y2="6"></line>
-                      <line x1="12" y1="18" x2="12" y2="22"></line>
-                      <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
-                      <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
-                      <line x1="2" y1="12" x2="6" y2="12"></line>
-                      <line x1="18" y1="12" x2="22" y2="12"></line>
-                      <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
-                      <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-                    </svg>
-                    {{ event.tool_name }}
-                    <span style="color:var(--text-muted); font-size: 10px; margin-left: 4px;">#{{ event.tool_call_id }}</span>
-                  </div>
-                  <div class="payload-progress">{{ event.content }}</div>
-                </div>
-
                 <div v-else-if="event.type === 'final_answer'" class="event-payload">
                   <div class="result-label final">→ FINAL ANSWER</div>
                   <div class="payload-text">{{ event.content }}</div>
@@ -420,12 +402,6 @@ watch(
   border-left: 2px solid var(--text-primary);
 }
 
-.event-item.tool_progress {
-  border-left: 2px dashed var(--text-muted);
-  background: rgba(255, 255, 255, 0.01);
-  opacity: 0.85;
-}
-
 .event-meta {
   display: flex;
   align-items: center;
@@ -529,25 +505,4 @@ watch(
   }
 }
 
-.payload-progress {
-  color: var(--text-secondary);
-  font-size: 11px;
-  padding-left: 18px;
-  line-height: 1.4;
-  animation: flashProgress 1.5s ease-in-out infinite alternate;
-}
-
-.spin {
-  animation: spinProgress 2s linear infinite;
-}
-
-@keyframes spinProgress {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes flashProgress {
-  from { opacity: 0.7; }
-  to { opacity: 1.0; }
-}
 </style>

@@ -74,7 +74,7 @@ export function reconstructTimelineFromEvents(events: RunEvent[], reply?: string
   for (const e of events) {
     if (e.type === 'thinking') {
       if (e.content) timeline.push({ kind: 'thinking', content: e.content });
-    } else if (e.type === 'final_answer') {
+    } else if (e.type === 'assistant_text' || e.type === 'final_answer') {
       if (e.content) {
         timeline.push({ kind: 'text', content: e.content });
         hasText = true;

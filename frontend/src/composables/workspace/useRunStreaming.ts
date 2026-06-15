@@ -107,7 +107,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
             state.streamingTimeline = [...tl, { kind: 'thinking', content: frame.data.content }];
           }
         } else if (frame.type === 'run_event') {
-          if (frame.data.type !== 'final_answer') {
+          if (!['assistant_text', 'final_answer', 'thinking'].includes(frame.data.type)) {
             state.streamingTimeline = [...state.streamingTimeline, { kind: 'event', event: frame.data }];
           }
           if ((state as any).interruptionWaitForTool && (state as any).interruptionPendingMessage) {

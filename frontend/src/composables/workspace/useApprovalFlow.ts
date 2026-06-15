@@ -118,7 +118,7 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
             streamingTimeline.value = [...tl, { kind: 'thinking', content: frame.data.content }];
           }
         } else if (frame.type === 'run_event') {
-          if (frame.data.type !== 'final_answer') {
+          if (!['assistant_text', 'final_answer', 'thinking'].includes(frame.data.type)) {
             streamingTimeline.value = [...streamingTimeline.value, { kind: 'event', event: frame.data }];
           }
           if (activeSessionId.value) {

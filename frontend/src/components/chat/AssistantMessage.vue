@@ -59,7 +59,7 @@ const buildMergedItems = (events: any[]): MergedTimelineItem[] => {
   };
   
   for (const e of events) {
-    if (e.type === 'final_answer') continue;
+    if (e.type === 'assistant_text' || e.type === 'final_answer' || e.type === 'thinking') continue;
     const tName = e.tool_name || e.type;
     if (!cg) {
       cg = { tool_name: tName, events: [e] };

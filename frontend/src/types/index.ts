@@ -79,7 +79,7 @@ export interface ToolResult {
 
 export interface RunEvent {
   index: number;
-  type: 'assistant_tool_call' | 'tool_result' | 'tool_error' | 'final_answer' | 'approval_required' | 'approval_rejected' | 'thinking' | 'tool_progress';
+  type: 'assistant_text' | 'assistant_tool_call' | 'tool_result' | 'tool_error' | 'final_answer' | 'approval_required' | 'thinking';
   content?: string | null;
   tool_name?: string | null;
   tool_call_id?: string | null;
@@ -130,10 +130,7 @@ export interface CompactResponse {
 
 // SSE streaming frame types
 export interface StreamStartData {
-  session_id: string;
   run_id: string;
-  agent_name: string;
-  skill_name: string | null;
 }
 
 export interface StreamDeltaData {
