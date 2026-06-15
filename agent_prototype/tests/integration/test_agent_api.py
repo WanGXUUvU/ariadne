@@ -156,7 +156,7 @@ class TestAgentApi(unittest.TestCase):
 
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_compact_endpoint_returns_compacted_state(self, mock_generate):
-        mock_generate.return_value = self._assistant_response(content="中段历史摘要")
+        mock_generate.return_value = self._assistant_response(content="结构化历史摘要")
         db = self.session_local()
         try:
             store = SessionStore(db)
@@ -171,8 +171,8 @@ class TestAgentApi(unittest.TestCase):
                     {"role": "user", "content": "我要保留关键约束"},
                     {"role": "assistant", "content": "好的，关键约束需要进入摘要"},
                     {"role": "tool", "content": "tool result: compact best practices"},
-                    {"role": "user", "content": "还要保留最近原始消息"},
-                    {"role": "assistant", "content": "明白，我们采用三段式策略"},
+                    {"role": "user", "content": "不再保留最近原始消息"},
+                    {"role": "assistant", "content": "明白，我们采用全量替换策略"},
                     {"role": "user", "content": "继续准备自动 compact"},
                     {"role": "assistant", "content": "自动 compact 会在 /run 前触发"},
                     {"role": "user", "content": "现在开始做 compact"},
@@ -188,24 +188,22 @@ class TestAgentApi(unittest.TestCase):
             json={
                 "session_id": "compact-session",
                 "trigger_threshold": 4,
-                "keep_recent_count": 2,
             },
         )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data["did_compact"])
-        self.assertEqual(data["state"]["messages"][0]["content"], "最初任务目标")
-        self.assertEqual(data["state"]["messages"][1]["role"], "system")
-        self.assertIn("中段历史摘要", data["state"]["messages"][1]["content"])
-        self.assertEqual(data["state"]["messages"][-2]["content"], "自动 compact 会在 /run 前触发")
-        self.assertEqual(data["state"]["messages"][-1]["content"], "现在开始做 compact")
+        self.assertEqual(len(data["state"]["messages"]), 1)
+        self.assertEqual(data["state"]["messages"][0]["role"], "system")
+        self.assertIn("[COMPACT_SUMMARY]", data["state"]["messages"][0]["content"])
+        self.assertIn("结构化历史摘要", data["state"]["messages"][0]["content"])
         mock_generate.assert_called_once()
 
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_run_endpoint_auto_compacts_long_session_before_reply(self, mock_generate):
         mock_generate.side_effect = [
-            self._assistant_response(content="自动压缩后的中段摘要"),
+            self._assistant_response(content="自动压缩后的结构化摘要"),
             self._assistant_response(content="run reply after auto compact"),
         ]
         db = self.session_local()
@@ -222,8 +220,8 @@ class TestAgentApi(unittest.TestCase):
                     {"role": "user", "content": "我要保留关键约束"},
                     {"role": "assistant", "content": "好的，关键约束需要进入摘要"},
                     {"role": "tool", "content": "tool result: compact best practices"},
-                    {"role": "user", "content": "还要保留最近原始消息"},
-                    {"role": "assistant", "content": "明白，我们采用三段式策略"},
+                    {"role": "user", "content": "不再保留最近原始消息"},
+                    {"role": "assistant", "content": "明白，我们采用全量替换策略"},
                     {"role": "user", "content": "继续准备自动 compact"},
                     {"role": "assistant", "content": "自动 compact 会在 /run 前触发"},
                     {"role": "user", "content": "现在开始做 compact"},
@@ -247,9 +245,10 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["reply"], "run reply after auto compact")
 
         compacted_messages = data["state"]["messages"]
-        self.assertEqual(compacted_messages[0]["content"], "最初任务目标")
-        self.assertEqual(compacted_messages[1]["role"], "system")
-        self.assertIn("自动压缩后的中段摘要", compacted_messages[1]["content"])
+        self.assertEqual(len(compacted_messages), 3)
+        self.assertEqual(compacted_messages[0]["role"], "system")
+        self.assertIn("[COMPACT_SUMMARY]", compacted_messages[0]["content"])
+        self.assertIn("自动压缩后的结构化摘要", compacted_messages[0]["content"])
         self.assertEqual(compacted_messages[-2]["role"], "user")
         self.assertEqual(compacted_messages[-2]["content"], "继续执行下一步")
         self.assertEqual(compacted_messages[-1]["role"], "assistant")
@@ -260,7 +259,7 @@ class TestAgentApi(unittest.TestCase):
     @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
     def test_run_endpoint_does_not_persist_auto_compact_when_run_fails(self, mock_generate):
         mock_generate.side_effect = [
-            self._assistant_response(content="自动压缩后的中段摘要"),
+            self._assistant_response(content="自动压缩后的结构化摘要"),
             RuntimeError("run failed after auto compact"),
         ]
         original_messages = [
@@ -273,8 +272,8 @@ class TestAgentApi(unittest.TestCase):
             {"role": "user", "content": "我要保留关键约束"},
             {"role": "assistant", "content": "好的，关键约束需要进入摘要"},
             {"role": "tool", "content": "tool result: compact best practices"},
-            {"role": "user", "content": "还要保留最近原始消息"},
-            {"role": "assistant", "content": "明白，我们采用三段式策略"},
+            {"role": "user", "content": "不再保留最近原始消息"},
+            {"role": "assistant", "content": "明白，我们采用全量替换策略"},
             {"role": "user", "content": "继续准备自动 compact"},
             {"role": "assistant", "content": "自动 compact 会在 /run 前触发"},
             {"role": "user", "content": "现在开始做 compact"},

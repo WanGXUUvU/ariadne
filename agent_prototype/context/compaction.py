@@ -2,201 +2,171 @@
 [九层模型 - L6 上下文压缩层 (Context Compaction Layer)]
 
 文件职责：
-- 定义历史对话压缩格式（前锚点、中段要压缩内容、最近保留原始消息）。
-- 落地 `HistoryCompactor` 大模型历史压缩总调度器，专门通过 LLM API 获取中段消息摘要。
+- 定义历史对话压缩格式。
+- 落地 `HistoryCompactor` 大模型历史压缩总调度器，专门通过 LLM API 获取全量历史摘要。
 - 封装生成标准 `[COMPACT_SUMMARY]` 消息气泡并执行 state 响应式替换的算法。
 
 上游依赖：L5 记忆层 (CompactService)。
 下游依赖：L1 模型层 (ModelAdapter)。
 """
 
+import re
+from dataclasses import dataclass
 from typing import Optional
+
 from agent_prototype.core.types import ChatMessage, ModelAdapter, ModelRequest, ModelConfig
-from agent_prototype.execution.runtime.types import RunState
-from agent_prototype.memory.summary.types import CompactOutput
 
-DEFAULT_COMPACT_THRESHOLD = 12  # 默认超过12条消息时触发 compact
-DEFAULT_KEEP_RECENT_COUNT = 4  # 默认 compact 后保留最近 4 条原始消息
-
-COMPACT_SUMMARY_PREFIX = (  # 定义 compact summary 的固定前缀，明确告诉模型这不是逐字历史
+COMPACT_SUMMARY_PREFIX = (
     "[COMPACT_SUMMARY]\n"
-    "The following is a compressed summary of the middle part of the conversation. "  # 说明下面是中段压缩摘要
-    "It is not a verbatim transcript. "  # 明确声明这不是逐字记录
-    "Preserve task goals, constraints, important tool results, and unfinished work."  # 要求保留目标、约束、工具结果和未完成事项
+    "这是一份结构化上下文摘要，用于替代压缩前的完整对话历史。"
+    "后续模型应把它视为继续执行任务的权威上下文。"
+    "除非摘要中明确标注为逐字引用，否则它不是原始对话逐字记录。"
 )
 
+NO_TOOLS_PREAMBLE = """你现在处于上下文压缩模式。
+你没有任何工具可用。
+不要尝试调用读取文件、执行命令、搜索、访问外部系统等任何工具。
+如果你认为需要额外信息，请只基于当前对话中已经出现的信息完成压缩。
+只按下面要求输出压缩结果，不要输出额外说明。"""
 
-def split_messages_for_compaction(
-    messages: list[ChatMessage],  # 输入完整历史消息列表
-    keep_recent_count: int = DEFAULT_KEEP_RECENT_COUNT,  # 输入要保留的最近原始消息数量
-) -> tuple[list[ChatMessage], list[ChatMessage], list[ChatMessage]]:
-    """把一长串的历史聊天记录切成三段：开头（前锚点）、中间（准备被压扁压缩的一段）和结尾（最近发生的、原样保留的几条）。
-    这样我们就知道要把哪部分送去让大模型压缩了。
+BASE_COMPACT_PROMPT = """你的任务是为当前对话生成一份结构化、足够详细的上下文摘要。
+这份摘要会替代压缩前的完整对话历史，用来节省上下文空间，
+同时必须保留后续继续执行任务所需的全部关键信息。
 
-    需要拿到的东西：
-    - messages: 完整的历史聊天消息列表。
-    - keep_recent_count: 结尾需要原样保留、不被压缩的消息数量。
+你必须包含下面 9 个部分。请把分析过程写在 <analysis> 标签内，
+把最终摘要写在 <summary> 标签内。
 
-    会给出来的结果：
-    - 一个有三个元素的元组，分别是：(前锚点消息列表, 中间待压缩消息列表, 最近的原始消息列表)。
+<analysis>
+请逐步分析：
+1. 用户最初的目标是什么，后续又补充或修正了哪些要求？
+2. 对话中出现了哪些重要对象、文件、接口、数据、代码片段、错误或处理结果？
+3. 哪些事项已经完成，哪些事项仍未完成？
+4. 压缩发生前，当前任务正处于什么准确状态？
+</analysis>
+
+<summary>
+1. PRIMARY REQUEST AND INTENT:
+   （说明用户的原始目标，以及后续对目标的补充、收窄或修正。要具体。）
+
+2. KEY TECHNICAL CONCEPTS:
+   （列出对继续任务有用的关键概念、术语、架构决策、业务规则、工具能力或约束。）
+
+3. FILES AND CODE SECTIONS:
+   （如果对话涉及文件、代码、接口、数据结构或配置，请列出路径/名称和关键内容。
+    如有必要，包含精确代码片段或行号；如果不涉及代码，也要说明相关对象或数据。）
+
+4. ERRORS AND FIXES:
+   （列出遇到的错误、误解、失败尝试、根因和最终处理方式。）
+
+5. PROBLEM SOLVING:
+   （说明已经解决的问题、采用的推理或权衡，以及仍在调查或需要继续判断的点。）
+
+6. ALL USER MESSAGES:
+   （逐字引用用户发送过的每一条消息。不要改写，不要概括。）
+
+7. PENDING TASKS:
+   （列出用户明确要求但尚未完成的事项。）
+
+8. CURRENT WORK STATE:
+   （准确描述压缩发生前的当前状态，例如：刚完成某项修改、正在等待验证、
+    正准备继续某个步骤、或已经没有未完成工作。）
+
+9. OPTIONAL NEXT STEP SUGGESTION:
+   （基于当前对话给出一个具体下一步建议。
+    必须引用用户或助手的原文来说明为什么建议这一步。）
+</summary>"""
+
+
+@dataclass
+class CompactedMessagesResult:
+    """压缩后的消息结果。"""
+
+    messages: list[ChatMessage]
+    compact_tokens: Optional[int] = None
+
+
+def build_compact_prompt(messages: list[ChatMessage]) -> str:
+    """构造压缩提示词。
+
+    输入的是当前完整历史，不再保留 anchor/recent 分段。
     """
-
-    if not messages:
-        return [], [], []
-
-    anchor_messages = [messages[0]]
-    remaining_messages = messages[1:]
-
-    if len(remaining_messages) <= keep_recent_count:
-        return anchor_messages, [], remaining_messages
-
-    middle_messages = remaining_messages[
-        :-keep_recent_count
-    ]  # 去掉最后 recent 后，中间这段就是要压缩的主体
-    recent_messages = remaining_messages[-keep_recent_count:]  # 最后几条消息作为 recent 原样保留
-
-    return anchor_messages, middle_messages, recent_messages
-
-
-def build_compact_prompt(middle_messages: list[ChatMessage]) -> str:
-    """专门为大模型准备一个“压缩指令”！把中间那段长长的聊天记录整理一下，
-    加上提示词，做成一个任务书，拜托大模型帮我们把这段内容归纳总结一下。
-
-    需要拿到的东西：
-    - middle_messages: 需要被压缩的中间那段聊天记录列表。
-
-    会给出来的结果：
-    - 一大段文本（Prompt），直接拿去喂给大模型就行。
-    """
-
     lines = [
-        "你是一个对话历史压缩助手。",
-        "请将以下对话片段的核心内容压缩成简洁的摘要。",
-        "要求：",
-        "- 保留关键任务目标、重要约束、工具调用结果和未完成的工作",
-        "- 直接输出摘要内容，不要在摘要中包含 [COMPACT_SUMMARY] 标签或任何说明前缀",
-        "- 使用简洁流畅的语言，避免多余格式",
+        NO_TOOLS_PREAMBLE,
         "",
-        "需要压缩的对话片段：",
+        BASE_COMPACT_PROMPT,
+        "",
+        "下面是需要压缩的完整对话历史，格式为逐行 JSON ChatMessage 对象。",
+        "第 6 部分必须从这些对象中逐字保留用户消息原文。",
+        "",
+        "<conversation>",
     ]
 
-    for message in middle_messages:
-        if message.tool_calls:
-            tool_names = ",".join(
-                tc.function.name for tc in message.tool_calls
-            )  # 只记录工具名，不展开参数
-            lines.append(f"- assistant 调用了工具: {tool_names}")
-            continue
-        content = message.content or "(空)"
-        lines.append(f"- {message.role}: {content}")
+    for message in messages:
+        lines.append(message.model_dump_json(exclude_none=True))
 
-    lines.append("")  # 空一行提升可读性
-    lines.append("请直接输出摘要，语言与对话保持一致，不要重复上面的指令：")
+    lines.extend(
+        [
+            "</conversation>",
+            "",
+            "只返回压缩结果。不要包含 [COMPACT_SUMMARY]。",
+        ]
+    )
 
     return "\n".join(lines)
 
 
-def build_compact_summary_message(summary_text: str) -> ChatMessage:
-    """大模型写好摘要文本后，这个函数会把文本包装成一条系统（system）消息，
-    并在开头贴上一个标签，告诉大家：“注意啦，下面是之前聊天中段的压缩版摘要！”
+def extract_compact_summary(raw_output: str) -> str:
+    """从模型输出里取出 <summary> 内容。
 
-    需要拿到的东西：
-    - summary_text: 大模型总结出来的摘要纯文本。
-
-    会给出来的结果：
-    - 一个 ChatMessage 消息对象，格式完美，可以直接存进聊天历史里。
+    如果模型没有按标签输出，就尽量去掉 analysis 段后返回剩余内容，避免压缩失败。
     """
+    text = (raw_output or "").strip()
+    summary_match = re.search(r"<summary>([\s\S]*?)</summary>", text, re.IGNORECASE)
+    if summary_match:
+        return summary_match.group(1).strip()
+    return re.sub(r"<analysis>[\s\S]*?</analysis>", "", text, flags=re.IGNORECASE).strip()
+
+
+def build_compact_summary_message(summary_text: str) -> ChatMessage:
+    """把摘要文本包装成一条 system 消息。"""
 
     return ChatMessage(
-        role="system",  # 用 system 角色，表示这是系统注入的 compact 摘要，不是 assistant 原话
-        content=f"{COMPACT_SUMMARY_PREFIX}\n\n{summary_text.strip()}",  # 把固定前缀 and 模型返回正文拼成最终摘要消息内容
-    )
-
-
-def compact_state_with_summary(
-    state: RunState,  # 输入当前完整会话状态
-    summary_text: str,  # 输入模型已经完整好的 compact 摘要文本
-    keep_recent_count: int = DEFAULT_KEEP_RECENT_COUNT,
-) -> CompactOutput:
-    """真正动手把历史聊天状态里的“中段”替换成大模型写好的“压缩摘要”！
-    它会检查如果中段消息其实很少就懒得压缩了；如果确实压缩了，就组装出一个全新的状态，并数数这次帮用户省下了多少条消息。
-
-    需要拿到的东西：
-    - state: 当前未压缩的完整智能体状态。
-    - summary_text: 已经生成好的中段摘要文本。
-    - keep_recent_count: 结尾要保留几条原样消息。
-
-    会给出来的结果：
-    - 一个 CompactOutput 对象，里面包含了：压缩后的新状态、到底有没有真的进行压缩（布尔值）、以及一共删掉了多少条原始消息。
-    """
-
-    anchor_messages, middle_messages, recent_messages = (
-        split_messages_for_compaction(  # 把历史切成三段
-            state.messages,  # 传入原始消息列表
-            keep_recent_count=keep_recent_count,  # 把 recent 保留数量传进去
-        )
-    )
-
-    summary_message = build_compact_summary_message(summary_text)
-    compacted_messages = anchor_messages + [summary_message] + recent_messages
-    compacted_state = state.model_copy(
-        update={"messages": compacted_messages}
-    )  # 基于旧 state 复制一个只替换 messages 的新 state
-
-    return CompactOutput(
-        state=compacted_state,  # 返回 compact 后的新状态
-        did_compact=True,  # 标记这次确实发生了 compact
-        removed_count=len(state.messages)- len(compacted_messages),  # 计算这次一共折叠掉了多少条原始消息
+        role="system",
+        content=f"{COMPACT_SUMMARY_PREFIX}\n\n{summary_text.strip()}",
     )
 
 
 class HistoryCompactor:
-    """这是一个“历史记录压缩调度员”。
-    它的工作是协调大模型适配器（ModelAdapter），把对话历史中太长太旧的中间部分，
-    让大模型给精简压缩成一句话摘要，以便腾出更多上下文空间，不让大模型“忘事”或者超出字数限制。
-    """
+    """协调模型适配器，把完整历史消息压缩成新的消息列表。"""
 
     def __init__(self, adapter: ModelAdapter):
-        """初始化压缩调度员，给他配备一个跟大模型沟通的“传声筒”（ModelAdapter）。
-
-        需要拿到的东西：
-        - adapter: 模型适配器，用来向大模型发请求。
-        """
         self.adapter = adapter
-        self.last_compact_tokens: Optional[int] = None
 
-    def compact(self, messages: list[ChatMessage], keep_recent: int) -> str:
-        """调度员的核心工作：挑出消息里能压缩的中间部分，拼好任务提示词发送给大模型，拿到大模型回复的摘要并返回。
+    def compact_messages(self, messages: list[ChatMessage]) -> CompactedMessagesResult:
+        """把原始消息列表压缩成一条 compact summary system message。"""
+        if not messages:
+            return CompactedMessagesResult(messages=[])
 
-        需要拿到的东西：
-        - messages: 原始的所有消息列表。
-        - keep_recent: 结尾要保留的消息数量。
-
-        会给出来的结果：
-        - 压缩好的摘要纯文本字符串（如果没东西可压，就返回空字符串）。
-        """
-        _, middle_messages, _ = split_messages_for_compaction(
-            messages,
-            keep_recent_count=keep_recent,
-        )
-        if not middle_messages:
-            self.last_compact_tokens = None
-            return ""
-
-        compact_prompt = build_compact_prompt(middle_messages)
+        compact_prompt = build_compact_prompt(messages)
         request = ModelRequest(
             messages=[
                 ChatMessage(role="system", content=compact_prompt),
             ],
             tools=[],
             config=ModelConfig(stream=False),
-            metadata={"mode": "compact"},
         )
         summary_response = self.adapter.generate(request)
+        summary_text = extract_compact_summary(summary_response.content or "")
 
         if summary_response.usage and summary_response.usage.input_tokens:
-            self.last_compact_tokens = summary_response.usage.input_tokens
+            compact_tokens = summary_response.usage.input_tokens
         else:
-            self.last_compact_tokens = None
+            compact_tokens = None
 
-        return (summary_response.content or "").strip()
+        if not summary_text:
+            return CompactedMessagesResult(messages=[], compact_tokens=compact_tokens)
+
+        return CompactedMessagesResult(
+            messages=[build_compact_summary_message(summary_text)],
+            compact_tokens=compact_tokens,
+        )
