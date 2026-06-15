@@ -8,7 +8,7 @@
 - 不定义工具执行结果（见 tools/result_types.py）。
 """
 
-from typing import Any, AsyncIterator, Iterator, Literal, Optional, Protocol
+from typing import Any, AsyncIterator, Literal, Optional, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -122,7 +122,7 @@ class StreamChunk(BaseModel):
     finish_reason: Optional[str] = None
     usage: Optional[ModelUsage] = None
     error: Optional[ModelError] = None
-    raw_event: dict[str, Any] = Field(default_factory=dict)
+    tool_call_delta: dict[str, Any] = Field(default_factory=dict)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -131,10 +131,6 @@ class ModelAdapter(Protocol):
 
     def generate(self, request: ModelRequest) -> ModelResponse:
         """输入统一请求，输出统一响应"""
-        ...
-
-    def stream_generate(self, request: ModelRequest) -> Iterator[StreamChunk]:
-        """输入统一请求，逐个 yield delta token 字符串"""
         ...
 
     async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[StreamChunk]:
