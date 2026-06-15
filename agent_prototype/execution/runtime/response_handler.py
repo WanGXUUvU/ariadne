@@ -19,8 +19,8 @@ from agent_prototype.core.types import ChatMessage
 from agent_prototype.execution.runtime.types import RunEvent
 
 
-def build_final_turn(raw_reply: str, event_index: int) -> tuple[str, RunEvent, ChatMessage]:
-    """这是一个“最终回复打包机”。
+def build_reply(raw_reply: str, event_index: int) -> tuple[str, RunEvent, ChatMessage]:
+    """这是一个“回复打包机”。
     当大模型完成全部思考和对话，吐出它最终的回答文本时，这个打包机就会把这段原始回答进行精简修剪，
     并把它们变形成三个不同的零件，方便后面的运行逻辑直接拿去用。
 

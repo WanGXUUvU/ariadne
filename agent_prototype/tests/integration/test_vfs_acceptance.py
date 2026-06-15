@@ -60,7 +60,7 @@ class FakeAsyncAdapter:
             yield StreamChunk(
                 type="tool_call_delta",
                 finish_reason="tool_calls",
-                raw_event={
+                tool_call_delta={
                     "tool_calls": [
                         {
                             "index": 0,
@@ -80,7 +80,7 @@ class FakeAsyncAdapter:
             )
             return
 
-        yield StreamChunk(type="delta", content_delta="partial")
+        yield StreamChunk(type="content_delta", content_delta="partial")
         await self.blocker.wait()
 
 
@@ -197,7 +197,7 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
                     session_id=session_id,
                     run_id=run_id,
                     user_input="流式写文件然后取消",
-                    reply_text="partial",
+                    reply="partial",
                     agent_name="software_engineer",
                 )
                 stream = None

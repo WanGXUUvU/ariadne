@@ -12,7 +12,7 @@
 import os
 import json
 import time, httpx, asyncio
-from typing import Any, Optional, Iterator, AsyncIterator
+from typing import Any, Optional, AsyncIterator
 
 import requests
 
@@ -86,7 +86,7 @@ class ChatCompletionsAdapter(ModelAdapter):
                     if emit:
                         events.append(
                             StreamChunk(
-                                type="delta",
+                                type="content_delta",
                                 content_delta=emit,
                                 finish_reason=finish_reason,
                             )
@@ -94,7 +94,7 @@ class ChatCompletionsAdapter(ModelAdapter):
                     self._tag_buf = partial
                     break
                 if open_idx > 0:
-                    events.append(StreamChunk(type="delta", content_delta=text[:open_idx]))
+                    events.append(StreamChunk(type="content_delta", delta=text[:open_idx]))
                 self._in_think = True
                 text = text[open_idx + len("<think_tag>") :]
 
@@ -103,17 +103,27 @@ class ChatCompletionsAdapter(ModelAdapter):
     def _parse_delta(self, delta: dict, finish_reason) -> list[StreamChunk]:
         tool_calls = delta.get("tool_calls")
         content = delta.get("content")
+        events: list[StreamChunk] = []
 
         if self.thinking_style == "always_on_style":
             if content:
-                return self._parse_think_content(content, finish_reason)
-            return [
-                StreamChunk(
-                    type="tool_call_delta" if tool_calls else "done",
-                    finish_reason=finish_reason,
-                    raw_event=delta,
+                events.extend(self._parse_think_content(content, finish_reason))
+            if tool_calls:
+                events.append(
+                    StreamChunk(
+                        type="tool_call_delta",
+                        finish_reason=finish_reason,
+                        tool_call_delta=delta,
+                    )
                 )
-            ]
+            if not events:
+                events.append(
+                    StreamChunk(
+                        type="done",
+                        finish_reason=finish_reason,
+                    )
+                )
+            return events
 
         thinking = (
             delta.get("reasoning_content")
@@ -121,18 +131,40 @@ class ChatCompletionsAdapter(ModelAdapter):
             or delta.get("reasoning")
         )
         if thinking:
-            return [
-                StreamChunk(type="thinking_delta", thinking_delta=thinking, raw_event=delta)
-            ]
-
-        return [
-            StreamChunk(
-                type="delta" if content else ("tool_call_delta" if tool_calls else "done"),
-                content_delta=content,
-                finish_reason=finish_reason,
-                raw_event=delta,
+            events.append(
+                StreamChunk(
+                    type="thinking_delta",
+                    thinking_delta=thinking,
+                )
             )
-        ]
+
+        if content:
+            events.append(
+                StreamChunk(
+                    type="content_delta",
+                    content_delta=content,
+                    finish_reason=finish_reason,
+                )
+            )
+
+        if tool_calls:
+            events.append(
+                StreamChunk(
+                    type="tool_call_delta",
+                    finish_reason=finish_reason,
+                    tool_call_delta=delta,
+                )
+            )
+
+        if not events:
+            events.append(
+                StreamChunk(
+                    type="done",
+                    finish_reason=finish_reason,
+                )
+            )
+
+        return events
 
     # ── 请求方法 ──────────────────────────────────────────────────────────
 
@@ -232,109 +264,6 @@ class ChatCompletionsAdapter(ModelAdapter):
             raw_response=data,
             provider_meta={},
         )
-
-    def stream_generate(self, request: ModelRequest) -> Iterator[StreamChunk]:
-        if not self.api_key:
-            raise RuntimeError("Missing API_KEY")
-
-        url = f"{self.base_url}/chat/completions"
-        headers = {
-            "Accept": "text/event-stream",
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
-        payload: dict[str, Any] = {
-            "model": request.config.model or self.model,
-            "messages": [msg.model_dump(exclude_none=True) for msg in request.messages],
-            "stream": True,
-        }
-        if request.config.temperature is not None:
-            payload["temperature"] = request.config.temperature
-        if request.config.top_p is not None:
-            payload["top_p"] = request.config.top_p
-        if request.config.max_output_tokens is not None:
-            payload["max_tokens"] = request.config.max_output_tokens
-        if request.config.tool_choice is not None:
-            payload["tool_choice"] = request.config.tool_choice
-        elif request.tools:
-            payload["tool_choice"] = "auto"
-
-        if request.tools:
-            payload["tools"] = request.tools
-
-        payload.update(request.config.provider_options)
-        payload.update(self.extra_payload)
-        payload["stream_options"] = {"include_usage": True}
-        max_retries = 3
-        initial_delay = 1.0
-        backoff_factor = 2.0
-
-        response = None
-        for attempt in range(max_retries + 1):
-            try:
-                response = requests.post(
-                    url, headers=headers, json=payload, timeout=2100, stream=True
-                )
-                response.raise_for_status()
-                break
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
-                if attempt == max_retries:
-                    raise RuntimeError(
-                        f"LLM request failed due to network/timeout error after {max_retries} retries: {exc}"
-                    ) from exc
-            except requests.exceptions.HTTPError as exc:
-                status_code = response.status_code if response is not None else 500
-                text = response.text if response is not None else ""
-                try:
-                    err_body = response.json() if response is not None else {}
-                except Exception:
-                    err_body = text
-
-                is_retryable = (
-                    status_code == 429
-                    or (500 <= status_code < 600)
-                    or (status_code == 400 and "engine is not available temporarily" in text)
-                )
-                if not is_retryable or attempt == max_retries:
-                    raise RuntimeError(
-                        f"LLM request failed: url={url}, model={payload['model']}, "
-                        f"status={status_code}, body={err_body}"
-                    ) from exc
-
-            delay = initial_delay * (backoff_factor**attempt)
-            time.sleep(delay)
-
-        self._reset_think_state()
-        for line in response.iter_lines():
-            if not line:
-                continue
-            text = line.decode("utf-8") if isinstance(line, bytes) else line
-            if not text.startswith("data:"):
-                continue
-            text = text[len("data:") :].strip()
-            if text == "[DONE]":
-                break
-            chunk = json.loads(text)
-            choices = chunk.get("choices") or []
-            if not choices:
-                usage_data = chunk.get("usage")
-                if usage_data:
-                    yield StreamChunk(
-                        type="done",
-                        usage=ModelUsage(
-                            input_tokens=usage_data.get("prompt_tokens"),
-                            output_tokens=usage_data.get("completion_tokens"),
-                            total_tokens=usage_data.get("total_tokens"),
-                            details=usage_data,
-                        ),
-                    )
-                continue
-            choice = choices[0]
-            delta = choice.get("delta", {})
-            finish_reason = choice.get("finish_reason")
-            for event in self._parse_delta(delta, finish_reason):
-                yield event
 
     async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[StreamChunk]:
         if not self.api_key:

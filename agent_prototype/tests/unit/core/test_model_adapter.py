@@ -119,6 +119,63 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         self.assertEqual(mock_post.call_args.kwargs["json"]["messages"][0]["role"], "user")
         self.assertEqual(mock_post.call_args.kwargs["json"]["messages"][0]["content"], "你好")
 
+    def test_parse_delta_splits_combined_fields_in_stable_order(self):
+        adapter = ChatCompletionsAdapter()
+
+        events = adapter._parse_delta(
+            {
+                "reasoning_content": "先想",
+                "content": "我先查一下",
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "id": "call_001",
+                        "function": {
+                            "name": "echo_tool",
+                            "arguments": '{"text":',
+                        },
+                    }
+                ],
+            },
+            finish_reason="tool_calls",
+        )
+
+        self.assertEqual([event.type for event in events], [
+            "thinking_delta",
+            "content_delta",
+            "tool_call_delta",
+        ])
+        self.assertEqual(events[0].thinking_delta, "先想")
+        self.assertEqual(events[1].content_delta, "我先查一下")
+        self.assertEqual(events[2].tool_call_delta["tool_calls"][0]["id"], "call_001")
+
+    def test_parse_delta_preserves_tool_call_after_always_on_content(self):
+        adapter = ChatCompletionsAdapter(thinking_style="always_on_style")
+
+        events = adapter._parse_delta(
+            {
+                "content": "我先查一下",
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "id": "call_001",
+                        "function": {
+                            "name": "echo_tool",
+                            "arguments": '{"text":',
+                        },
+                    }
+                ],
+            },
+            finish_reason="tool_calls",
+        )
+
+        self.assertEqual([event.type for event in events], [
+            "content_delta",
+            "tool_call_delta",
+        ])
+        self.assertEqual(events[0].content_delta, "我先查一下")
+        self.assertEqual(events[1].tool_call_delta["tool_calls"][0]["id"], "call_001")
+
     @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("agent_prototype.core.adapters.chat_completions.requests.post")
     @patch("agent_prototype.core.adapters.chat_completions.time.sleep")
