@@ -17,7 +17,6 @@ class CompactInput(BaseModel):
 
     session_id: str = Field(min_length=1)
     trigger_threshold: int = Field(default=12, ge=1)
-    keep_recent_count: int = Field(default=2, ge=1)
     force: bool = Field(default=False)
 
 

@@ -18,7 +18,6 @@
 - 不感知 HTTP 语义。
 """
 
-from typing import Optional
 from sqlalchemy.orm import Session
 
 from agent_prototype.infra.db.orm_models import SessionRecord, ModelSetting
@@ -26,8 +25,6 @@ from agent_prototype.memory.summary.types import CompactInput, CompactOutput
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.context.compaction import (
-    compact_state_with_summary,
-    split_messages_for_compaction,
     HistoryCompactor,
 )
 from agent_prototype.execution.runtime.types import RunState
@@ -47,33 +44,31 @@ class CompactService:
         state: RunState,
         context_tokens: int,
         context_length: int,
-        keep_recent_count: int,
         compactor: HistoryCompactor,
         force: bool = False,
     ) -> CompactOutput:
         """在内存中评估并执行一次压缩，不做持久化。"""
+        if not state.messages:
+            return CompactOutput(state=state, did_compact=False, removed_count=0)
+
         if not force:
             if context_tokens == 0 or context_length == 0:
                 return CompactOutput(state=state, did_compact=False, removed_count=0)
             if context_tokens / context_length < 0.7:
                 return CompactOutput(state=state, did_compact=False, removed_count=0)
 
-        summary_text = compactor.compact(state.messages, keep_recent=keep_recent_count)
+        compacted = compactor.compact_messages(state.messages)
 
-        if not summary_text:
+        if not compacted.messages:
             raise ValueError("Compact summary is empty")
 
-        compact_tokens: Optional[int] = compactor.last_compact_tokens
-
-        compact_result = compact_state_with_summary(
-            state=state,
-            summary_text=summary_text,
-            keep_recent_count=keep_recent_count,
+        compacted_state = state.model_copy(update={"messages": compacted.messages})
+        return CompactOutput(
+            state=compacted_state,
+            did_compact=True,
+            removed_count=max(len(state.messages) - len(compacted.messages), 0),
+            compact_tokens=compacted.compact_tokens,
         )
-        if compact_tokens is not None:
-            compact_result = compact_result.model_copy(update={"compact_tokens": compact_tokens})
-
-        return compact_result
 
     def compact_session(self, payload: CompactInput) -> CompactOutput:
         """对指定 session 执行压缩，并将结果持久化。"""
@@ -114,7 +109,6 @@ class CompactService:
             state=state,
             context_tokens=context_tokens,
             context_length=context_length,
-            keep_recent_count=payload.keep_recent_count,
             force=payload.force or force_by_count,
             compactor=compactor,
         )
@@ -139,14 +133,14 @@ class CompactService:
                 last_reply_preview=record.last_reply_preview if record else None,
                 context_tokens=new_context_tokens,
             )
-            recent_active_count = payload.keep_recent_count // 2
             runs = self._run_store.list_run_records(payload.session_id)
             parent_runs = [r for r in runs if r.parent_run_id is None]
             runs_count = len(parent_runs)
             for idx, run in enumerate(parent_runs):
                 if idx == 0:
                     continue
-                if idx >= (runs_count - recent_active_count):
+                # compact 后只保留一条 summary，但保留最近一轮 run active 方便前端继续定位当前任务。
+                if idx == runs_count - 1:
                     continue
                 run.is_active = "0"
 

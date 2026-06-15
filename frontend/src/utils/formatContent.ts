@@ -4,7 +4,10 @@
  */
 export function formatContent(text: string | null): string {
   if (!text) return '';
-  text = text.replace('[COMPACT_SUMMARY]\nThe following is a compressed summary of the middle part of the conversation. It is not a verbatim transcript. Preserve task goals, constraints, important tool results, and unfinished work.\n\n', '');
+  if (text.startsWith('[COMPACT_SUMMARY]')) {
+    const [, ...summaryParts] = text.split(/\n\s*\n/);
+    text = summaryParts.length > 0 ? summaryParts.join('\n\n') : text.replace('[COMPACT_SUMMARY]', '').trim();
+  }
 
   let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

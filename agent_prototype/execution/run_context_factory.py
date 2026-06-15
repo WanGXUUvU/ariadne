@@ -76,7 +76,6 @@ class RunContextFactory:
                 state=state,
                 context_tokens=context_tokens,
                 context_length=context_length,
-                keep_recent_count=2,
                 compactor=compactor,
             )
             state = compact_result.state
