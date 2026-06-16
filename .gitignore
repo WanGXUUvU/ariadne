@@ -13,6 +13,9 @@ __pycache__/
 
 .env
 
+# 文档（本地维护）
+docs/
+
 # 数据库文件
 *.db
 *.db-shm
