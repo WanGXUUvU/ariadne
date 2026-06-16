@@ -17,6 +17,7 @@ from typing import Any, AsyncIterator, Optional
 import asyncio
 
 import requests
+import httpx
 
 from backend.core.types import ChatMessage
 from backend.core.types import ModelAdapter
