@@ -78,7 +78,9 @@ class MiddlewarePipeline:
                 logger.debug(f"[Pipeline] 进入中间件: {middleware.__class__.__name__}")
                 try:
                     res = await middleware.call(context, next_fn)
-                    logger.debug(f"[Pipeline] 退出中间件: {middleware.__class__.__name__}")
+                    logger.debug(
+                        f"[Pipeline] 退出中间件: {middleware.__class__.__name__}"
+                    )
                     return res
                 except Exception as e:
                     logger.exception(

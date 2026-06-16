@@ -67,7 +67,9 @@ class TestSessionPermission(unittest.TestCase):
             f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
         )
         Base.metadata.create_all(bind=self.engine)
-        self.session_local = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.session_local = sessionmaker(
+            autocommit=False, autoflush=False, bind=self.engine
+        )
 
     def tearDown(self):
         self.engine.dispose()
@@ -77,7 +79,9 @@ class TestSessionPermission(unittest.TestCase):
         """新建 session 的 permission_profile 应默认为 conservative。"""
         db = self.session_local()
         try:
-            summary = SessionService(db).create_session(CreateSessionInput(session_name="test"))
+            summary = SessionService(db).create_session(
+                CreateSessionInput(session_name="test")
+            )
             self.assertEqual(summary.permission_profile, "conservative")
         finally:
             db.close()

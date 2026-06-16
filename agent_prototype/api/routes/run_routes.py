@@ -18,7 +18,11 @@
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
-from agent_prototype.execution.persistence.types import RunInput, RunOutput, FinalizeRunInput
+from agent_prototype.execution.persistence.types import (
+    RunInput,
+    RunOutput,
+    FinalizeRunInput,
+)
 from agent_prototype.memory.session.types import ResetInput
 from agent_prototype.api.dto.schemas import RunDetailResponse, ToolCallSummary
 from agent_prototype.execution.service import RunService
@@ -174,7 +178,9 @@ def get_run_detail_api(
 
 
 @router.get("/child-runs/{run_id}")
-def get_child_run_status_api(run_id: str, service: RunService = Depends(get_run_service)):
+def get_child_run_status_api(
+    run_id: str, service: RunService = Depends(get_run_service)
+):
     """这个函数是用来查询异步启动的子 Agent（Child Run）当前运行到哪了。
 
     因为子 Agent 是丢到后台默默跑的，我们需要拿着它的 ID 去前台"轮询"查查它跑完没有、报错了没有，还是正在跑。

@@ -30,7 +30,9 @@ class TestSessionTruncate(unittest.TestCase):
 
     def test_truncate_session_middle(self):
         # 1. 创建会话并模拟存入多轮对话
-        summary = self.service.create_session(CreateSessionInput(session_name="test_truncate"))
+        summary = self.service.create_session(
+            CreateSessionInput(session_name="test_truncate")
+        )
         session_id = summary.session_id
 
         record, state = self.service.get_session(session_id)
@@ -39,25 +41,63 @@ class TestSessionTruncate(unittest.TestCase):
             ChatMessage(role="user", content="Hello"),
             ChatMessage(role="assistant", content="Hi! How can I help you?"),
             ChatMessage(role="user", content="Tell me a joke"),
-            ChatMessage(role="assistant", content="Why did the scarecrow win an award?"),
+            ChatMessage(
+                role="assistant", content="Why did the scarecrow win an award?"
+            ),
             ChatMessage(role="user", content="I don't know"),
-            ChatMessage(role="assistant", content="Because he was outstanding in his field!"),
+            ChatMessage(
+                role="assistant", content="Because he was outstanding in his field!"
+            ),
         ]
         self.service.store.save_state(session_id, state)
 
         # 2. 插入对应的 runs, events, tool calls, pending approvals 记录
-        run1 = SessionRunRecord(session_id=session_id, run_id="r1", user_input="Hello", reply="Hi", parent_run_id=None)
-        run2 = SessionRunRecord(session_id=session_id, run_id="r2", user_input="Tell me a joke", reply="Why did...", parent_run_id=None)
-        run3 = SessionRunRecord(session_id=session_id, run_id="r3", user_input="I don't know", reply="Because...", parent_run_id=None)
+        run1 = SessionRunRecord(
+            session_id=session_id,
+            run_id="r1",
+            user_input="Hello",
+            reply="Hi",
+            parent_run_id=None,
+        )
+        run2 = SessionRunRecord(
+            session_id=session_id,
+            run_id="r2",
+            user_input="Tell me a joke",
+            reply="Why did...",
+            parent_run_id=None,
+        )
+        run3 = SessionRunRecord(
+            session_id=session_id,
+            run_id="r3",
+            user_input="I don't know",
+            reply="Because...",
+            parent_run_id=None,
+        )
         self.db.add_all([run1, run2, run3])
         self.db.commit()
 
         # 添加一些关联的细节数据用来验证级联清理
-        event1 = SessionRunEventRecord(run_id="r1", event_index=0, type="thinking", content="...")
-        event2 = SessionRunEventRecord(run_id="r2", event_index=0, type="thinking", content="...")
-        event3 = SessionRunEventRecord(run_id="r3", event_index=0, type="thinking", content="...")
-        tool_call = ToolCallRecord(run_id="r2", tool_name="web_search", status="completed")
-        approval = PendingApproval(id="app1", session_id=session_id, run_id="r3", tool_name="spawn_child_agent", arguments="", event_index=1, saved_messages=[])
+        event1 = SessionRunEventRecord(
+            run_id="r1", event_index=0, type="thinking", content="..."
+        )
+        event2 = SessionRunEventRecord(
+            run_id="r2", event_index=0, type="thinking", content="..."
+        )
+        event3 = SessionRunEventRecord(
+            run_id="r3", event_index=0, type="thinking", content="..."
+        )
+        tool_call = ToolCallRecord(
+            run_id="r2", tool_name="web_search", status="completed"
+        )
+        approval = PendingApproval(
+            id="app1",
+            session_id=session_id,
+            run_id="r3",
+            tool_name="spawn_child_agent",
+            arguments="",
+            event_index=1,
+            saved_messages=[],
+        )
         self.db.add_all([event1, event2, event3, tool_call, approval])
         self.db.commit()
 
@@ -91,7 +131,9 @@ class TestSessionTruncate(unittest.TestCase):
 
     def test_truncate_session_all(self):
         # 1. 创建会话并模拟存入多轮对话
-        summary = self.service.create_session(CreateSessionInput(session_name="test_truncate"))
+        summary = self.service.create_session(
+            CreateSessionInput(session_name="test_truncate")
+        )
         session_id = summary.session_id
 
         record, state = self.service.get_session(session_id)
@@ -100,25 +142,63 @@ class TestSessionTruncate(unittest.TestCase):
             ChatMessage(role="user", content="Hello"),
             ChatMessage(role="assistant", content="Hi! How can I help you?"),
             ChatMessage(role="user", content="Tell me a joke"),
-            ChatMessage(role="assistant", content="Why did the scarecrow win an award?"),
+            ChatMessage(
+                role="assistant", content="Why did the scarecrow win an award?"
+            ),
             ChatMessage(role="user", content="I don't know"),
-            ChatMessage(role="assistant", content="Because he was outstanding in his field!"),
+            ChatMessage(
+                role="assistant", content="Because he was outstanding in his field!"
+            ),
         ]
         self.service.store.save_state(session_id, state)
 
         # 2. 插入对应的 runs, events, tool calls, pending approvals 记录
-        run1 = SessionRunRecord(session_id=session_id, run_id="r1", user_input="Hello", reply="Hi", parent_run_id=None)
-        run2 = SessionRunRecord(session_id=session_id, run_id="r2", user_input="Tell me a joke", reply="Why did...", parent_run_id=None)
-        run3 = SessionRunRecord(session_id=session_id, run_id="r3", user_input="I don't know", reply="Because...", parent_run_id=None)
+        run1 = SessionRunRecord(
+            session_id=session_id,
+            run_id="r1",
+            user_input="Hello",
+            reply="Hi",
+            parent_run_id=None,
+        )
+        run2 = SessionRunRecord(
+            session_id=session_id,
+            run_id="r2",
+            user_input="Tell me a joke",
+            reply="Why did...",
+            parent_run_id=None,
+        )
+        run3 = SessionRunRecord(
+            session_id=session_id,
+            run_id="r3",
+            user_input="I don't know",
+            reply="Because...",
+            parent_run_id=None,
+        )
         self.db.add_all([run1, run2, run3])
         self.db.commit()
 
         # 添加一些关联的细节数据用来验证级联清理
-        event1 = SessionRunEventRecord(run_id="r1", event_index=0, type="thinking", content="...")
-        event2 = SessionRunEventRecord(run_id="r2", event_index=0, type="thinking", content="...")
-        event3 = SessionRunEventRecord(run_id="r3", event_index=0, type="thinking", content="...")
-        tool_call = ToolCallRecord(run_id="r2", tool_name="web_search", status="completed")
-        approval = PendingApproval(id="app1", session_id=session_id, run_id="r3", tool_name="spawn_child_agent", arguments="", event_index=1, saved_messages=[])
+        event1 = SessionRunEventRecord(
+            run_id="r1", event_index=0, type="thinking", content="..."
+        )
+        event2 = SessionRunEventRecord(
+            run_id="r2", event_index=0, type="thinking", content="..."
+        )
+        event3 = SessionRunEventRecord(
+            run_id="r3", event_index=0, type="thinking", content="..."
+        )
+        tool_call = ToolCallRecord(
+            run_id="r2", tool_name="web_search", status="completed"
+        )
+        approval = PendingApproval(
+            id="app1",
+            session_id=session_id,
+            run_id="r3",
+            tool_name="spawn_child_agent",
+            arguments="",
+            event_index=1,
+            saved_messages=[],
+        )
         self.db.add_all([event1, event2, event3, tool_call, approval])
         self.db.commit()
 

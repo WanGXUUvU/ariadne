@@ -87,11 +87,15 @@ def handle_tool_calls(
         )
         current_index += 1
 
-        if allow_tool_names is not None and tool_call.function.name not in allow_tool_names:
+        if (
+            allow_tool_names is not None
+            and tool_call.function.name not in allow_tool_names
+        ):
             raise ValueError(f"Tool not allowed: {tool_call.function.name}")
 
         # 为同步工具执行构造轻量 Context，确保下沉沙箱生效
         from agent_prototype.security.middleware.base import ToolCallContext
+
         context = ToolCallContext(
             tool_name=tool_call.function.name,
             tool_args=tool_call.function.arguments,
@@ -126,7 +130,9 @@ def handle_tool_calls(
                 content=tool_result.content,
             )
         else:
-            error_message = tool_result.error.message if tool_result.error else "Tool failed"
+            error_message = (
+                tool_result.error.message if tool_result.error else "Tool failed"
+            )
             events.append(
                 RunEvent(
                     index=current_index,
@@ -314,7 +320,11 @@ async def async_handle_tool_calls(
             item.result_message = tool_message
             tool_messages.append(tool_message)
         elif tool_result.error:
-            error_message = tool_result.error.message if tool_result.error.message else "Tool failed"
+            error_message = (
+                tool_result.error.message
+                if tool_result.error.message
+                else "Tool failed"
+            )
             yield RunEvent(
                 index=current_index,
                 type="tool_error",

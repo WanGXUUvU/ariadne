@@ -18,7 +18,12 @@ import requests
 
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.core.types import ModelAdapter
-from agent_prototype.core.types import ModelRequest, ModelResponse, ModelUsage, StreamChunk
+from agent_prototype.core.types import (
+    ModelRequest,
+    ModelResponse,
+    ModelUsage,
+    StreamChunk,
+)
 
 
 class ChatCompletionsAdapter(ModelAdapter):
@@ -69,12 +74,16 @@ class ChatCompletionsAdapter(ModelAdapter):
                     partial = self._partial_suffix(text, "</think_tag>")
                     emit = text[: len(text) - len(partial)] if partial else text
                     if emit:
-                        events.append(StreamChunk(type="thinking_delta", thinking_delta=emit))
+                        events.append(
+                            StreamChunk(type="thinking_delta", thinking_delta=emit)
+                        )
                     self._tag_buf = partial
                     break
                 if close_idx > 0:
                     events.append(
-                        StreamChunk(type="thinking_delta", thinking_delta=text[:close_idx])
+                        StreamChunk(
+                            type="thinking_delta", thinking_delta=text[:close_idx]
+                        )
                     )
                 self._in_think = False
                 text = text[close_idx + len("</think_tag>") :]
@@ -94,7 +103,9 @@ class ChatCompletionsAdapter(ModelAdapter):
                     self._tag_buf = partial
                     break
                 if open_idx > 0:
-                    events.append(StreamChunk(type="content_delta", delta=text[:open_idx]))
+                    events.append(
+                        StreamChunk(type="content_delta", delta=text[:open_idx])
+                    )
                 self._in_think = True
                 text = text[open_idx + len("<think_tag>") :]
 
@@ -209,10 +220,15 @@ class ChatCompletionsAdapter(ModelAdapter):
         response = None
         for attempt in range(max_retries + 1):
             try:
-                response = requests.post(url, headers=headers, json=payload, timeout=2100)
+                response = requests.post(
+                    url, headers=headers, json=payload, timeout=2100
+                )
                 response.raise_for_status()
                 break
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+            except (
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            ) as exc:
                 if attempt == max_retries:
                     raise RuntimeError(
                         f"LLM request failed due to network/timeout error after {max_retries} retries: {exc}"
@@ -224,7 +240,10 @@ class ChatCompletionsAdapter(ModelAdapter):
                 is_retryable = (
                     status_code == 429
                     or (500 <= status_code < 600)
-                    or (status_code == 400 and "engine is not available temporarily" in text)
+                    or (
+                        status_code == 400
+                        and "engine is not available temporarily" in text
+                    )
                 )
                 if not is_retryable or attempt == max_retries:
                     raise RuntimeError(
@@ -265,7 +284,9 @@ class ChatCompletionsAdapter(ModelAdapter):
             provider_meta={},
         )
 
-    async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[StreamChunk]:
+    async def async_stream_generate(
+        self, request: ModelRequest
+    ) -> AsyncIterator[StreamChunk]:
         if not self.api_key:
             raise RuntimeError("Missing API_KEY")
 

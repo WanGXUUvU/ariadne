@@ -19,7 +19,6 @@ from sqlalchemy.orm import relationship
 
 from .engine import Base
 
-
 # ── Session 相关表 ────────────────────────────────────────────────────────────
 
 
@@ -36,7 +35,9 @@ class SessionRecord(Base):
     session_name = Column(String, nullable=True)
     state_json = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
     last_agent_name = Column(String, nullable=True, index=True)
     message_count = Column(Integer, nullable=False, default=0, server_default="0")
     last_reply_preview = Column(String(120), nullable=True)
@@ -51,7 +52,9 @@ class SessionRecord(Base):
     thinking_effort = Column(String, nullable=False, default="medium")
     workspace_path = Column(String, nullable=True)
     workspace_name = Column(String, nullable=True)
-    session_type = Column(String, nullable=False, default="coding", server_default="coding")
+    session_type = Column(
+        String, nullable=False, default="coding", server_default="coding"
+    )
     parent_session_id = Column(
         String,
         ForeignKey("session_records.session_id", ondelete="SET NULL"),
@@ -110,7 +113,10 @@ class ToolCallRecord(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(
-        String, ForeignKey("session_runs.run_id", ondelete="CASCADE"), index=True, nullable=False
+        String,
+        ForeignKey("session_runs.run_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
     tool_name = Column(String, nullable=False)
     tool_call_id = Column(String, nullable=True)  # LLM 分配的 ID
@@ -184,7 +190,9 @@ class PendingApproval(Base):
     tool_name = Column(String, nullable=False)  # 要执行的工具
     tool_call_id = Column(String, nullable=True)
     arguments = Column(Text, nullable=False)  # 工具参数 JSON
-    status = Column(String, nullable=False, default="pending")  # pending / approved / rejected
+    status = Column(
+        String, nullable=False, default="pending"
+    )  # pending / approved / rejected
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     saved_messages = Column(JSON, nullable=False)
     event_index = Column(Integer, nullable=False)
@@ -223,13 +231,18 @@ class ModelSetting(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     provider_id = Column(
-        Integer, ForeignKey("provider_configs.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("provider_configs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     model_id = Column(String, nullable=False)  # 如 "deepseek-v4-flash"
     display_name = Column(String, nullable=True)  # 覆盖显示名
     enabled = Column(Integer, nullable=False, default=0)  # 0/1，是否出现在对话框
     supports_thinking = Column(Integer, nullable=False, default=0)
-    thinking_style = Column(String, nullable=True)  # "deepseek_style" | "sensenova_style" | "none"
+    thinking_style = Column(
+        String, nullable=True
+    )  # "deepseek_style" | "sensenova_style" | "none"
     effort_levels = Column(Text, nullable=True)  # JSON 字符串，如 '["low","high"]'
     context_length = Column(Integer, nullable=True)
     supports_tools = Column(Integer, nullable=False, default=0)

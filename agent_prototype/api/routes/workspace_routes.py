@@ -5,7 +5,10 @@
 from fastapi import APIRouter, Depends, status
 from agent_prototype.api.dto.schemas import WorkspaceSummary
 from agent_prototype.memory.workspace.service import WorkspaceService
-from agent_prototype.api.routes.dependencies import error_response, get_workspace_service
+from agent_prototype.api.routes.dependencies import (
+    error_response,
+    get_workspace_service,
+)
 
 router = APIRouter()
 
@@ -17,7 +20,9 @@ def list_workspace_api(service: WorkspaceService = Depends(get_workspace_service
 
 
 @router.post("/workspaces/select-dialog", response_model=WorkspaceSummary)
-def select_workspace_dialog_api(service: WorkspaceService = Depends(get_workspace_service)):
+def select_workspace_dialog_api(
+    service: WorkspaceService = Depends(get_workspace_service),
+):
     """唤起 macOS 原生 Finder 选择弹窗，自动注册并返回工作区信息。
     若用户取消或超时，则抛出 400 Bad Request。
     """

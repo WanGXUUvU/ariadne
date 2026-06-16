@@ -178,7 +178,7 @@ class RunLifecycle:
 
             yield RunStatusItem(status=status)
 
-        except (GeneratorExit, asyncio.CancelledError):
+        except GeneratorExit, asyncio.CancelledError:
             async for flushed in _flush_thinking():
                 yield flushed
 

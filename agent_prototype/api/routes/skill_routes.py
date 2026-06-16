@@ -25,7 +25,9 @@ router = APIRouter()
 
 
 @router.get("/skills", response_model=list[SkillSummary])
-def list_skills_api(service: SkillService = Depends(get_skill_service)) -> list[SkillSummary]:
+def list_skills_api(
+    service: SkillService = Depends(get_skill_service),
+) -> list[SkillSummary]:
     """这个函数是用来列出系统里所有可用技能（Skill）的。
 
     技能是 Agent 能够执行的某种大任务或复杂业务流，通过这个接口可以方便地查看当前所有已加载技能的状态（比如是否启用等）。

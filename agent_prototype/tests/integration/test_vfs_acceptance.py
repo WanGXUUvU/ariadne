@@ -183,7 +183,10 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
 
                 for _ in range(8):
                     frame = _parse_sse(await stream.__anext__())
-                    if frame["type"] == "run_event" and frame["data"]["type"] == "tool_result":
+                    if (
+                        frame["type"] == "run_event"
+                        and frame["data"]["type"] == "tool_result"
+                    ):
                         saw_tool_result = True
                     if frame["type"] == "delta":
                         saw_delta = True
@@ -211,7 +214,11 @@ class TestVfsAcceptance(unittest.IsolatedAsyncioTestCase):
 
         db = self.session_local()
         try:
-            run = db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+            run = (
+                db.query(SessionRunRecord)
+                .filter(SessionRunRecord.run_id == run_id)
+                .first()
+            )
             self.assertIsNotNone(run)
             self.assertEqual(run.run_status, "cancelled")
             self.assertEqual(run.reply, "partial")

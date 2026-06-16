@@ -35,7 +35,9 @@ class TestAgentApi(unittest.TestCase):
 
         # Mock RunContextFactory._create_adapter 绕过物理数据库配置校验，直接返回一个 mock 好的 ChatCompletionsAdapter
         from agent_prototype.execution.run_context_factory import RunContextFactory
-        from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
+        from agent_prototype.core.adapters.chat_completions import (
+            ChatCompletionsAdapter,
+        )
 
         self.create_adapter_patcher = patch.object(
             RunContextFactory,
@@ -63,10 +65,14 @@ class TestAgentApi(unittest.TestCase):
     def _assistant_response(self, content=None, tool_calls=None):
         return build_assistant_response(content=content, tool_calls=tool_calls)
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_run_endpoint(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="mock reply")
-        response = self.client.post("/run", json={"session_id": "session-a", "user_input": "你好"})
+        response = self.client.post(
+            "/run", json={"session_id": "session-a", "user_input": "你好"}
+        )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -79,7 +85,12 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(
             data["state"]["messages"],
             [
-                {"role": "user", "content": "你好", "tool_calls": None, "tool_call_id": None},
+                {
+                    "role": "user",
+                    "content": "你好",
+                    "tool_calls": None,
+                    "tool_call_id": None,
+                },
                 {
                     "role": "assistant",
                     "content": "mock reply",
@@ -102,8 +113,12 @@ class TestAgentApi(unittest.TestCase):
             ],
         )
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
-    def test_run_endpoint_returns_metadata_with_explicit_agent_and_skill(self, mock_generate):
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
+    def test_run_endpoint_returns_metadata_with_explicit_agent_and_skill(
+        self, mock_generate
+    ):
         mock_generate.return_value = self._assistant_response(content="skill reply")
         db = self.session_local()
         try:
@@ -154,7 +169,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertTrue(data["metadata"]["run_id"])
         self.assertEqual(data["metadata"]["agent_name"], "reviewer")
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_compact_endpoint_returns_compacted_state(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="结构化历史摘要")
         db = self.session_local()
@@ -200,7 +217,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertIn("结构化历史摘要", data["state"]["messages"][0]["content"])
         mock_generate.assert_called_once()
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_run_endpoint_auto_compacts_long_session_before_reply(self, mock_generate):
         mock_generate.side_effect = [
             self._assistant_response(content="自动压缩后的结构化摘要"),
@@ -252,12 +271,18 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(compacted_messages[-2]["role"], "user")
         self.assertEqual(compacted_messages[-2]["content"], "继续执行下一步")
         self.assertEqual(compacted_messages[-1]["role"], "assistant")
-        self.assertEqual(compacted_messages[-1]["content"], "run reply after auto compact")
+        self.assertEqual(
+            compacted_messages[-1]["content"], "run reply after auto compact"
+        )
 
         self.assertEqual(mock_generate.call_count, 2)
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
-    def test_run_endpoint_does_not_persist_auto_compact_when_run_fails(self, mock_generate):
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
+    def test_run_endpoint_does_not_persist_auto_compact_when_run_fails(
+        self, mock_generate
+    ):
         mock_generate.side_effect = [
             self._assistant_response(content="自动压缩后的结构化摘要"),
             RuntimeError("run failed after auto compact"),
@@ -308,15 +333,22 @@ class TestAgentApi(unittest.TestCase):
             persisted_state = store.read_session_state("auto-compact-fail-session")
             self.assertIsNotNone(persisted_state)
             self.assertEqual(
-                [message.model_dump(exclude_none=True) for message in persisted_state.messages],
+                [
+                    message.model_dump(exclude_none=True)
+                    for message in persisted_state.messages
+                ],
                 original_messages,
             )
         finally:
             db.close()
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_run_endpoint_updates_session_metadata(self, mock_generate):
-        mock_generate.return_value = self._assistant_response(content="mock reply\nwith preview")
+        mock_generate.return_value = self._assistant_response(
+            content="mock reply\nwith preview"
+        )
         response = self.client.post(
             "/run",
             json={"session_id": "session-meta", "user_input": "你好，简单回复我一句"},
@@ -327,7 +359,9 @@ class TestAgentApi(unittest.TestCase):
         db = self.session_local()
         try:
             record = (
-                db.query(SessionRecord).filter(SessionRecord.session_id == "session-meta").first()
+                db.query(SessionRecord)
+                .filter(SessionRecord.session_id == "session-meta")
+                .first()
             )
 
             self.assertIsNotNone(record)
@@ -342,9 +376,15 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.agent.definition.service.AgentDefinitionService.load_definition")
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
-    def test_run_endpoint_uses_explicit_agent_name(self, mock_generate, mock_load_definition):
+    @patch(
+        "agent_prototype.agent.definition.service.AgentDefinitionService.load_definition"
+    )
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
+    def test_run_endpoint_uses_explicit_agent_name(
+        self, mock_generate, mock_load_definition
+    ):
         mock_generate.return_value = self._assistant_response(content="review reply")
         mock_load_definition.return_value = AgentDefinition(
             id="reviewer",
@@ -356,7 +396,11 @@ class TestAgentApi(unittest.TestCase):
 
         response = self.client.post(
             "/run",
-            json={"session_id": "session-a", "user_input": "帮我审查", "agent_name": "reviewer"},
+            json={
+                "session_id": "session-a",
+                "user_input": "帮我审查",
+                "agent_name": "reviewer",
+            },
         )
 
         self.assertEqual(response.status_code, 200)
@@ -370,7 +414,9 @@ class TestAgentApi(unittest.TestCase):
         return_value="---\nname: openai-docs\ndescription: 查文档\n---\nFULL SKILL BODY",
     )
     @patch("agent_prototype.context.skill_context.list_skills")
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_run_endpoint_loads_selected_skill_content_into_system_prompt(
         self,
         mock_generate,
@@ -410,7 +456,9 @@ class TestAgentApi(unittest.TestCase):
         db = self.session_local()
         try:
             record = (
-                db.query(SessionRecord).filter(SessionRecord.session_id == "session-skill").first()
+                db.query(SessionRecord)
+                .filter(SessionRecord.session_id == "session-skill")
+                .first()
             )
             run_record = (
                 db.query(SessionRunRecord)
@@ -425,7 +473,9 @@ class TestAgentApi(unittest.TestCase):
 
     @patch("agent_prototype.context.skill_context.load_skill_content")
     @patch("agent_prototype.context.skill_context.list_skills")
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_run_endpoint_without_skill_name_only_includes_catalog_prompt(
         self,
         mock_generate,
@@ -506,11 +556,15 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"]["code"], "bad_request")
-        self.assertEqual(response.json()["error"]["message"], "Skill is disabled: openai-docs")
+        self.assertEqual(
+            response.json()["error"]["message"], "Skill is disabled: openai-docs"
+        )
         mock_load_skill_content.assert_not_called()
 
     @patch("agent_prototype.context.skill_context.list_skills", return_value=[])
-    def test_run_endpoint_returns_structured_error_when_skill_not_found(self, mock_list_skills):
+    def test_run_endpoint_returns_structured_error_when_skill_not_found(
+        self, mock_list_skills
+    ):
         response = self.client.post(
             "/run",
             json={
@@ -570,7 +624,9 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_reset_endpoint_clears_messages_but_keeps_same_session(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="reset reply")
         self.client.post(
@@ -602,7 +658,9 @@ class TestAgentApi(unittest.TestCase):
         db = self.session_local()
         try:
             record = (
-                db.query(SessionRecord).filter(SessionRecord.session_id == "session-reset").first()
+                db.query(SessionRecord)
+                .filter(SessionRecord.session_id == "session-reset")
+                .first()
             )
             self.assertIsNotNone(record)
             self.assertEqual(record.session_name, "session-reset")
@@ -623,7 +681,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["error"]["code"], "bad_request")
         self.assertEqual(data["error"]["message"], "Session not found")
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_delete_session_endpoint_removes_existing_session(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="delete reply")
         self.client.post(
@@ -648,7 +708,9 @@ class TestAgentApi(unittest.TestCase):
         db = self.session_local()
         try:
             record = (
-                db.query(SessionRecord).filter(SessionRecord.session_id == "session-delete").first()
+                db.query(SessionRecord)
+                .filter(SessionRecord.session_id == "session-delete")
+                .first()
             )
             self.assertIsNone(record)
         finally:
@@ -662,7 +724,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(data["error"]["code"], "bad_request")
         self.assertEqual(data["error"]["message"], "Session not found")
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_list_sessions_endpoint_returns_summaries(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="first reply")
         self.client.post("/run", json={"session_id": "session-b", "user_input": "你好"})
@@ -670,7 +734,9 @@ class TestAgentApi(unittest.TestCase):
         import time
 
         time.sleep(1)
-        self.client.post("/run", json={"session_id": "session-b", "user_input": "再来一次"})
+        self.client.post(
+            "/run", json={"session_id": "session-b", "user_input": "再来一次"}
+        )
 
         response = self.client.get("/sessions")
 
@@ -686,10 +752,14 @@ class TestAgentApi(unittest.TestCase):
         self.assertIn("created_at", data[0])
         self.assertIn("updated_at", data[0])
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_read_session_endpoint_returns_detail(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="detail reply")
-        self.client.post("/run", json={"session_id": "session-detail", "user_input": "你好"})
+        self.client.post(
+            "/run", json={"session_id": "session-detail", "user_input": "你好"}
+        )
 
         response = self.client.get("/sessions/session-detail")
 
@@ -702,7 +772,12 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(
             data["state"]["messages"],
             [
-                {"role": "user", "content": "你好", "tool_calls": None, "tool_call_id": None},
+                {
+                    "role": "user",
+                    "content": "你好",
+                    "tool_calls": None,
+                    "tool_call_id": None,
+                },
                 {
                     "role": "assistant",
                     "content": "detail reply",
@@ -756,12 +831,16 @@ class TestAgentApi(unittest.TestCase):
         by_name = {item["name"]: item for item in data}
 
         self.assertEqual(by_name["Alpha Skill"]["description"], "Alpha summary")
-        self.assertEqual(by_name["Alpha Skill"]["path"], "project-opencode/alpha-skill/SKILL.md")
+        self.assertEqual(
+            by_name["Alpha Skill"]["path"], "project-opencode/alpha-skill/SKILL.md"
+        )
         self.assertTrue(by_name["Alpha Skill"]["enabled"])
         self.assertIsNone(by_name["Alpha Skill"]["error"])
 
         self.assertFalse(by_name["broken-skill"]["enabled"])
-        self.assertEqual(by_name["broken-skill"]["path"], "user-codex/broken-skill/SKILL.md")
+        self.assertEqual(
+            by_name["broken-skill"]["path"], "user-codex/broken-skill/SKILL.md"
+        )
         self.assertIn("Missing frontmatter", by_name["broken-skill"]["error"])
 
     @patch("agent_prototype.skills.loader.get_default_skill_config_path")
@@ -779,7 +858,9 @@ class TestAgentApi(unittest.TestCase):
             "alpha-skill",
             "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
         )
-        mock_get_default_skill_roots.return_value = [("project-opencode", project_skills_root)]
+        mock_get_default_skill_roots.return_value = [
+            ("project-opencode", project_skills_root)
+        ]
         mock_get_default_skill_config_path.return_value = config_path
 
         disable_response = self.client.post("/skills/Alpha Skill/disable")
@@ -787,7 +868,8 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(disable_response.status_code, 200)
         self.assertFalse(disable_response.json()["enabled"])
         self.assertEqual(
-            config_path.read_text(encoding="utf-8"), '{\n  "disabled": [\n    "Alpha Skill"\n  ]\n}'
+            config_path.read_text(encoding="utf-8"),
+            '{\n  "disabled": [\n    "Alpha Skill"\n  ]\n}',
         )
 
         list_response = self.client.get("/skills")
@@ -799,9 +881,13 @@ class TestAgentApi(unittest.TestCase):
 
         self.assertEqual(enable_response.status_code, 200)
         self.assertTrue(enable_response.json()["enabled"])
-        self.assertEqual(config_path.read_text(encoding="utf-8"), '{\n  "disabled": []\n}')
+        self.assertEqual(
+            config_path.read_text(encoding="utf-8"), '{\n  "disabled": []\n}'
+        )
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_trace_endpoint_returns_runs_in_order(self, mock_generate):
         mock_generate.return_value = self._assistant_response(content="trace reply")
         first_response = self.client.post(
@@ -823,7 +909,9 @@ class TestAgentApi(unittest.TestCase):
                 second_response.json()["metadata"]["run_id"],
             ],
         )
-        self.assertEqual([run["user_input"] for run in data["runs"]], ["第一轮", "第二轮"])
+        self.assertEqual(
+            [run["user_input"] for run in data["runs"]], ["第一轮", "第二轮"]
+        )
         self.assertEqual(data["runs"][0]["event_count"], 1)
         self.assertEqual(data["runs"][0]["events"][0]["type"], "final_answer")
         self.assertEqual(data["runs"][0]["events"][0]["content"], "trace reply")
@@ -837,13 +925,19 @@ class TestAgentApi(unittest.TestCase):
         finally:
             db.close()
 
-    @patch("agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate")
+    @patch(
+        "agent_prototype.core.adapters.chat_completions.ChatCompletionsAdapter.generate"
+    )
     def test_trace_endpoint_supports_run_id_filter(self, mock_generate):
-        mock_generate.return_value = self._assistant_response(content="filtered trace reply")
+        mock_generate.return_value = self._assistant_response(
+            content="filtered trace reply"
+        )
         first_response = self.client.post(
             "/run", json={"session_id": "trace-filter", "user_input": "第一轮"}
         )
-        self.client.post("/run", json={"session_id": "trace-filter", "user_input": "第二轮"})
+        self.client.post(
+            "/run", json={"session_id": "trace-filter", "user_input": "第二轮"}
+        )
 
         response = self.client.get(
             f"/sessions/trace-filter/trace?run_id={first_response.json()['metadata']['run_id']}"
@@ -852,7 +946,9 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data["runs"]), 1)
-        self.assertEqual(data["runs"][0]["run_id"], first_response.json()["metadata"]["run_id"])
+        self.assertEqual(
+            data["runs"][0]["run_id"], first_response.json()["metadata"]["run_id"]
+        )
         self.assertEqual(data["runs"][0]["user_input"], "第一轮")
 
     def test_trace_endpoint_returns_404_for_missing_trace(self):

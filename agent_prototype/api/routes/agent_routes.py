@@ -25,14 +25,17 @@ router = APIRouter()
 
 @router.get("/agents/{agent_id}")
 def load_agent_definition_api(
-    agent_id: str, service: AgentDefinitionService = Depends(get_agent_definition_service)
+    agent_id: str,
+    service: AgentDefinitionService = Depends(get_agent_definition_service),
 ) -> AgentDefinition:
     """根据智能体 ID 获取其详细配置定义。"""
     return service.load_definition(agent_id)
 
 
 @router.get("/agents")
-def list_agents_api(service: AgentDefinitionService = Depends(get_agent_definition_service)):
+def list_agents_api(
+    service: AgentDefinitionService = Depends(get_agent_definition_service),
+):
     """获取系统内所有可用的智能体模板列表。"""
     return service.list_agents()
 
@@ -48,7 +51,8 @@ def save_agent_api(
 
 @router.delete("/agents/{agent_id}")
 def delete_agent_api(
-    agent_id: str, service: AgentDefinitionService = Depends(get_agent_definition_service)
+    agent_id: str,
+    service: AgentDefinitionService = Depends(get_agent_definition_service),
 ):
     """删除指定的智能体模板配置。"""
     service.delete_agent(agent_id)

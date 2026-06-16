@@ -36,7 +36,11 @@ class DummyMiddleware(BaseMiddleware):
                 content=None,
                 error=ToolError(
                     code="SHORT_CIRCUIT",
-                    tool_name=context.tool_name if hasattr(context, "tool_name") else "unknown",
+                    tool_name=(
+                        context.tool_name
+                        if hasattr(context, "tool_name")
+                        else "unknown"
+                    ),
                     message=f"Short circuited by {self.name}",
                 ),
             )

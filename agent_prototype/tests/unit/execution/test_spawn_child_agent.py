@@ -21,7 +21,9 @@ from agent_prototype.tests.helpers.db import make_sqlite_test_db
 from agent_prototype.tests.helpers.factories import build_run_output
 
 
-def _seed_session_model(session_local, session_id: str, model_id: str = "test-model") -> None:
+def _seed_session_model(
+    session_local, session_id: str, model_id: str = "test-model"
+) -> None:
     db = session_local()
     try:
         provider = ProviderConfig(
@@ -110,13 +112,25 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
 
         # 核心修复：通过 patch "run_service.AgentRunner" 来正确 mock 线程中实例化的类，并重定向 DB 操作为测试内存库
         with (
-            patch("agent_prototype.execution.child_run_launcher._executor", self.executor),
-            patch("agent_prototype.execution.child_run_launcher._global_futures", self.futures),
-            patch("agent_prototype.execution.child_run_launcher.AgentRunner") as MockAgent,
-            patch("agent_prototype.execution.child_run_launcher.RunVfsRegistry") as MockVfsRegistry,
-            patch("agent_prototype.execution.persistence.run_recorder.RunVfsRegistry") as MockPersistVfsRegistry,
             patch(
-                "agent_prototype.execution.child_run_launcher.SessionLocal", self.session_local
+                "agent_prototype.execution.child_run_launcher._executor", self.executor
+            ),
+            patch(
+                "agent_prototype.execution.child_run_launcher._global_futures",
+                self.futures,
+            ),
+            patch(
+                "agent_prototype.execution.child_run_launcher.AgentRunner"
+            ) as MockAgent,
+            patch(
+                "agent_prototype.execution.child_run_launcher.RunVfsRegistry"
+            ) as MockVfsRegistry,
+            patch(
+                "agent_prototype.execution.persistence.run_recorder.RunVfsRegistry"
+            ) as MockPersistVfsRegistry,
+            patch(
+                "agent_prototype.execution.child_run_launcher.SessionLocal",
+                self.session_local,
             ),
         ):
 
@@ -152,8 +166,12 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             self.assertEqual(children[0].parent_run_id, parent_run_id)
             self.assertEqual(children[0].user_input, "帮我查一下天气")
             self.assertEqual(children[0].reply, "子任务完成")
-            self.assertEqual(MockAgent.call_args.kwargs["model_adapter"].model, "test-model")
-            self.assertEqual(mock_instance.execute.call_args.kwargs["run_id"], child_run_id)
+            self.assertEqual(
+                MockAgent.call_args.kwargs["model_adapter"].model, "test-model"
+            )
+            self.assertEqual(
+                mock_instance.execute.call_args.kwargs["run_id"], child_run_id
+            )
             MockVfsRegistry.create.assert_called_once_with(child_run_id)
             staged_vfs.commit_all.assert_called_once()
             MockPersistVfsRegistry.take.assert_called_once_with(child_run_id)
@@ -169,12 +187,22 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         run_service = RunService(db)
 
         with (
-            patch("agent_prototype.execution.child_run_launcher._executor", self.executor),
-            patch("agent_prototype.execution.child_run_launcher._global_futures", self.futures),
-            patch("agent_prototype.execution.child_run_launcher.AgentRunner") as MockAgent,
-            patch("agent_prototype.execution.child_run_launcher.RunVfsRegistry") as MockVfsRegistry,
             patch(
-                "agent_prototype.execution.child_run_launcher.SessionLocal", self.session_local
+                "agent_prototype.execution.child_run_launcher._executor", self.executor
+            ),
+            patch(
+                "agent_prototype.execution.child_run_launcher._global_futures",
+                self.futures,
+            ),
+            patch(
+                "agent_prototype.execution.child_run_launcher.AgentRunner"
+            ) as MockAgent,
+            patch(
+                "agent_prototype.execution.child_run_launcher.RunVfsRegistry"
+            ) as MockVfsRegistry,
+            patch(
+                "agent_prototype.execution.child_run_launcher.SessionLocal",
+                self.session_local,
             ),
         ):
             mock_instance = MagicMock()
@@ -220,11 +248,19 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         run_service = RunService(db)
 
         with (
-            patch("agent_prototype.execution.child_run_launcher._executor", self.executor),
-            patch("agent_prototype.execution.child_run_launcher._global_futures", self.futures),
-            patch("agent_prototype.execution.child_run_launcher.AgentRunner") as MockAgent,
             patch(
-                "agent_prototype.execution.child_run_launcher.SessionLocal", self.session_local
+                "agent_prototype.execution.child_run_launcher._executor", self.executor
+            ),
+            patch(
+                "agent_prototype.execution.child_run_launcher._global_futures",
+                self.futures,
+            ),
+            patch(
+                "agent_prototype.execution.child_run_launcher.AgentRunner"
+            ) as MockAgent,
+            patch(
+                "agent_prototype.execution.child_run_launcher.SessionLocal",
+                self.session_local,
             ),
         ):
 
@@ -251,7 +287,9 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             self.assertEqual(len(children), 2)
             for child in children:
                 self.assertEqual(child.parent_run_id, parent_run_id)
-            self.assertEqual(MockAgent.call_args.kwargs["model_adapter"].model, "test-model")
+            self.assertEqual(
+                MockAgent.call_args.kwargs["model_adapter"].model, "test-model"
+            )
         finally:
             db.close()
 

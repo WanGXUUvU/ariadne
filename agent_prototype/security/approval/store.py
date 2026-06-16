@@ -75,7 +75,8 @@ class SqliteApprovalStore:
             arguments=arguments,
             status="pending",
             saved_messages=[
-                saved_message.model_dump(exclude_none=True) for saved_message in saved_messages
+                saved_message.model_dump(exclude_none=True)
+                for saved_message in saved_messages
             ],
             event_index=event_index,
         )
@@ -93,7 +94,11 @@ class SqliteApprovalStore:
         会给出来的结果：
         - Optional[PendingApproval]: 对应的审批记录，如果找不到就返回 None。
         """
-        return self.db.query(PendingApproval).filter(PendingApproval.id == approval_id).first()
+        return (
+            self.db.query(PendingApproval)
+            .filter(PendingApproval.id == approval_id)
+            .first()
+        )
 
     def update_status(self, approval_id: str, status: str) -> Optional[PendingApproval]:
         """更改审批工单的状态（比如从“pending 待处理”变成“approved 已批准”或“rejected 已拒绝”）。

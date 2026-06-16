@@ -17,7 +17,6 @@ from agent_prototype.tools.types import ToolDefinition
 from agent_prototype.tools.registry import ToolRegistry
 from agent_prototype.tools.result_types import ToolResult, ToolError
 
-
 # ── Stub 工具 ──────────────────────────────────────────────────────────────────
 
 
@@ -135,7 +134,9 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
     # ── 直接执行（不经过管道）─────────────────────────────────────────────────
 
     def test_registry_executes_safe_tool(self):
-        result = self.registry.execute_tool_call("safe_tool", json.dumps({"message": "world"}))
+        result = self.registry.execute_tool_call(
+            "safe_tool", json.dumps({"message": "world"})
+        )
         self.assertTrue(result.ok)
         self.assertEqual(result.content, "echo:world")
 
@@ -150,7 +151,9 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
 
     # ── 管道执行 ──────────────────────────────────────────────────────────────
 
-    async def _run_pipeline(self, tool_name: str, args: dict, middlewares) -> ToolResult:
+    async def _run_pipeline(
+        self, tool_name: str, args: dict, middlewares
+    ) -> ToolResult:
         """辅助：构建 context + pipeline，执行并返回结果。"""
         context = ToolCallContext(
             tool_name=tool_name,
@@ -168,7 +171,9 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
     async def test_pipeline_passes_through_safe_tool(self):
         """安全工具能透过中间件管道正常执行。"""
         log: list[str] = []
-        result = await self._run_pipeline("safe_tool", {"message": "pipe"}, [TraceMiddleware(log)])
+        result = await self._run_pipeline(
+            "safe_tool", {"message": "pipe"}, [TraceMiddleware(log)]
+        )
         self.assertTrue(result.ok)
         self.assertEqual(result.content, "echo:pipe")
         self.assertEqual(log, ["before:safe_tool", "after:safe_tool"])
@@ -205,7 +210,9 @@ class TestToolPipeline(unittest.IsolatedAsyncioTestCase):
             async def call(self, ctx, nxt):
                 return await self._fn(ctx, nxt)
 
-        pipeline = MiddlewarePipeline([NamedMiddleware(outer_call), NamedMiddleware(inner_call)])
+        pipeline = MiddlewarePipeline(
+            [NamedMiddleware(outer_call), NamedMiddleware(inner_call)]
+        )
 
         async def terminal():
             log.append("terminal")

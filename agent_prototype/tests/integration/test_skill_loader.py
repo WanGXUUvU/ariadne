@@ -28,7 +28,9 @@ class TestSkillLoader(unittest.TestCase):
             "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
         )
         self._write_skill(
-            user_skills_root, "broken-skill", "name: Broken Skill\n# Missing frontmatter\n"
+            user_skills_root,
+            "broken-skill",
+            "name: Broken Skill\n# Missing frontmatter\n",
         )
 
         results = list_skills(

@@ -16,7 +16,6 @@ from pydantic import BaseModel
 from agent_prototype.execution.runtime.types import RunEvent, RunState
 from agent_prototype.memory.session.types import SessionSummary
 
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 工具调用摘要 — Tool Call Summary
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -70,7 +70,10 @@ class AgentDefinitionService:
         - 合并后的所有 Agent 详细配置对象列表（List[AgentDefinition]）。
         """
         # 内置定义默认打底，标记为 is_builtin = True
-        merged = {a.id: a.model_copy(update={"is_builtin": True}) for a in list_builtin_agents()}
+        merged = {
+            a.id: a.model_copy(update={"is_builtin": True})
+            for a in list_builtin_agents()
+        }
 
         # 遍历数据库自定义，覆盖同 id 记录，标记 is_builtin = False
         for a in self.store.list_all():

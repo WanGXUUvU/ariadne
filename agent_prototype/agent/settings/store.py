@@ -29,7 +29,11 @@ class SqliteSettingsStore:
 
     def create_provider(self, name: str, base_url: str, api_key: str) -> ProviderConfig:
         """登记或更新大模型厂商记录。"""
-        record = self.db.query(ProviderConfig).filter(ProviderConfig.base_url == base_url).first()
+        record = (
+            self.db.query(ProviderConfig)
+            .filter(ProviderConfig.base_url == base_url)
+            .first()
+        )
         if record is not None:
             record.name = name
             record.api_key = api_key
@@ -40,7 +44,11 @@ class SqliteSettingsStore:
 
     def list_providers(self) -> list[ProviderConfig]:
         """获取所有供应商记录，按创建时间降序排序。"""
-        return self.db.query(ProviderConfig).order_by(ProviderConfig.created_at.desc()).all()
+        return (
+            self.db.query(ProviderConfig)
+            .order_by(ProviderConfig.created_at.desc())
+            .all()
+        )
 
     def patch_provider(
         self,
@@ -51,7 +59,11 @@ class SqliteSettingsStore:
         is_default: Optional[bool] = None,
     ) -> Optional[ProviderConfig]:
         """局部修改供应商配置。若设为默认，则清除其它记录的默认标记。"""
-        record = self.db.query(ProviderConfig).filter(ProviderConfig.id == provider_id).first()
+        record = (
+            self.db.query(ProviderConfig)
+            .filter(ProviderConfig.id == provider_id)
+            .first()
+        )
         if record is None:
             return None
         if name is not None:
@@ -67,7 +79,11 @@ class SqliteSettingsStore:
 
     def delete_provider(self, provider_id: int) -> None:
         """从数据库物理删除指定的供应商记录（级联删除关联模型配置）。"""
-        record = self.db.query(ProviderConfig).filter(ProviderConfig.id == provider_id).first()
+        record = (
+            self.db.query(ProviderConfig)
+            .filter(ProviderConfig.id == provider_id)
+            .first()
+        )
         if record is not None:
             self.db.delete(record)
 
@@ -85,7 +101,10 @@ class SqliteSettingsStore:
         """保存或更新从供应商同步的模型设置。若已存在则覆盖更新属性。"""
         record = (
             self.db.query(ModelSetting)
-            .filter(ModelSetting.provider_id == provider_id, ModelSetting.model_id == model_id)
+            .filter(
+                ModelSetting.provider_id == provider_id,
+                ModelSetting.model_id == model_id,
+            )
             .first()
         )
         if record is not None:
@@ -129,7 +148,9 @@ class SqliteSettingsStore:
         display_name: Optional[str] = None,
     ) -> Optional[ModelSetting]:
         """局部修改模型配置（是否启用或显示名称）。"""
-        record = self.db.query(ModelSetting).filter(ModelSetting.id == model_db_id).first()
+        record = (
+            self.db.query(ModelSetting).filter(ModelSetting.id == model_db_id).first()
+        )
         if record is None:
             return None
         if enabled is not None:

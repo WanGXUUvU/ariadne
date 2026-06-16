@@ -26,7 +26,9 @@ router = APIRouter()  # 创建路由器
 
 @router.get("/sessions/{session_id}/trace", response_model=TraceResponse)
 def read_session_trace_api(
-    session_id: str, run_id: Optional[str] = None, service: RunService = Depends(get_run_service)
+    session_id: str,
+    run_id: Optional[str] = None,
+    service: RunService = Depends(get_run_service),
 ) -> TraceResponse:
     """这个函数是用来读取会话在后台运行时的详细执行轨迹（Trace/运行步骤）的。
 
@@ -42,7 +44,9 @@ def read_session_trace_api(
     """
     run_records, events_map = service.get_session_trace(session_id, run_id=run_id)
     if not run_records:
-        return error_response(status.HTTP_404_NOT_FOUND, "trace_not_found", "Trace not found")
+        return error_response(
+            status.HTTP_404_NOT_FOUND, "trace_not_found", "Trace not found"
+        )
 
     runs = []
     for run_record in run_records:

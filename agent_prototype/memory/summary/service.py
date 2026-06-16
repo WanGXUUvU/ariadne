@@ -122,7 +122,8 @@ class CompactService:
                 new_context_tokens = compact_result.compact_tokens
             else:
                 new_context_tokens = (
-                    sum(len(m.content or "") for m in compact_result.state.messages) // 4
+                    sum(len(m.content or "") for m in compact_result.state.messages)
+                    // 4
                 )
 
             self.store.save_state(

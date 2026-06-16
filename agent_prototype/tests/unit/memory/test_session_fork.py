@@ -29,7 +29,9 @@ class TestSessionFork(unittest.TestCase):
 
     def test_fork_session_success(self):
         # 1. 创建原会话并注入对话历史记录
-        summary = self.service.create_session(CreateSessionInput(session_name="my_parent_session"))
+        summary = self.service.create_session(
+            CreateSessionInput(session_name="my_parent_session")
+        )
         parent_id = summary.session_id
 
         record, state = self.service.get_session(parent_id)
@@ -38,19 +40,39 @@ class TestSessionFork(unittest.TestCase):
             ChatMessage(role="user", content="Hello"),
             ChatMessage(role="assistant", content="Hi! How can I help you?"),
             ChatMessage(role="user", content="Tell me a joke"),
-            ChatMessage(role="assistant", content="Why did the scarecrow win an award?"),
+            ChatMessage(
+                role="assistant", content="Why did the scarecrow win an award?"
+            ),
         ]
         self.service.store.save_state(parent_id, state)
 
         # 2. 在原会话中注入 Runs、Events 和 Tool Calls 数据以验证深度拷贝
-        run1 = SessionRunRecord(session_id=parent_id, run_id="r1", user_input="Hello", reply="Hi", parent_run_id=None)
-        run2 = SessionRunRecord(session_id=parent_id, run_id="r2", user_input="Tell me a joke", reply="Why did...", parent_run_id=None)
+        run1 = SessionRunRecord(
+            session_id=parent_id,
+            run_id="r1",
+            user_input="Hello",
+            reply="Hi",
+            parent_run_id=None,
+        )
+        run2 = SessionRunRecord(
+            session_id=parent_id,
+            run_id="r2",
+            user_input="Tell me a joke",
+            reply="Why did...",
+            parent_run_id=None,
+        )
         self.db.add_all([run1, run2])
         self.db.commit()
 
-        event1 = SessionRunEventRecord(run_id="r1", event_index=0, type="thinking", content="Cloning this...")
-        event2 = SessionRunEventRecord(run_id="r2", event_index=0, type="thinking", content="Discarding this...")
-        tool_call = ToolCallRecord(run_id="r1", tool_name="web_search", status="completed")
+        event1 = SessionRunEventRecord(
+            run_id="r1", event_index=0, type="thinking", content="Cloning this..."
+        )
+        event2 = SessionRunEventRecord(
+            run_id="r2", event_index=0, type="thinking", content="Discarding this..."
+        )
+        tool_call = ToolCallRecord(
+            run_id="r1", tool_name="web_search", status="completed"
+        )
         self.db.add_all([event1, event2, tool_call])
         self.db.commit()
 
@@ -61,8 +83,16 @@ class TestSessionFork(unittest.TestCase):
         forked_id = fork_summary.session_id
 
         # 4. 验证会话表字段与元数据拷贝
-        parent_db = self.db.query(SessionRecord).filter(SessionRecord.session_id == parent_id).first()
-        forked_db = self.db.query(SessionRecord).filter(SessionRecord.session_id == forked_id).first()
+        parent_db = (
+            self.db.query(SessionRecord)
+            .filter(SessionRecord.session_id == parent_id)
+            .first()
+        )
+        forked_db = (
+            self.db.query(SessionRecord)
+            .filter(SessionRecord.session_id == forked_id)
+            .first()
+        )
 
         self.assertIsNotNone(forked_db)
         self.assertEqual(forked_db.session_name, "fork: my_parent_session")
@@ -79,8 +109,16 @@ class TestSessionFork(unittest.TestCase):
         self.assertEqual(len(original_state.messages), 5)
 
         # 6. 验证 Runs 以及 Trace 数据克隆
-        parent_runs = self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == parent_id).all()
-        forked_runs = self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == forked_id).all()
+        parent_runs = (
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.session_id == parent_id)
+            .all()
+        )
+        forked_runs = (
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.session_id == forked_id)
+            .all()
+        )
 
         # 原会话的 Runs 应该依旧为 2 个
         self.assertEqual(len(parent_runs), 2)
@@ -93,16 +131,26 @@ class TestSessionFork(unittest.TestCase):
         self.assertEqual(forked_run.user_input, "Hello")
 
         # 验证对应的 Event 和 Tool Call 也被深拷贝并挂载到了新的 run_id 上
-        forked_events = self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id == forked_run.run_id).all()
+        forked_events = (
+            self.db.query(SessionRunEventRecord)
+            .filter(SessionRunEventRecord.run_id == forked_run.run_id)
+            .all()
+        )
         self.assertEqual(len(forked_events), 1)
         self.assertEqual(forked_events[0].content, "Cloning this...")
 
-        forked_tools = self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id == forked_run.run_id).all()
+        forked_tools = (
+            self.db.query(ToolCallRecord)
+            .filter(ToolCallRecord.run_id == forked_run.run_id)
+            .all()
+        )
         self.assertEqual(len(forked_tools), 1)
         self.assertEqual(forked_tools[0].tool_name, "web_search")
 
         # 7. 验证独立隔离性 (向新分支添加消息，不会影响父会话)
-        forked_state.messages.append(ChatMessage(role="user", content="New query in child"))
+        forked_state.messages.append(
+            ChatMessage(role="user", content="New query in child")
+        )
         self.service.store.save_state(forked_id, forked_state)
 
         # 重读验证

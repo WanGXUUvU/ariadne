@@ -12,7 +12,6 @@ from typing import Any, AsyncIterator, Literal, Optional, Protocol
 
 from pydantic import BaseModel, Field
 
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 一、工具调用原语 — Tool Call Primitives
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -133,6 +132,8 @@ class ModelAdapter(Protocol):
         """输入统一请求，输出统一响应"""
         ...
 
-    async def async_stream_generate(self, request: ModelRequest) -> AsyncIterator[StreamChunk]:
+    async def async_stream_generate(
+        self, request: ModelRequest
+    ) -> AsyncIterator[StreamChunk]:
         """用 async for 循环消费——每次迭代都是一个 await 点。"""
         ...

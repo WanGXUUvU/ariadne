@@ -28,10 +28,17 @@ from agent_prototype.memory.session.types import (
     RenameSessionInput,
     ResetInput,
     SessionSummary,
-    ForkSessionInput
+    ForkSessionInput,
 )
 
-from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig,PendingApproval,ToolCallRecord,SessionRunRecord,SessionRunEventRecord
+from agent_prototype.infra.db.orm_models import (
+    ModelSetting,
+    ProviderConfig,
+    PendingApproval,
+    ToolCallRecord,
+    SessionRunRecord,
+    SessionRunEventRecord,
+)
 from agent_prototype.memory.session.store import SessionStore
 
 
@@ -193,7 +200,9 @@ class SessionService:
             raise
         return {"ok": True}
 
-    def update_session(self, session_id: str, payload: RenameSessionInput) -> dict[str, bool]:
+    def update_session(
+        self, session_id: str, payload: RenameSessionInput
+    ) -> dict[str, bool]:
         """一站式多功能会话更新。如果想同时改会话名字、切换安全权限档位、换模型、换模型服务商，或者开启/关闭深度思考参数，都可以通过这个函数一次性搞定。
 
         需要拿到的东西：
@@ -272,81 +281,98 @@ class SessionService:
         state = self.store.read_session_state(session_id)
         return record, state
 
-    def truncate_session(self,session_id:str,message_index:int)->dict[str,bool]:
+    def truncate_session(self, session_id: str, message_index: int) -> dict[str, bool]:
         """截断指定会话的历史。
         根据message_index物理阶段后续所有消息，以及相关的所有表记录"""
 
-        record=self.store.load_record(session_id)
+        record = self.store.load_record(session_id)
         if record is None:
             raise ValueError("Session not found")
-        
-        state=self.store.read_session_state(session_id)
+
+        state = self.store.read_session_state(session_id)
         if not state:
             raise ValueError("Session state not found")
-        
-        if message_index <0 or message_index >=len(state.messages):
+
+        if message_index < 0 or message_index >= len(state.messages):
             raise ValueError("Invalid message index")
-        
+
         try:
-            state.messages=state.messages[:message_index]
+            state.messages = state.messages[:message_index]
             self.store.save_state(
                 session_id,
                 state=state,
                 session_name=record.session_name,
             )
 
-            top_runs=(self.db.query(SessionRunRecord).filter(
-                SessionRunRecord.session_id==session_id,
-                SessionRunRecord.parent_run_id.is_(None)
-            ).order_by(SessionRunRecord.id.asc()).all())
+            top_runs = (
+                self.db.query(SessionRunRecord)
+                .filter(
+                    SessionRunRecord.session_id == session_id,
+                    SessionRunRecord.parent_run_id.is_(None),
+                )
+                .order_by(SessionRunRecord.id.asc())
+                .all()
+            )
 
-            k=sum(1 for msg in state.messages if msg.role=="user")
+            k = sum(1 for msg in state.messages if msg.role == "user")
 
-            to_delete=top_runs[k:]
+            to_delete = top_runs[k:]
 
             if to_delete:
-                run_ids=[r.run_id for r in to_delete]
-            
-                self.db.query(PendingApproval).filter(PendingApproval.run_id.in_(run_ids)).delete(synchronize_session=False)
-                self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id.in_(run_ids)).delete(synchronize_session=False)
-                self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id.in_(run_ids)).delete(synchronize_session=False)
-                
+                run_ids = [r.run_id for r in to_delete]
+
+                self.db.query(PendingApproval).filter(
+                    PendingApproval.run_id.in_(run_ids)
+                ).delete(synchronize_session=False)
+                self.db.query(ToolCallRecord).filter(
+                    ToolCallRecord.run_id.in_(run_ids)
+                ).delete(synchronize_session=False)
+                self.db.query(SessionRunEventRecord).filter(
+                    SessionRunEventRecord.run_id.in_(run_ids)
+                ).delete(synchronize_session=False)
+
                 # 删除顶层运行本身，以及所有挂载其下的子智能体运行 (parent_run_id)
                 self.db.query(SessionRunRecord).filter(
-                    SessionRunRecord.run_id.in_(run_ids) | SessionRunRecord.parent_run_id.in_(run_ids)
+                    SessionRunRecord.run_id.in_(run_ids)
+                    | SessionRunRecord.parent_run_id.in_(run_ids)
                 ).delete(synchronize_session=False)
             self.db.commit()
         except Exception:
             self.db.rollback()
             raise
         return {"ok": True}
-    
-    def fork_session(self,session_id:str,payload:ForkSessionInput)->SessionSummary:
+
+    def fork_session(
+        self, session_id: str, payload: ForkSessionInput
+    ) -> SessionSummary:
         """从指定截断点派生出一个新的分支会话"""
 
-        parent_record=self.store.load_record(session_id)
+        parent_record = self.store.load_record(session_id)
         if parent_record is None:
             raise ValueError("Parent session not found")
-        
-        parent_state=self.store.read_session_state(session_id)
+
+        parent_state = self.store.read_session_state(session_id)
         if parent_state is None:
             raise ValueError("Parent session state not found")
-        
-        message_index=payload.message_index
+
+        message_index = payload.message_index
 
         if message_index < 0 or message_index > len(parent_state.messages):
             raise ValueError("Invalid message index")
-        
+
         forked_messages = parent_state.messages[:message_index]
 
-        forked_state=RunState()
-        forked_state.messages=forked_messages
+        forked_state = RunState()
+        forked_state.messages = forked_messages
 
-        forked_name = getattr(payload, "session_name", None) or f"fork: {parent_record.session_name or 'Untitled'}"
-        forked_session_id=uuid.uuid4().hex
+        forked_name = (
+            getattr(payload, "session_name", None)
+            or f"fork: {parent_record.session_name or 'Untitled'}"
+        )
+        forked_session_id = uuid.uuid4().hex
 
         try:
-            record=self.store.save_state(
+            record = self.store.save_state(
                 forked_session_id,
                 state=forked_state,
                 session_name=forked_name,
@@ -361,7 +387,7 @@ class SessionService:
             record.thinking_enabled = parent_record.thinking_enabled
             record.thinking_effort = parent_record.thinking_effort
             record.permission_profile = parent_record.permission_profile
-            
+
             # 设置派生关联元数据
             record.parent_session_id = session_id
             record.fork_message_index = message_index
@@ -397,7 +423,11 @@ class SessionService:
                 )
                 self.db.add(forked_run)
                 # 5.2) 克隆对应的 Trace 步骤事件
-                events = self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id == parent_run.run_id).all()
+                events = (
+                    self.db.query(SessionRunEventRecord)
+                    .filter(SessionRunEventRecord.run_id == parent_run.run_id)
+                    .all()
+                )
                 for ev in events:
                     forked_ev = SessionRunEventRecord(
                         run_id=new_run_id,
@@ -410,7 +440,11 @@ class SessionService:
                     )
                     self.db.add(forked_ev)
                 # 5.3) 克隆对应的工具调用流水
-                tool_calls = self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id == parent_run.run_id).all()
+                tool_calls = (
+                    self.db.query(ToolCallRecord)
+                    .filter(ToolCallRecord.run_id == parent_run.run_id)
+                    .all()
+                )
                 for tc in tool_calls:
                     forked_tc = ToolCallRecord(
                         run_id=new_run_id,
@@ -446,7 +480,11 @@ class SessionService:
                     )
                     self.db.add(forked_child)
                     # 克隆子智能体运行的 Events & Tool Calls
-                    child_events = self.db.query(SessionRunEventRecord).filter(SessionRunEventRecord.run_id == child_run.run_id).all()
+                    child_events = (
+                        self.db.query(SessionRunEventRecord)
+                        .filter(SessionRunEventRecord.run_id == child_run.run_id)
+                        .all()
+                    )
                     for cev in child_events:
                         forked_cev = SessionRunEventRecord(
                             run_id=child_new_run_id,
@@ -458,7 +496,11 @@ class SessionService:
                             tool_result_json=cev.tool_result_json,
                         )
                         self.db.add(forked_cev)
-                    child_tool_calls = self.db.query(ToolCallRecord).filter(ToolCallRecord.run_id == child_run.run_id).all()
+                    child_tool_calls = (
+                        self.db.query(ToolCallRecord)
+                        .filter(ToolCallRecord.run_id == child_run.run_id)
+                        .all()
+                    )
                     for ctc in child_tool_calls:
                         forked_ctc = ToolCallRecord(
                             run_id=child_new_run_id,

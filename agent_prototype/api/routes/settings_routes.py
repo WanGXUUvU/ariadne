@@ -18,7 +18,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, status
 
 from agent_prototype.agent.settings.types import ModelOut, ProviderOut
-from agent_prototype.api.dto.schemas import CreateProviderInput, PatchModelInput, PatchProviderInput
+from agent_prototype.api.dto.schemas import (
+    CreateProviderInput,
+    PatchModelInput,
+    PatchProviderInput,
+)
 from agent_prototype.agent.settings import SettingsService
 from agent_prototype.api.routes.dependencies import error_response, get_settings_service
 
@@ -30,9 +34,12 @@ router = APIRouter(prefix="/settings")
 # ---------------------------------------------------------------------------
 
 
-@router.post("/providers", response_model=ProviderOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/providers", response_model=ProviderOut, status_code=status.HTTP_201_CREATED
+)
 def create_provider_api(
-    payload: CreateProviderInput, service: SettingsService = Depends(get_settings_service)
+    payload: CreateProviderInput,
+    service: SettingsService = Depends(get_settings_service),
 ) -> ProviderOut:
     """注册并添加一个新的大模型供应商（Provider）配置。"""
     return service.create_provider(
