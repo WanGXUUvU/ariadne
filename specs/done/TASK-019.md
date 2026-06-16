@@ -30,7 +30,7 @@ Skill Management / Config
 - 错误信息清楚。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 默认 skill 被禁用时如何处理。

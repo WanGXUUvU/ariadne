@@ -43,8 +43,8 @@
 ## 4. 项目结构 (Project Structure)
 
 ```
-AGENT Build/
-├── agent_prototype/            ← Python 后端
+Ariadne/
+├── backend/            ← Python 后端
 │   ├── agent/                  # Agent 定义与类型
 │   ├── api/                    # FastAPI 路由 + DTO schemas
 │   │   ├── routes/             # run, settings, tools, approval, compact
@@ -104,20 +104,20 @@ AGENT Build/
 
 ```bash
 # 运行所有单元测试
-python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v
+python3 -m unittest discover -s backend/tests -p 'test_*.py' -v
 
 # 运行特定测试文件
-python3 -m unittest agent_prototype.tests.integration.test_agent_api -v
+python3 -m unittest backend.tests.integration.test_agent_api -v
 
 # 代码风格检查
-black agent_prototype/ --check
-ruff check agent_prototype/
+black backend/ --check
+ruff check backend/
 
 # 编译检查（语法 + import）
-python3 -m compileall agent_prototype/
+python3 -m compileall backend/
 
 # 启动后端服务
-cd agent_prototype && python3 -m api.app
+cd backend && python3 -m api.app
 ```
 
 ### 前端 (Vue 3 + TypeScript)
@@ -132,7 +132,7 @@ npm run lint      # 代码检查
 
 ```bash
 # 后端：测试 + 编译
-python3 -m compileall agent_prototype/ && python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v
+python3 -m compileall backend/ && python3 -m unittest discover -s backend/tests -p 'test_*.py' -v
 
 # 前端：构建
 npm run build

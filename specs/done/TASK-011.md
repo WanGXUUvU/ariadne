@@ -31,7 +31,7 @@ Skill / Tool Registry
 - default skill 仍能使用 `echo_tool`。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 是否同时做了暴露前过滤和执行前校验。

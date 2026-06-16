@@ -162,9 +162,9 @@ graph TD
 
 前端调哪个接口 / need改的层：
 - 后端：
-  - agent_prototype/execution/persistence/types.py
-  - agent_prototype/execution/persistence/service.py
-  - agent_prototype/execution/streaming/stream_run_session.py
-  - agent_prototype/execution/resume/service.py
-  - agent_prototype/observation/tool_run_observer.py
+  - backend/execution/persistence/types.py
+  - backend/execution/persistence/service.py
+  - backend/execution/streaming/stream_run_session.py
+  - backend/execution/resume/service.py
+  - backend/observation/tool_run_observer.py
 ```

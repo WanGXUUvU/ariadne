@@ -100,7 +100,7 @@ Context Management / Session
 - mock LLM compact 调用，验证只压中段历史
 - 验证前锚点和最近原始消息未丢失
 - 验证 compact 后再次 `/run` 仍能得到回复
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 主动 compact 和自动 compact 是否共用同一套核心逻辑

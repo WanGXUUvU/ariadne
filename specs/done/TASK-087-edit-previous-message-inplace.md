@@ -36,7 +36,7 @@
 2. 对话在第 2 轮以“用 Python 读取 b.txt”为输入重新流动，AI 重新输出。
 
 ### 需要改的层：
-*   **后端 API 路由层**：在 `agent_prototype/api/` 中增加 `/sessions/{id}/truncate` 路由。
+*   **后端 API 路由层**：在 `backend/api/` 中增加 `/sessions/{id}/truncate` 路由。
 *   **后端持久化层**：在 `SqliteSessionStore` 增加 `truncate_messages(session_id, index)` 物理删除方法。
 *   **前端组件层**：[MessageList.vue](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/components/MessageList.vue) 增加编辑态、保存动作。
 *   **前端逻辑层**：[useWorkspace.ts](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/composables/useWorkspace.ts) 增加调用截断 API 及重新拉起运行的方法。

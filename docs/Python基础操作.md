@@ -2190,7 +2190,7 @@ A2A 依赖：
 这里只是学习笔记，不代表马上创建文件。
 
 ~~~树形
-agent_prototype/mcp/
+backend/mcp/
 ├── config.py
 │   └── 负责：定义 MCPServerConfig
 │
@@ -2203,7 +2203,7 @@ agent_prototype/mcp/
 └── bridge.py
     └── 负责：把 DiscoveredMCPTool 包成 ToolRegistry 能执行的工具
 
-agent_prototype/rag/
+backend/rag/
 ├── document_loader.py
 │   └── 负责：从 docs / specs / README 读取文档
 │
@@ -2219,7 +2219,7 @@ agent_prototype/rag/
 └── service.py
     └── 负责：提供 index_workspace() 和 search()
 
-agent_prototype/a2a/
+backend/a2a/
 ├── agent_card.py
 │   └── 负责：描述本项目 Agent 能力
 │
@@ -2727,7 +2727,7 @@ create_after_sales_ticket
 推荐先做 mock 工具，不直接接真实业务系统。
 
 ~~~树形
-agent_prototype/tools/customer_service/
+backend/tools/customer_service/
 ├── query_order.py
 ├── query_logistics.py
 ├── query_product.py
@@ -3088,7 +3088,7 @@ Hybrid Search
 推荐最小文件边界：
 
 ~~~树形
-agent_prototype/rag/
+backend/rag/
 ├── types.py
 │   ├── DocumentChunk
 │   ├── SearchResult
@@ -3110,7 +3110,7 @@ agent_prototype/rag/
     ├── index_workspace()
     └── search(query, top_k)
 
-agent_prototype/tools/builtin/rag_search.py
+backend/tools/builtin/rag_search.py
 └── 把 RAGService.search 包成工具
 ~~~
 
@@ -3664,7 +3664,7 @@ MCP tool 应该映射进 ToolRegistry
       "enabled": true,
       "transport": "stdio",
       "command": "python3",
-      "args": ["-m", "agent_prototype.rag.mcp_server"],
+      "args": ["-m", "backend.rag.mcp_server"],
       "cwd": "/Users/wangxu/Documents/AGENT Build",
       "env": {
         "RAG_INDEX_PATH": ".rag/index"
@@ -4393,7 +4393,7 @@ Agent Memory
 推荐新增边界：
 
 ~~~树形
-agent_prototype/memory/long_term/
+backend/memory/long_term/
 ├── types.py
 │   ├── MemoryRecord
 │   ├── MemoryCandidate

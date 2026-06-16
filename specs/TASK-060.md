@@ -35,7 +35,7 @@ Plugin Platform
 - 不需要先连远程仓库也能验证插件分发链路。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - marketplace 是否只做本地最小闭环。

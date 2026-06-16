@@ -34,7 +34,7 @@
 - 搜索结果数量有上限，不会撑爆上下文。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 - 手动问一个需要最新信息的问题，观察工具调用。
 
 ## Review 检查点

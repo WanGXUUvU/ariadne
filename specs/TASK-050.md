@@ -31,7 +31,7 @@
 - tool_names 只包含安全的文件操作工具。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - system_prompt 是否明确禁止直接写文件（要走 propose 流程）。

@@ -35,7 +35,7 @@ App / Connector Platform
 - 后续 app tool runtime 接入不需要重新改 manifest 结构。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 是否与官方 `apps.<id>` 配置层对齐。

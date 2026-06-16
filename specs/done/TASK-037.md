@@ -40,7 +40,7 @@ Chat UI / Runtime
 - 下次发消息时截断内容在 context 里
 
 ## 验证
-- `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`
+- `python3 -m unittest discover -s backend/tests -p 'test_*.py' -v`
 - 手动点 Stop，验证 UI 和数据库
 
 ## Review 检查点

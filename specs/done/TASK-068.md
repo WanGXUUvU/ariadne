@@ -7,7 +7,7 @@
 Backend Naming Convention
 
 ## 我对当前项目的理解
-现在 `agent_prototype/` 的职责分层已经基本清楚了，但有几类文件名还过于泛：
+现在 `backend/` 的职责分层已经基本清楚了，但有几类文件名还过于泛：
 - `model/types.py`
 - `skills/loader.py`
 - `tools/registry.py`
@@ -30,9 +30,9 @@ Backend Naming Convention
 ## 本次建议改名
 | 当前文件 | 建议文件 |
 |---|---|
-| `agent_prototype/model/types.py` | `agent_prototype/model/model_types.py` |
-| `agent_prototype/skills/loader.py` | `agent_prototype/skills/skill_loader.py` |
-| `agent_prototype/tools/registry.py` | `agent_prototype/tools/tool_registry.py` |
+| `backend/model/types.py` | `backend/model/model_types.py` |
+| `backend/skills/loader.py` | `backend/skills/skill_loader.py` |
+| `backend/tools/registry.py` | `backend/tools/tool_registry.py` |
 
 ## 范围内
 - 机械性重命名文件
@@ -53,5 +53,5 @@ Backend Naming Convention
 - 旧路径如果保留，只能是短期兼容 shim
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 

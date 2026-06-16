@@ -34,7 +34,7 @@ Model Adapter
 - 测试不需要真实 API Key。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 - 可选：有 API Key 时手动跑一次真实 Responses 调用。
 
 ## Review 检查点

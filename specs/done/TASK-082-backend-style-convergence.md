@@ -49,14 +49,14 @@ need改的层：
 
 ## 4. 目标文件
 
-- `agent_prototype/execution/service.py`
-- `agent_prototype/execution/runtime_context_factory.py`
-- `agent_prototype/execution/child_agent_dispatcher.py`
-- `agent_prototype/execution/trace_query_service.py`
-- `agent_prototype/context/assembler.py`
-- `agent_prototype/context/skill_context.py`
-- `agent_prototype/memory/session/store.py`
-- `agent_prototype/memory/summary/service.py`
+- `backend/execution/service.py`
+- `backend/execution/runtime_context_factory.py`
+- `backend/execution/child_agent_dispatcher.py`
+- `backend/execution/trace_query_service.py`
+- `backend/context/assembler.py`
+- `backend/context/skill_context.py`
+- `backend/memory/session/store.py`
+- `backend/memory/summary/service.py`
 
 ## 5. Checklist
 

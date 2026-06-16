@@ -31,7 +31,7 @@ Model Adapter
 - 后续新增 Responses adapter 不需要重写 Agent。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - interface 是否贴近现有需求。
@@ -48,4 +48,4 @@ Model Adapter
 - `compact` 和 `run` 已拆成可配置模型，长会话 compact 已实测可触发。
 
 ## 验证结果
-- `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`
+- `python3 -m unittest discover -s backend/tests -p 'test_*.py' -v`

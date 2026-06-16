@@ -210,9 +210,9 @@ graph TD
 
 前端调哪个接口 / need改的层：
 - 后端：
-  - agent_prototype/execution/runtime/execution_session.py（新）
-  - agent_prototype/execution/streaming/stream_run_session.py
-  - agent_prototype/execution/service.py
-  - agent_prototype/execution/resume/service.py
-  - agent_prototype/execution/child_agent_dispatcher.py
+  - backend/execution/runtime/execution_session.py（新）
+  - backend/execution/streaming/stream_run_session.py
+  - backend/execution/service.py
+  - backend/execution/resume/service.py
+  - backend/execution/child_agent_dispatcher.py
 ```

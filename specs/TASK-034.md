@@ -30,7 +30,7 @@ Observability
 - 前端和 CLI 可以直接显示 usage。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - usage 字段是否兼容不同模型供应商。

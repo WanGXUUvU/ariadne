@@ -66,7 +66,7 @@ Backend Architecture
 - 结构上能清楚解释每一层职责。
 
 ## 验证
-- `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`
+- `python3 -m unittest discover -s backend/tests -p 'test_*.py' -v`
 
 ## Review 检查点
 - 是否先拆最有价值的模块，而不是平均用力。
@@ -74,4 +74,4 @@ Backend Architecture
 - 是否保证技能发现/读取/配置行为保持一致。
 
 ## 收口记录
-- 2026-05-10：已完成 `skill_loader.py` 与 `run_service.py` 的职责收缩，补充分层 helper，并通过 `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`。
+- 2026-05-10：已完成 `skill_loader.py` 与 `run_service.py` 的职责收缩，补充分层 helper，并通过 `python3 -m unittest discover -s backend/tests -p 'test_*.py' -v`。

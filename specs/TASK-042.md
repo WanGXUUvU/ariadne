@@ -41,7 +41,7 @@ Codex 官方把安全边界拆成两层：`sandbox mode` 负责技术边界，`a
 - 不影响现有 `/run`、`/reset` 行为。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 权限 schema 是否过度复杂。

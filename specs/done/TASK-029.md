@@ -32,7 +32,7 @@
 - 和未来 `coding` agent 定义文件格式一致。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - YAML 格式是否和 loader 对齐。

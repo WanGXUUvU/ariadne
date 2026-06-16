@@ -3,7 +3,7 @@ import { onMounted } from 'vue';
 
 onMounted(() => {
   // 读取本地缓存主题并应用到 body 元素
-  const savedTheme = localStorage.getItem('agent-build-theme') || 'default';
+  const savedTheme = localStorage.getItem('ariadne-theme') || 'default';
   document.body.className = `theme-${savedTheme}`;
 });
 </script>

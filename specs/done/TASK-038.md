@@ -43,7 +43,7 @@ TASK-037 完成了文字流式阶段的 Stop + 截断保存。但工具执行阶
 - 非流式 `/run` 不受影响
 
 ## 验证
-- `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`
+- `python3 -m unittest discover -s backend/tests -p 'test_*.py' -v`
 - 手动触发工具调用，执行中 Stop，验证中断和落库
 
 ## Review 检查点

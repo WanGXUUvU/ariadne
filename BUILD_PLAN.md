@@ -23,7 +23,7 @@
 ## 仓库结构
 
 ```
-agent_prototype/
+backend/
   core/           # 共享 — AgentDefinition, Schema, ToolTypes
   runtime/        # 共享 — Agent 执行器, LLM Client, Tool Registry
   storage/        # 共享 — Session, Trace, DB

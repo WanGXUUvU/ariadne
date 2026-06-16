@@ -30,7 +30,7 @@ Skill Management
 - 索引结果足够 UI 使用。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 是否符合渐进加载思路。

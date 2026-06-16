@@ -31,7 +31,7 @@ Audit / Safety
 
 ## 验证
 - `alembic upgrade head`
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 日志是否稳定且字段少。

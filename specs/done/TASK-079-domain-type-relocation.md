@@ -120,14 +120,14 @@ need改的层：
 ## 5. 切片迭代路线 (Checklist)
 
 - [ ] **切片 1：建立归位目标文件**
-  - [ ] 新建 `agent_prototype/model/types/agent.py`，将 `AgentState`、`AgentEvent`、`AgentInput`、`AgentOutput`、`RunMetadata`、`FinalizeRunInput` 定义搬入。
-  - [ ] 新建 `agent_prototype/skills/types.py`，将 `SkillSummary` 定义搬入。
-  - [ ] 新建 `agent_prototype/execution/streaming/types.py`，将 `StreamFrame` 定义搬入。
-  - [ ] `api/dto/schemas.py` 在原位置加 re-export（`from agent_prototype.model.types.agent import AgentState, ...`），确保现有 import 零破坏。
+  - [ ] 新建 `backend/model/types/agent.py`，将 `AgentState`、`AgentEvent`、`AgentInput`、`AgentOutput`、`RunMetadata`、`FinalizeRunInput` 定义搬入。
+  - [ ] 新建 `backend/skills/types.py`，将 `SkillSummary` 定义搬入。
+  - [ ] 新建 `backend/execution/streaming/types.py`，将 `StreamFrame` 定义搬入。
+  - [ ] `api/dto/schemas.py` 在原位置加 re-export（`from backend.model.types.agent import AgentState, ...`），确保现有 import 零破坏。
   - [ ] 运行全量测试，确认全绿（此时改动为零破坏）。
 
 - [ ] **切片 2：迁移 22 处引用**
-  - [ ] 将所有非 API 层文件中的 `from agent_prototype.api.dto.schemas import X` 批量改为从对应低层模块引入。
+  - [ ] 将所有非 API 层文件中的 `from backend.api.dto.schemas import X` 批量改为从对应低层模块引入。
   - [ ] 优先级顺序（从低层到高层，避免中途出现循环）：
     1. `model/adapters/chat_completions.py` → `model.types.domain`（`ChatMessage` 已在 domain，此处是 TASK-078 遗留）
     2. `skills/loader.py`、`skills/service.py` → `skills.types`
@@ -143,7 +143,7 @@ need改的层：
   - [ ] 确认 `api/dto/schemas.py` 的 re-export 行不再被非 API 层引用后，删除所有 re-export 行。
   - [ ] 最终 `api/dto/schemas.py` 只剩 HTTP I/O 形状定义。
   - [ ] 运行全量测试，100% 通过。
-  - [ ] （可选）运行静态扫描脚本验证：非 API 层文件中 `from agent_prototype.api` 的 import 数量为 0。
+  - [ ] （可选）运行静态扫描脚本验证：非 API 层文件中 `from backend.api` 的 import 数量为 0。
 
 ---
 

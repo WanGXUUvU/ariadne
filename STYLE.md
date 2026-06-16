@@ -17,14 +17,14 @@
 - 不新增仅用于兼容旧路径的桥接文件。
 
 ## 测试规则
-- 重复的测试数据库初始化、假对象构造、TestClient 覆盖逻辑放进 `agent_prototype/tests/helpers/`。
+- 重复的测试数据库初始化、假对象构造、TestClient 覆盖逻辑放进 `backend/tests/helpers/`。
 - patch 优先打稳定边界，不 patch 临时私有实现。
 - 新测试优先复用 helper，不重复抄初始化样板。
 
 ## Python 工具
-- 格式化：`./.venv/bin/black agent_prototype`
-- 检查：`./.venv/bin/ruff check agent_prototype`
-- 自动修复 import 和基础问题：`./.venv/bin/ruff check --fix agent_prototype`
+- 格式化：`./.venv/bin/black backend`
+- 检查：`./.venv/bin/ruff check backend`
+- 自动修复 import 和基础问题：`./.venv/bin/ruff check --fix backend`
 
 说明：
 - `black` 负责统一格式。
@@ -32,6 +32,6 @@
 - import 排序和更细的风格收敛，按触达文件逐步推进，避免一次性制造大规模无意义 churn。
 
 ## 提交前最小检查
-- `./.venv/bin/black --check agent_prototype`
-- `./.venv/bin/ruff check agent_prototype`
-- `python3 -m unittest discover -s agent_prototype/tests/unit -p 'test_*.py'`
+- `./.venv/bin/black --check backend`
+- `./.venv/bin/ruff check backend`
+- `python3 -m unittest discover -s backend/tests/unit -p 'test_*.py'`

@@ -32,7 +32,7 @@ Verification
 
 ## 验证
 - 测试成功命令、失败命令、未知命令。
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 命令白名单是否清楚。

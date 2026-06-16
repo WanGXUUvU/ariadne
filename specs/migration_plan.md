@@ -1,4 +1,4 @@
-# agent_prototype 迁移方案
+# backend 迁移方案
 
 > 目标：按九层能力模型重组目录，消除职责混杂，统一文件命名约定。  
 > 原则：先建目录契约，不改业务逻辑，逐层搬迁，新旧共存直到全部完成。
@@ -8,7 +8,7 @@
 ## 一、迁移后完整目录树
 
 ```
-agent_prototype/
+backend/
 │
 ├── model/                              # L1 模型层
 │   ├── adapters/
@@ -589,7 +589,7 @@ touch observation/tracer.py observation/logger.py
 # 修复 alembic — ORM 路径已变，需同步更新 env.py
 # 将 target_metadata 的 import 从旧路径改为新路径：
 # from infrastructure.database.models import Base
-# → from agent_prototype.infra.db.orm_models import Base
+# → from backend.infra.db.orm_models import Base
 # 同时确认 alembic.ini 中 script_location 指向正确
 ```
 

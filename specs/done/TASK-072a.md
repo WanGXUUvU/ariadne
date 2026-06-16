@@ -62,7 +62,7 @@ thinking_enabled   BOOLEAN  DEFAULT FALSE
 thinking_effort    TEXT     DEFAULT "medium"
 ```
 
-### 2. 新建文件 `agent_prototype/model/thinking_styles.py`
+### 2. 新建文件 `backend/model/thinking_styles.py`
 
 ```python
 THINKING_STYLES = {

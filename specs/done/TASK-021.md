@@ -31,7 +31,7 @@ API
 - 错误响应可读。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - response 是否过大。

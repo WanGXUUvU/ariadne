@@ -30,7 +30,7 @@ Tool Runtime / Trace
 - UI 不需要猜测返回内容形状。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - schema 是否过度设计。

@@ -33,7 +33,7 @@ Multi-Agent
 - 第一版行为可预测，不做自动无限递归。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 是否限制最大 child 数量和深度。

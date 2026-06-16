@@ -7,13 +7,13 @@
 Repo Structure
 
 ## 范围内
-- 只梳理 `agent_prototype` 的目录职责和入口边界
+- 只梳理 `backend` 的目录职责和入口边界
 - 只梳理 `TASK-026` 与结构整理的关系
 - 只更新任务卡和状态，不改任何代码文件
 - 只保留一个最小、可继续推进的结构结论
 
 ## 范围外
-- 不改 `agent_prototype/core/model.adapter.py`
+- 不改 `backend/core/model.adapter.py`
 - 不改 runtime、storage、api、frontend 任何代码
 - 不做模型协议实现
 - 不做测试变更

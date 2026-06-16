@@ -13,8 +13,8 @@
 ## 2. 当前问题总盘点 (Problem Inventory)
 
 ### 2.1 Progress 链路只搭了骨架，未真正闭环
-1. [agent_prototype/tools/registry.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/tools/registry.py:76) 目前只执行 `tool.handler(**args)`，没有把 `ToolCallContext` 注入 handler。
-2. [agent_prototype/tools/builtin/search/web_search.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/tools/builtin/search/web_search.py:29) 虽然支持 `__context__`，但当前大概率永远拿不到。
+1. [backend/tools/registry.py](/Users/wangxu/Documents/AGENT%20Build/backend/tools/registry.py:76) 目前只执行 `tool.handler(**args)`，没有把 `ToolCallContext` 注入 handler。
+2. [backend/tools/builtin/search/web_search.py](/Users/wangxu/Documents/AGENT%20Build/backend/tools/builtin/search/web_search.py:29) 虽然支持 `__context__`，但当前大概率永远拿不到。
 3. 结果：`tool_progress` 的后半段（queue / SSE / 前端渲染）已经写好，但真正的“工具上报 progress”没有实线接通。
 
 ### 2.2 右侧 TracePanel 还不是真正的实时 Trace
@@ -24,27 +24,27 @@
 4. 结果：消息区时间线可以流动，右侧 Trace 卡片却大概率要等整轮结束后才刷新。
 
 ### 2.3 结果事件仍是“整批结束后统一吐”，不是 per-tool 实时收口
-1. [agent_prototype/execution/runtime/tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py:327) 当前要等 `gather_task.result()` 全部结束，才统一发 `tool_result/tool_error`。
+1. [backend/execution/runtime/tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py:327) 当前要等 `gather_task.result()` 全部结束，才统一发 `tool_result/tool_error`。
 2. 结果：A 工具已经完成，用户仍要等 B 工具结束后，才能看到 A 的最终结果。
 
 ### 2.4 当前取消是协程层取消，不是底层工具真停
-1. [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py:289) 的 `task.cancel()` 只取消外层 async task。
-2. 真正的同步工具执行仍在线程池里，见 [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py:233)。
+1. [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py:289) 的 `task.cancel()` 只取消外层 async task。
+2. 真正的同步工具执行仍在线程池里，见 [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py:233)。
 3. 结果：审批、异常、超时发生后，前台虽然不再等待，但线程池里的同步工具可能仍继续运行。
 
 ### 2.5 审批模型仍是“单异常 / 单 approval_id / 单次恢复”
-1. [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py:287) 发现一个 `ApprovalRequiredException` 就整批暂停，只 yield 一条 `approval_required` 后返回。
-2. [agent_prototype/execution/resume/service.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/resume/service.py:55) 一次只恢复一个 `approval_id`。
+1. [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py:287) 发现一个 `ApprovalRequiredException` 就整批暂停，只 yield 一条 `approval_required` 后返回。
+2. [backend/execution/resume/service.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/resume/service.py:55) 一次只恢复一个 `approval_id`。
 3. 同一轮 assistant 若返回多个需要审批的工具，当前无法可靠支持“逐个批准 / 拒绝，最终补齐整批 tool results 再继续模型”。
 
 ### 2.6 批次内审批 event index 语义不稳
-1. [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py:219) 把 `current_index` 快照塞进 `context.extra["current_index"]`。
+1. [tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py:219) 把 `current_index` 快照塞进 `context.extra["current_index"]`。
 2. 并发批次里多个审批工具可能共享或竞争同一个快照值。
-3. [agent_prototype/observation/tool_run_observer.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/observation/tool_run_observer.py:60) 又把这个值落库为 `approval.event_index`。
+3. [backend/observation/tool_run_observer.py](/Users/wangxu/Documents/AGENT%20Build/backend/observation/tool_run_observer.py:60) 又把这个值落库为 `approval.event_index`。
 4. 结果：审批记录里的 `event_index` 未必代表真实主线程事件顺序。
 
 ### 2.7 测试覆盖明显落后于新架构
-1. 当前已有的是 registry/pipeline 基础测试，见 [agent_prototype/tests/unit/tools/test_tool_pipeline.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/tests/unit/tools/test_tool_pipeline.py:1) 和 [agent_prototype/tests/unit/tools/test_tool_registry.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/tests/unit/tools/test_tool_registry.py:1)。
+1. 当前已有的是 registry/pipeline 基础测试，见 [backend/tests/unit/tools/test_tool_pipeline.py](/Users/wangxu/Documents/AGENT%20Build/backend/tests/unit/tools/test_tool_pipeline.py:1) 和 [backend/tests/unit/tools/test_tool_registry.py](/Users/wangxu/Documents/AGENT%20Build/backend/tests/unit/tools/test_tool_registry.py:1)。
 2. 缺少针对以下主题的闭环测试：
    * 并发耗时明显小于串行
    * `__context__` 注入成功且 progress 真吐出
@@ -105,7 +105,7 @@
 ## 5. 最小闭环切片 (Slices)
 
 ### 🟢 切片 1：Progress 真闭环接通
-*   **修改**：[agent_prototype/tools/registry.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/tools/registry.py) / [agent_prototype/execution/runtime/tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py) / [agent_prototype/execution/resume/service.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/resume/service.py)
+*   **修改**：[backend/tools/registry.py](/Users/wangxu/Documents/AGENT%20Build/backend/tools/registry.py) / [backend/execution/runtime/tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py) / [backend/execution/resume/service.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/resume/service.py)
 *   **实现**：
     *   为 `execute_tool_call()` 增加可选 `context` 入参。
     *   仅在 handler 支持时注入 `__context__`，避免破坏旧工具签名。
@@ -119,14 +119,14 @@
     *   run 结束后再以持久化 `traceRuns` 覆盖 live 态，防止刷新丢失最终事实数据。
 
 ### 🟢 切片 3：Tool Batch 状态机建模
-*   **修改**：运行时类型层 [NEW]，以及 [agent_prototype/execution/runtime/tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py)
+*   **修改**：运行时类型层 [NEW]，以及 [backend/execution/runtime/tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py)
 *   **实现**：
     *   定义 `ToolBatch` / `ToolBatchItem` 运行态结构。
     *   明确 item 状态最少包含：`ready/running/approval_pending/completed/rejected/failed`。
     *   把“审批”从异常语义升级为 batch item 状态语义。
 
 ### 🟢 切片 4：预检 + 无审批先跑 + 审批排队
-*   **修改**：[tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py) / 审批中间件 / observer
+*   **修改**：[tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py) / 审批中间件 / observer
 *   **实现**：
     *   先预检整批 `tool_calls` 哪些需要审批。
     *   无审批工具直接并发执行。
@@ -134,21 +134,21 @@
     *   取消“发现一个审批就整批 return”的旧逻辑。
 
 ### 🟢 切片 5：审批恢复改为驱动 Batch Item，而不是直接恢复模型
-*   **修改**：[agent_prototype/execution/resume/service.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/resume/service.py) / approval store / approval routes
+*   **修改**：[backend/execution/resume/service.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/resume/service.py) / approval store / approval routes
 *   **实现**：
     *   approve / reject 只改变某个 batch item 的状态。
     *   approve 后执行对应工具，reject 后生成对应 tool result 替代物。
     *   只有当整批 item 全部进入终态后，才统一回填所有 `tool_messages` 并继续模型。
 
 ### 🟢 切片 6：结果实时策略与协作式取消收紧
-*   **修改**：[tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/tool_runner.py) / `ToolCallContext`
+*   **修改**：[tool_runner.py](/Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/tool_runner.py) / `ToolCallContext`
 *   **实现**：
     *   决定是否采用 `result_queue` / `asyncio.as_completed()` 让单工具结果实时落前端。
     *   为长耗时工具增加协作式取消信号，至少让工具能在关键阶段主动检查并停止。
     *   清理当前基于 `current_index` 快照的审批 index 语义，改为主线程正式编号或直接以 `tool_call_id` 为主锚点。
 
 ### 🟢 切片 7：测试补齐
-*   **修改**：`agent_prototype/tests/...` / `frontend` 对应测试文件
+*   **修改**：`backend/tests/...` / `frontend` 对应测试文件
 *   **实现**：
     *   并发耗时测试。
     *   `__context__` 注入与 progress 流测试。

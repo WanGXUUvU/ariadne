@@ -32,7 +32,7 @@ Review / Agent Behavior
 
 ## 验证
 - 用一个 mock diff 测试 review 输入构造。
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - review prompt 是否具体。

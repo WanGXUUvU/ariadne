@@ -31,7 +31,7 @@ API / Session
 - 不存在的 session 返回 404 风格错误。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 列表接口是否避免返回过大 state。

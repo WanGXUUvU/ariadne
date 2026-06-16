@@ -32,7 +32,7 @@
 - 删除当前 session 后不出现空白或崩溃。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 - 手动在 UI 中重命名和删除会话。
 
 ## Review 检查点

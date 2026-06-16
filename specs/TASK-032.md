@@ -31,7 +31,7 @@ Session Control
 - session 列表能看到 parent 信息。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - fork 是否复制必要字段但不复制运行中状态。

@@ -74,7 +74,7 @@ TASK-040 实现了同步阻塞的 spawn_child_agent，子 Agent 返回前主 Age
 - 原有串行行为（直接 wait）不受影响
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_parallel_child_agents -v`
+- `python3 -m unittest backend.tests.test_parallel_child_agents -v`
 
 ## Review 检查点
 - futures 字典是否会内存泄漏（run 结束后清理）

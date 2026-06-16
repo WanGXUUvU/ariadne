@@ -91,7 +91,7 @@ core/adapters/chat_completions.py → model/adapters/chat_completions.py
 core/adapters/protocol.py         → model/adapters/protocol.py (暂保留)
 ```
 
-- 更新所有 `from agent_prototype.core.adapters` 的 import
+- 更新所有 `from backend.core.adapters` 的 import
 - 涉及文件：execution/persistence/builder.py, execution/persistence/types.py, memory/summary/service.py, tests/
 
 ### Step 2: 创建 `model/types/domain.py`，搬迁 LLM 协议原语
@@ -120,7 +120,7 @@ core/adapters/protocol.py         → model/adapters/protocol.py (暂保留)
 
 ### Step 5: 全局 import 路径修正
 
-更新所有 61 处 `from agent_prototype.core.types import` 和 5 处 `from agent_prototype.core.adapters import`。
+更新所有 61 处 `from backend.core.types import` 和 5 处 `from backend.core.adapters import`。
 
 ### Step 6: 删除 `core/` 目录
 
@@ -133,8 +133,8 @@ core/adapters/protocol.py         → model/adapters/protocol.py (暂保留)
 ### Step 8: 验证
 
 ```bash
-python -c "import agent_prototype; print('OK')"
-python -m pytest agent_prototype/tests/ -x -q
+python -c "import backend; print('OK')"
+python -m pytest backend/tests/ -x -q
 ```
 
 ---
@@ -162,6 +162,6 @@ infra/        →  无业务依赖，只做技术适配
 - [ ] `model/` 目录包含 adapters/ + types/
 - [ ] `agent/types.py` 是真正定义（非 re-export）
 - [ ] 各层 types.py 只含本层领域类型
-- [ ] 无任何 `from agent_prototype.core` import
-- [ ] `python -c "import agent_prototype"` 通过
-- [ ] `python -m pytest agent_prototype/tests/ -x -q` 通过
+- [ ] 无任何 `from backend.core` import
+- [ ] `python -c "import backend"` 通过
+- [ ] `python -m pytest backend/tests/ -x -q` 通过

@@ -20,7 +20,7 @@ Agent Core
 - 自动选择 agent
 
 ## 实现步骤
-1. 新建 `agent_prototype/agent_loader.py` 或同等模块。
+1. 新建 `backend/agent_loader.py` 或同等模块。
 2. 定义 `AgentDefinition` Pydantic/dataclass 对象。
 3. 实现读取默认 agent 定义的函数。
 4. 第一版优先用简单、稳定的结构，不引入复杂依赖。
@@ -33,7 +33,7 @@ Agent Core
 - 不影响现有 agent 行为。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 读取器是否只负责读取和解析，不负责运行。

@@ -36,7 +36,7 @@
 | 2026-05-30 | 已完成任务卡归档 | — | 将 TASK-073/074/075/076/078/079/080/081/082 移入 `specs/done/`。 |
 | 2026-05-30 | `TASK-076` 并发工具执行与流式进度流完美收口 | Verify / Review | 成功实现基于 `asyncio.gather` 与 `asyncio.Queue` 管道的流式进度并发广播，完成跨线程 `run_coroutine_threadsafe` 自愈通信，以及审批拦截时 Task 优雅 Cancel 安全手刹，前后端 Vue 3 呼吸动效完美打包编译，96 项单测全绿通过。 |
 | 2026-05-30 | `TASK-082` 后端核心及周边链路风格收敛完成 | Verify / Review | 完成两轮风格大扫除：统一 execution/context/memory 核心层及 api/settings/tools 主链路所有文件的模块头注释与 docstring 模板，替换所有的“教学散文”；`ContextAssembler` 抽出工作区文本读取 helper；`black`、`ruff check`、96 项 unit/integration tests 全绿通过。 |
-| 2026-05-30 | `TASK-081` 运行时边界拆解完成 | Verify / Review | 新增 RuntimeContextFactory / ChildAgentDispatcher / TraceQueryService，RunService 收窄为 façade；`core/types.py` 剥离运行时与工具结果类型；前端 `useWorkspace.ts` 拆为 5 个 workspace composable；`python3 -m unittest agent_prototype.tests.integration.test_agent_api`、unit tests、`python3 -m compileall agent_prototype`、`npm run build` 全通过。 |
+| 2026-05-30 | `TASK-081` 运行时边界拆解完成 | Verify / Review | 新增 RuntimeContextFactory / ChildAgentDispatcher / TraceQueryService，RunService 收窄为 façade；`core/types.py` 剥离运行时与工具结果类型；前端 `useWorkspace.ts` 拆为 5 个 workspace composable；`python3 -m unittest backend.tests.integration.test_agent_api`、unit tests、`python3 -m compileall backend`、`npm run build` 全通过。 |
 | 2026-05-28 | 领域类型归位完成，api/dto/schemas.py 精简为纯 HTTP I/O 文件 | Verify / Review | 新建 model/types/agent.py、skills/types.py、execution/streaming/types.py。22 处非 API 层文件的 `from api.dto.schemas import` 已全部迁至对应低层模块。api/routes 与测试同步迁移。删除 schemas.py 中的 re-export 块。96 项测试全绿。 |
 | 2026-05-27 | 整体架构极致重构解耦与九层模型边界清洗完成 | Verify / Review | 成功实现 L1-L8 层全解耦。L2 彻底无状态化，L3 桥接工具完全闭包回调化，L5-L8 循环依赖完全剥离，落地 L6 统一装配器 ContextAssembler，96 项单测全部绿灯通过。 |
 | 2026-05-23 | 编写通用中间件地基与工具中间件包并验证 | Verify / Review | 跳过切片5，直接完成切片6。成功实现完全通用的 BaseMiddleware、MiddlewarePipeline 地基，并派生出首个工具特定的 SandboxMiddleware、ApprovalMiddleware 与 4 个单元测试，单测完美通过（81/83 Passed）。 |
@@ -55,7 +55,7 @@
 | 2026-05-10 | 同步收紧 `TASK-027` / `TASK-028` | planning | 统一 SSE 语义事件契约，前端不再默认 token 级 delta。 |
 | 2026-05-10 | 切换到 `TASK-027` | planning | `TASK-054` 暂停，先推进 streaming 事件输出主线。 |
 | 2026-05-10 | 切换到 `TASK-054` | planning | `TASK-072` 已收口，进入 `MCP` 边界设计主线。 |
-| 2026-05-10 | 补充卡 02 收口 | Verify / Review | `skill_loader.py` 已拆出 `skill_config.py`，`run_service.py` 收窄为预处理 / 执行 / 落库三段，`python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v` 通过。 |
+| 2026-05-10 | 补充卡 02 收口 | Verify / Review | `skill_loader.py` 已拆出 `skill_config.py`，`run_service.py` 收窄为预处理 / 执行 / 落库三段，`python3 -m unittest discover -s backend/tests -p 'test_*.py' -v` 通过。 |
 | 2026-05-10 | 补充卡 01 收口 | Verify / Review | `agent_runtime.py` 已拆成 facade + helpers，runtime 单测和前端构建通过。 |
 | 2026-05-10 | `TASK-070` 收口并切换到 `TASK-054` | Verify / Review | 路由入口拆分、应用层收窄完成，后续中心文件暂不继续拆。 |
 | 2026-05-09 | `TASK-026` 收口并切换到 `TASK-070` | Verify / Review | 统一 `ModelAdapter` 与 `ChatCompletionsAdapter` 已落地，runtime / compact / run_service 已迁移。 |

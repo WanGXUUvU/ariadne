@@ -47,7 +47,7 @@ graph TD
 ### 2. 重构后极简的后端文件物理树
 
 ```text
-agent_prototype/
+backend/
 ├── interface/                                  # 🌟 控制层：提供 API 暴露与入参校验
 │   ├── __init__.py
 │   ├── api/
@@ -99,7 +99,7 @@ agent_prototype/
 后端改造中，唯一的纯硬核解耦点在于 **工具管道化模式**。
 大模型在调用工具（如读写文件）时，我们需要**拦截沙箱越界**、**拦截危险操作审批**。将这些独立职责做成“洋葱圈中间件”，可以避免主 Runtime 引擎堆积大量 `if-else`。
 
-📄 **管道核心逻辑文件**：`agent_prototype/application/runtime/tool_pipeline.py`
+📄 **管道核心逻辑文件**：`backend/application/runtime/tool_pipeline.py`
 
 ```python
 from abc import ABC, abstractmethod

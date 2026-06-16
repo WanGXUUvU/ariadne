@@ -35,7 +35,7 @@ Hooks / Runtime
 - 插件 hooks 和项目 hooks 的来源边界清楚。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - event 选择是否最小且够用。

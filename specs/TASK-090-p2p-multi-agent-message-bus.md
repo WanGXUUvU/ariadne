@@ -50,7 +50,7 @@
 ### 需要改的层：
 *   **数据库层**：Alembic 迁移新增 `agent_messages` 表。
 *   **工具层**：新增 `send_agent_message` 和 `check_agent_inbox` 工具实现。
-*   **执行层**：[agent_runtime.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/runtime/agent_runtime.py) 能够在接收到新 P2P 消息时触发挂起 Agent 的唤醒逻辑。
+*   **执行层**：[agent_runtime.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/execution/runtime/agent_runtime.py) 能够在接收到新 P2P 消息时触发挂起 Agent 的唤醒逻辑。
 *   **前端 Trace 层**：[TracePanel.vue](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/components/TracePanel.vue) 支持多 Agent 消息流向关系的拓扑与渲染。
 
 ---

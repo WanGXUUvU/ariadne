@@ -51,7 +51,7 @@ need改的层：
 ## 3. 切片迭代路线 (Checklist)
 
 - [ ] **切片 1：双轨提示词拼接分级与本地规则注入**
-  - [ ] 在 `agent_prototype/application/services/run/run_context_builder.py` 中重构提示词组装逻辑：
+  - [ ] 在 `backend/application/services/run/run_context_builder.py` 中重构提示词组装逻辑：
     - 编码会话 (`session_type == "coding"`)：加载内置的、极其专业的软件开发系统提示词（`BUILTIN_SOFTWARE_ENGINEER_PROMPT`），并动态合并工作区根目录的 `AGENTS.md` 规则。
     - 助理会话 (`session_type == "assistant"`)：底座**零预设任何性格/人设系统提示词（白板无界模式）**，其心智提示词 100% 动态读取用户自定义字段（`AgentRecord.system_prompt`）以及空间心智文件（`SOUL.md` / `AGENTS.md` / `USER.md`）进行干净的初始化组装，彻底避免人设冲突。
   - [ ] 在 `run_context_builder.py` 中增加对 `AGENTS.md` / `SOUL.md` / `USER.md` 等工作区文件的检测、加载和解析逻辑，使用特定 XML 隔离标签包裹并压在提示词尾部保证最高优先级。
@@ -62,7 +62,7 @@ need改的层：
   - [ ] **实现智能体双轨解耦路由机制**：
     - 在创建 `coding` 开发会话时，默认且强行关联底座内置的、全量工具链的 `"Software Engineer"` 专业智能体定义；
     - 在创建 `assistant` 个人助理会话时，允许自由关联用户通过 `AgentManager` 雇用/创建的自定义智能体记录，并拉取其专属配置的受限工具名单。
-  - [ ] 重构 `agent_prototype/application/services/run/run_service.py` 或 pipeline 组装逻辑：
+  - [ ] 重构 `backend/application/services/run/run_service.py` 或 pipeline 组装逻辑：
     - `session_type == "coding"`：装配 `[SandboxMiddleware, ApprovalMiddleware]`。
     - `session_type == "assistant"`：仅装配 `[ApprovalMiddleware]`。
   - [ ] 运行单测验证不同会话类型下，工具执行经过的中间件链路完全符合预期。

@@ -4,21 +4,21 @@ BLACK := ./.venv/bin/black
 RUFF := ./.venv/bin/ruff
 
 format:
-	$(BLACK) agent_prototype
+	$(BLACK) backend
 
 format-check:
-	$(BLACK) --check agent_prototype
+	$(BLACK) --check backend
 
 lint:
-	$(RUFF) check agent_prototype
+	$(RUFF) check backend
 
 lint-fix:
-	$(RUFF) check --fix agent_prototype
+	$(RUFF) check --fix backend
 
 test-unit:
-	python3 -m unittest discover -s agent_prototype/tests/unit -p 'test_*.py'
+	python3 -m unittest discover -s backend/tests/unit -p 'test_*.py'
 
 test-integration:
-	python3 -m unittest agent_prototype.tests.integration.test_agent_api
+	python3 -m unittest backend.tests.integration.test_agent_api
 
 test-all: test-unit test-integration

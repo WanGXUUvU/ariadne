@@ -75,11 +75,11 @@ Backend Architecture
 ## 建议关注的文件
 | 当前文件 | 优化方向 | 是否优先动 |
 |---|---|---|
-| `agent_prototype/runtime/agent_runtime.py` | 拆成 facade + helpers | 是 |
-| `agent_prototype/runtime/message_builder.py` | 新增 helper | 是 |
-| `agent_prototype/runtime/tool_executor.py` | 新增 helper | 是 |
-| `agent_prototype/runtime/response_handler.py` | 新增 helper | 是 |
-| `agent_prototype/runtime/event_builder.py` | 视增长再拆 | 否 |
+| `backend/runtime/agent_runtime.py` | 拆成 facade + helpers | 是 |
+| `backend/runtime/message_builder.py` | 新增 helper | 是 |
+| `backend/runtime/tool_executor.py` | 新增 helper | 是 |
+| `backend/runtime/response_handler.py` | 新增 helper | 是 |
+| `backend/runtime/event_builder.py` | 视增长再拆 | 否 |
 
 ## 范围内
 - 拆 runtime 中最明显的多职责代码
@@ -108,7 +108,7 @@ Backend Architecture
 - 后续新增 runtime 能力不会直接回流到单个大文件里。
 
 ## 验证
-- `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`
+- `python3 -m unittest discover -s backend/tests -p 'test_*.py' -v`
 
 ## Review 检查点
 - 是否真的把 runtime 拆薄了。

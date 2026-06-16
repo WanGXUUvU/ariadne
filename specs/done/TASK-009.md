@@ -32,7 +32,7 @@ API / Agent Core
 - 请求传入不存在的 agent 时不会静默回退。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 错误是否清楚。

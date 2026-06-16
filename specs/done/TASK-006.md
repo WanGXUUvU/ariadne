@@ -36,7 +36,7 @@ Agent Core
 - 现有测试仍然通过。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 定义层是否和未来 registry、loader、UI 兼容。

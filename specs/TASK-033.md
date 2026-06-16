@@ -40,7 +40,7 @@ Codex 官方把用户级 `~/.codex/config.toml`、项目级 `.codex/config.toml`
 - 现有运行链路能读取 model / personality / permissions 配置但行为不变。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 配置是否集中。

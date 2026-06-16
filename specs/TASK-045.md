@@ -36,7 +36,7 @@ Workspace / Review
 
 ## 验证
 - 测试前后读取文件内容，确认没有被修改。
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 是否把“生成 diff”和“应用修改”严格分开。

@@ -12,7 +12,7 @@
    * 修改 `spawn_child_agent` 工具描述：告知大模型“调用此工具委派后台任务后，主流程会挂起，无需轮询或阻塞等待。当子 Agent 完成时，系统会自动将结果作为输入唤醒您”。
    * 调用 `spawn_child_agent` 后，主运行流不再等待，立刻结束当前 Run 并吐出 `status: waiting_for_child`。
 2. **后台异步 Worker 与通知链 (Asynchronous Wakeup)**：
-   * 修改 [child_agent_dispatcher.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/child_agent_dispatcher.py) 中子智能体线程结束时的行为。
+   * 修改 [child_agent_dispatcher.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/execution/child_agent_dispatcher.py) 中子智能体线程结束时的行为。
    * 当子 Agent 执行完毕（在 `_run_child_worker` 线程内）：
      1. 将子 Agent 的最终 `reply` 作为一条特殊格式的 `ChatMessage(role="user", content="[子智能体 ${agent_name} 的执行报告]: ${reply}")` 插入父 Session 的消息流中。
      2. 向 API 的广播信道发送事件，通知前端主会话已被自动唤醒。
@@ -38,7 +38,7 @@
 4. 主 Agent 自动开始打字：“根据代码审计员的报告，`main.py` 存在以下安全隐患，我将帮您进行修改...”
 
 ### 需要改的层：
-*   **后端调度器**：[child_agent_dispatcher.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/child_agent_dispatcher.py) 增加 Worker 结束后的回调触发，自动调用 `RunService.async_stream_agent` 执行流。
+*   **后端调度器**：[child_agent_dispatcher.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/execution/child_agent_dispatcher.py) 增加 Worker 结束后的回调触发，自动调用 `RunService.async_stream_agent` 执行流。
 *   **工具层**：修改 `spawn_child_agent` 逻辑，移除 `wait_child_agent` 和 `check_child_status` 的推荐。
 *   **前端流状态层**：[useRunStreaming.ts](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/composables/workspace/useRunStreaming.ts) 能够接受子 Agent 完成并自动唤醒主 Agent 的 SSE 新连接帧。
 *   **前端状态组件**：在 [ChatPanel.vue](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/components/ChatPanel.vue) 渲染子智能体正在运行的呼吸动效状态栏。

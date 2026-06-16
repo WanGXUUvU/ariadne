@@ -151,11 +151,11 @@ ToolResult(
 
 前端调哪个接口 / need改的层：
 - 后端：
-  - `agent_prototype/tools/builtin/filesystem/*.py` (工具返回协议压缩)
-  - `agent_prototype/tools/result_types.py` (结果 metadata 语义增强)
-  - `agent_prototype/execution/streaming/stream_run_session.py` (终态收口重整)
-  - `agent_prototype/observation/tool_run_observer.py` (paused 语义重新归位)
-  - `agent_prototype/execution/persistence/service.py` (统一终态与一致性升级)
+  - `backend/tools/builtin/filesystem/*.py` (工具返回协议压缩)
+  - `backend/tools/result_types.py` (结果 metadata 语义增强)
+  - `backend/execution/streaming/stream_run_session.py` (终态收口重整)
+  - `backend/observation/tool_run_observer.py` (paused 语义重新归位)
+  - `backend/execution/persistence/service.py` (统一终态与一致性升级)
 - 前端：
   - `frontend/src/components/chat/ToolCard.vue`
   - `frontend/src/components/chat/ToolTree.vue`

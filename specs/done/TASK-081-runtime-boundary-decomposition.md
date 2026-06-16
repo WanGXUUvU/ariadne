@@ -213,9 +213,9 @@ need改的层：
 
 ### 切片 5：回归验证
 - [x] 后端：
-  - [x] `python3 -m unittest agent_prototype.tests.integration.test_agent_api`
-  - [x] `python3 -m unittest discover -s agent_prototype/tests/unit -p 'test_*.py'`
-  - [x] `python3 -m compileall agent_prototype`
+  - [x] `python3 -m unittest backend.tests.integration.test_agent_api`
+  - [x] `python3 -m unittest discover -s backend/tests/unit -p 'test_*.py'`
+  - [x] `python3 -m compileall backend`
 - [x] 前端：
   - [x] `npm run build`
 - [ ] 手动验证主链路：

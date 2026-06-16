@@ -7,7 +7,7 @@
 Tests
 
 ## 我对当前项目的理解
-项目主体已经完成分层重构，但测试仍然集中在 `agent_prototype/tests/test_agent.py` 里。
+项目主体已经完成分层重构，但测试仍然集中在 `backend/tests/test_agent.py` 里。
 这个文件同时覆盖：
 - Agent runtime
 - LLM adapter
@@ -33,13 +33,13 @@ Tests
 ## 建议拆分
 | 当前文件 | 建议拆分后文件 |
 |---|---|
-| `agent_prototype/tests/test_agent.py` | `test_agent_runtime.py` |
-| `agent_prototype/tests/test_agent.py` | `test_model_adapter.py` |
-| `agent_prototype/tests/test_agent.py` | `test_session_store.py` |
-| `agent_prototype/tests/test_agent.py` | `test_skill_loader.py` |
-| `agent_prototype/tests/test_agent.py` | `test_agent_api.py` |
-| `agent_prototype/tests/test_agent.py` | `test_tool_registry.py` |
-| `agent_prototype/tests/test_agent.py` | `test_agent_definition_service.py` |
+| `backend/tests/test_agent.py` | `test_agent_runtime.py` |
+| `backend/tests/test_agent.py` | `test_model_adapter.py` |
+| `backend/tests/test_agent.py` | `test_session_store.py` |
+| `backend/tests/test_agent.py` | `test_skill_loader.py` |
+| `backend/tests/test_agent.py` | `test_agent_api.py` |
+| `backend/tests/test_agent.py` | `test_tool_registry.py` |
+| `backend/tests/test_agent.py` | `test_agent_definition_service.py` |
 
 ## 范围内
 - 新建测试文件
@@ -57,8 +57,8 @@ Tests
 ## 完成标准
 - 测试文件按模块拆开
 - 现有测试语义保持不变
-- `python3 -m unittest agent_prototype.tests.test_agent -v` 或等价测试命令通过
+- `python3 -m unittest backend.tests.test_agent -v` 或等价测试命令通过
 
 ## 验证
-- `python3 -m unittest discover -s agent_prototype/tests -p \"test_*.py\" -v`
+- `python3 -m unittest discover -s backend/tests -p \"test_*.py\" -v`
 

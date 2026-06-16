@@ -57,27 +57,27 @@ Backend Architecture
 
 | 当前文件 | 建议归位 | 说明 |
 |---|---|---|
-| `agent_prototype/api/app.py` | 保持 `api/app.py` | 应用入口，不要再拆散 |
-| `agent_prototype/api/routes.py` | 后续拆成 `api/routes/*.py` | 路由会继续增长，单文件会越来越难维护 |
-| `agent_prototype/runtime/agent.py` | `runtime/agent_runtime.py` 或 `runtime/agent_loop.py` | 真正的 Agent run loop |
-| `agent_prototype/runtime/services.py` | `application/run_service.py` 等 | 这是应用编排，不是 runtime |
-| `agent_prototype/runtime/llm_client.py` | `model/openai_adapter.py` 或 `model/adapter.py` | 模型调用边界应该从 runtime 里移走 |
-| `agent_prototype/runtime/prompt_builder.py` | `context/prompt_builder.py` | prompt 构造属于上下文层 |
-| `agent_prototype/runtime/compaction.py` | `context/compaction.py` | 历史压缩属于上下文层 |
-| `agent_prototype/runtime/tool_registry.py` | `tools/registry.py` | 工具注册属于 tools |
-| `agent_prototype/runtime/skill_loader.py` | `skills/loader.py` | Skill 加载属于 skills |
-| `agent_prototype/runtime/skill_service.py` | `application/skill_service.py` 或 `skills/registry.py` | 如果是业务编排就进 application，如果是纯技能管理就进 skills |
-| `agent_prototype/runtime/agent_loader.py` | `application/agent_definition_service.py` 或 `storage/agent_definition_store.py` | Agent 定义加载不应继续挂在 runtime |
-| `agent_prototype/core/model.adapter.py` | 改名为 `model/adapter.py` | Python 文件名不要用点号分隔 |
-| `agent_prototype/storage/session_store.py` | `storage/stores/session_store.py` 或 `repositories/session_repo.py` | 持久化逻辑归 storage |
-| `agent_prototype/storage/agent_definition_store.py` | `storage/stores/agent_definition_store.py` | Agent 定义存储归 storage |
-| `agent_prototype/tools_defs/*.py` | `tools/builtin/*.py` | 本地工具实现归 tools |
+| `backend/api/app.py` | 保持 `api/app.py` | 应用入口，不要再拆散 |
+| `backend/api/routes.py` | 后续拆成 `api/routes/*.py` | 路由会继续增长，单文件会越来越难维护 |
+| `backend/runtime/agent.py` | `runtime/agent_runtime.py` 或 `runtime/agent_loop.py` | 真正的 Agent run loop |
+| `backend/runtime/services.py` | `application/run_service.py` 等 | 这是应用编排，不是 runtime |
+| `backend/runtime/llm_client.py` | `model/openai_adapter.py` 或 `model/adapter.py` | 模型调用边界应该从 runtime 里移走 |
+| `backend/runtime/prompt_builder.py` | `context/prompt_builder.py` | prompt 构造属于上下文层 |
+| `backend/runtime/compaction.py` | `context/compaction.py` | 历史压缩属于上下文层 |
+| `backend/runtime/tool_registry.py` | `tools/registry.py` | 工具注册属于 tools |
+| `backend/runtime/skill_loader.py` | `skills/loader.py` | Skill 加载属于 skills |
+| `backend/runtime/skill_service.py` | `application/skill_service.py` 或 `skills/registry.py` | 如果是业务编排就进 application，如果是纯技能管理就进 skills |
+| `backend/runtime/agent_loader.py` | `application/agent_definition_service.py` 或 `storage/agent_definition_store.py` | Agent 定义加载不应继续挂在 runtime |
+| `backend/core/model.adapter.py` | 改名为 `model/adapter.py` | Python 文件名不要用点号分隔 |
+| `backend/storage/session_store.py` | `storage/stores/session_store.py` 或 `repositories/session_repo.py` | 持久化逻辑归 storage |
+| `backend/storage/agent_definition_store.py` | `storage/stores/agent_definition_store.py` | Agent 定义存储归 storage |
+| `backend/tools_defs/*.py` | `tools/builtin/*.py` | 本地工具实现归 tools |
 
 ## 我建议的目录目标
 不是一次把仓库彻底改成大工程模板，而是先把职责收口到位。
 
 ```text
-agent_prototype/
+backend/
 ├── api/
 │   ├── app.py
 │   ├── routes/

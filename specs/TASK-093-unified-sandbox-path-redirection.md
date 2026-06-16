@@ -26,7 +26,7 @@ graph TD
 ```
 
 ### 2.1 子任务参数补齐 (`ChildAgentDispatcher`)
-在 [child_agent_dispatcher.py L119](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/execution/child_agent_dispatcher.py#L119) 中，根据 `session_id` 查询会话主记录，获取 `workspace_path`，并传入子 Agent 启动入参：
+在 [child_agent_dispatcher.py L119](file:///Users/wangxu/Documents/AGENT%20Build/backend/execution/child_agent_dispatcher.py#L119) 中，根据 `session_id` 查询会话主记录，获取 `workspace_path`，并传入子 Agent 启动入参：
 ```python
 # 查询主 Session 绑定的工作区路径
 workspace_path = None
@@ -44,7 +44,7 @@ output = agent.run(
 ```
 
 ### 2.2 抽离 `SandboxPathResolver` 统一工具层
-新建 `agent_prototype/security/sandbox/resolver.py`，实现同步的参数校验与重定向逻辑：
+新建 `backend/security/sandbox/resolver.py`，实现同步的参数校验与重定向逻辑：
 ```python
 class SandboxPathResolver:
     @staticmethod
@@ -57,7 +57,7 @@ class SandboxPathResolver:
 ```
 
 ### 2.3 注册表执行器统一校验
-在 [tools/registry.py L76 `execute_tool_call`](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/tools/registry.py#L76) 中，调用 `SandboxPathResolver` 进行校验和改写：
+在 [tools/registry.py L76 `execute_tool_call`](file:///Users/wangxu/Documents/AGENT%20Build/backend/tools/registry.py#L76) 中，调用 `SandboxPathResolver` 进行校验和改写：
 ```python
 # 在 execute_tool_call 中：
 workspace_path = getattr(context, "workspace_path", None)
@@ -90,8 +90,8 @@ if workspace_path:
 
 前端调哪个接口 / need改的层：
 - 后端：
-  - `agent_prototype/execution/child_agent_dispatcher.py` (子任务参数透传)
-  - `agent_prototype/security/sandbox/resolver.py` (新增通用解析层)
-  - `agent_prototype/tools/registry.py` (注册表执行入口拦截)
-  - `agent_prototype/execution/runtime/agent_runtime.py` (传递 workspace_path)
+  - `backend/execution/child_agent_dispatcher.py` (子任务参数透传)
+  - `backend/security/sandbox/resolver.py` (新增通用解析层)
+  - `backend/tools/registry.py` (注册表执行入口拦截)
+  - `backend/execution/runtime/agent_runtime.py` (传递 workspace_path)
 ```

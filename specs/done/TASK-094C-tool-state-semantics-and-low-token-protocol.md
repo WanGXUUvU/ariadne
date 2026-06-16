@@ -152,6 +152,6 @@ except Exception:
 ## 8. 验证
 
 ```bash
-python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v
+python3 -m unittest discover -s backend/tests -p 'test_*.py' -v
 cd frontend && npm run build
 ```

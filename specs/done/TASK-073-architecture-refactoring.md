@@ -48,14 +48,14 @@ graph TD
 为保证项目代码呈现高品质“工业级”质感，后端统一遵循以下命名准则：
 
 1.  **服务类 (Service Classes)**：
-    *   统一放置在 `agent_prototype/application/services/` 中。
+    *   统一放置在 `backend/application/services/` 中。
     *   文件名：`snake_case` + `_service.py` 结尾（如 `agent_definition_service.py`, `settings_service.py`）。
     *   类名：`PascalCase` + `Service` 结尾（如 `AgentDefinitionService`, `SettingsService`）。
 2.  **方法与函数 (Methods)**：
     *   类内部方法一律使用 `snake_case`，以动词开头（如 `load_definition()`, `list_sessions()`, `approve_request()`）。
     *   公共接口不应带任何 `_service` 或 `_action` 冗余后缀。
 3.  **持久化仓储 (Repositories / Stores)**：
-    *   统一放置在 `agent_prototype/infrastructure/database/repositories/` 中.
+    *   统一放置在 `backend/infrastructure/database/repositories/` 中.
     *   文件名：`snake_case` + `_store.py` 结尾。
     *   类名：`Sqlite` + `PascalCase` + `Store` 结尾（如 `SqliteSessionStore`）。
 
@@ -66,7 +66,7 @@ graph TD
 我们将所有 9 个服务模块全部整编为高内聚 OOP 服务类：
 
 ### 4.1 `AgentDefinitionService` (修正)
-*   **文件**：[agent_definition_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/agent_definition_service.py)
+*   **文件**：[agent_definition_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/agent_definition_service.py)
 *   **类定义**：`class AgentDefinitionService`
 *   **依赖注入**：`__init__(self, db: Session)` 实例化 `SqliteAgentDefinitionStore(db)`
 *   **接口**：
@@ -76,7 +76,7 @@ graph TD
     *   `save_agent(self, definition: AgentDefinition) -> AgentDefinition`
 
 ### 4.2 `ApprovalService` (修正)
-*   **文件**：[approval_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/approval_service.py)
+*   **文件**：[approval_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/approval_service.py)
 *   **类定义**：`class ApprovalService`
 *   **依赖注入**：`__init__(self, db: Session)` 实例化 `SqliteApprovalStore(db)`
 *   **接口**：
@@ -85,7 +85,7 @@ graph TD
     *   `reject(self, approval_id: str) -> Optional[PendingApproval]`
 
 ### 4.3 `CompactService` (修正)
-*   **文件**：[compact_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/compact_service.py)
+*   **文件**：[compact_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/compact_service.py)
 *   **类定义**：`class CompactService`
 *   **依赖注入**：`__init__(self, db: Session)` 实例化 `SqliteSessionStore(db)`
 *   **接口**：
@@ -93,7 +93,7 @@ graph TD
     *   `auto_compact_in_memory(self, state: AgentState, context_tokens: int, context_length: int, keep_recent_count: int = 2) -> CompactResult` (内存预处理压缩，无状态提取)
 
 ### 4.4 `SessionService` (修正)
-*   **文件**：[session_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/session_service.py)
+*   **文件**：[session_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/session_service.py)
 *   **类定义**：`class SessionService`
 *   **依赖注入**：`__init__(self, db: Session)` 实例化 `SqliteSessionStore(db)`
 *   **接口**：
@@ -105,7 +105,7 @@ graph TD
     *   `update_session_settings(self, session_id: str, model_provider_id: Optional[str] = None, model_id: Optional[str] = None, thinking_enabled: Optional[bool] = None, thinking_effort: Optional[str] = None) -> SessionRecord`
 
 ### 4.5 `SettingsService` (修正 & 规范命名)
-*   **原文件**：[setting_services.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/setting_services.py) ➡️ **重命名为**：`settings_service.py`
+*   **原文件**：[setting_services.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/setting_services.py) ➡️ **重命名为**：`settings_service.py`
 *   **类定义**：`class SettingsService`
 *   **依赖注入**：`__init__(self, db: Session)`
 *   **接口**：
@@ -116,7 +116,7 @@ graph TD
     *   `save_model_setting(self, model_id: str, provider_id: str, context_length: int, thinking_style: str = "none") -> None`
 
 ### 4.6 `SkillService` (修正)
-*   **文件**：[skill_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/skill_service.py)
+*   **文件**：[skill_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/skill_service.py)
 *   **类定义**：`class SkillService`
 *   **依赖注入**：`__init__(self, db: Session)` 实例化 `SqliteSessionStore(db)`
 *   **接口**：
@@ -126,14 +126,14 @@ graph TD
     *   `enable_skill_in_session(self, session_id: str, skill_name: str) -> None`
 
 ### 4.7 `SkillContextService` (修正)
-*   **文件**：[skill_context_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/skill_context_service.py)
+*   **文件**：[skill_context_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/skill_context_service.py)
 *   **类定义**：`class SkillContextService`
 *   **依赖注入**：`__init__(self, db: Session)`
 *   **接口**：
     *   `build_runtime_definition_with_skills(self, definition: AgentDefinition, agent_input: AgentInput) -> AgentDefinition`
 
 ### 4.8 `RunService` (修正 - 最硬核服务)
-*   **文件**：[run_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/run_service.py)
+*   **文件**：[run_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/run_service.py)
 *   **类定义**：`class RunService`
 *   **依赖注入**：`__init__(self, db: Session)` 实例化 `SqliteSessionStore(db)` 和 `SqliteApprovalStore(db)` 并聚合成员。
 *   **核心逻辑改造**：
@@ -144,7 +144,7 @@ graph TD
         2. 无绑定或数据库为空时抛出 ValueError。
 
 ### 4.9 `ResumeRunService` (修正)
-*   **文件**：[resume_run_service.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/application/services/resume_run_service.py)
+*   **文件**：[resume_run_service.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/application/services/resume_run_service.py)
 *   **类定义**：`class ResumeRunService`
 *   **依赖注入**：`__init__(self, db: Session)`
 *   **接口**：
@@ -180,8 +180,8 @@ graph TD
   - [x] 修正 Skill 目录的 mock 路径偏差，确保测试可以顺利读取到内置 Skill。
   - [x] 启动单元测试，达成 `OK (failures=0, errors=0)` 全量绿灯通关。
 - [x] **切片 6：编写通用中间件地基与工具中间件包**
-  - [x] 在 `agent_prototype/core/middleware.py` 中建立完全通用的洋葱圈中间件地基 `BaseMiddleware` 与 `MiddlewarePipeline`。
-  - [x] 在 `agent_prototype/application/runtime/middleware/` 目录下完成工具中间件包的独立分层与审批/沙箱中间件物理骨架编写，并通过 100% 单元测试。
+  - [x] 在 `backend/core/middleware.py` 中建立完全通用的洋葱圈中间件地基 `BaseMiddleware` 与 `MiddlewarePipeline`。
+  - [x] 在 `backend/application/runtime/middleware/` 目录下完成工具中间件包的独立分层与审批/沙箱中间件物理骨架编写，并通过 100% 单元测试。
 
 
 

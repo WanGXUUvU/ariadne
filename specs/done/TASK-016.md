@@ -30,7 +30,7 @@ Trace / API
 - 事件 schema 复用现有 `AgentEvent`。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 是否避免重复存储过多内容。

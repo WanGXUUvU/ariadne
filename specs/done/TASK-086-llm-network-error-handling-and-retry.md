@@ -9,7 +9,7 @@
 
 ### 范围内：
 1. **后端 API 弹性重试机制**：
-   * 在 [chat_completions.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/core/adapters/chat_completions.py) 中，针对 `generate` 和 `async_stream_generate` 引入可配置的指数退避重试（Exponential Backoff Retry）。
+   * 在 [chat_completions.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/core/adapters/chat_completions.py) 中，针对 `generate` 和 `async_stream_generate` 引入可配置的指数退避重试（Exponential Backoff Retry）。
    * 自动捕获特定重试类型：网络连接超时、DNS 解析失败、HTTP 状态码 429（限流）、5xx（服务端错误）。
    * 最大重试次数默认为 3 次，初始等待 1s，按指数增加。
 2. **前端错误状态捕获与展示**：
@@ -36,7 +36,7 @@
 2. 点击 **【Retry】** 后，卡片消失，大模型重新开始流式打字并继续输出。
 
 ### 调哪个接口 / 需要改的层：
-*   **后端 API 适配层**：[chat_completions.py](file:///Users/wangxu/Documents/AGENT%20Build/agent_prototype/core/adapters/chat_completions.py) 增加 retry helper 装饰器或逻辑。
+*   **后端 API 适配层**：[chat_completions.py](file:///Users/wangxu/Documents/AGENT%20Build/backend/core/adapters/chat_completions.py) 增加 retry helper 装饰器或逻辑。
 *   **前端流控制组合式函数**：[useRunStreaming.ts](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/composables/workspace/useRunStreaming.ts) 处理 error 事件和触发 retry。
 *   **前端聊天控制面板**：[ChatPanel.vue](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/components/ChatPanel.vue) 和 [MessageList.vue](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/components/MessageList.vue) 渲染错误卡片与重试按钮。
 

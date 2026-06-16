@@ -94,10 +94,10 @@ class StagingFileSystem:
 
 前端调哪个接口 / need改的层：
 - 后端：
-  - `agent_prototype/tools/builtin/filesystem/fs_write.py` (写入拦截)
-  - `agent_prototype/tools/builtin/filesystem/fs_read.py` (读取重定向)
-  - `agent_prototype/execution/persistence/service.py` (提交生命周期)
-  - `agent_prototype/execution/streaming/stream_run_session.py` (生命周期清理)
+  - `backend/tools/builtin/filesystem/fs_write.py` (写入拦截)
+  - `backend/tools/builtin/filesystem/fs_read.py` (读取重定向)
+  - `backend/execution/persistence/service.py` (提交生命周期)
+  - `backend/execution/streaming/stream_run_session.py` (生命周期清理)
 - 前端：
   - 修改 `ToolCard.vue` 识别暂存与回滚状态并渲染徽章。
 ```

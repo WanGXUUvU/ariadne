@@ -32,7 +32,7 @@ API
 - 后续 `POST /run` 可以直接复用这个 session。
 
 ## 验证
-- `python3 -m unittest agent_prototype.tests.test_agent -v`
+- `python3 -m unittest backend.tests.test_agent -v`
 
 ## Review 检查点
 - 是否没有把创建 session 和首次运行耦合。

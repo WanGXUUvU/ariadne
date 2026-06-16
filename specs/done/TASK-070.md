@@ -59,7 +59,7 @@ Backend Architecture
 目标：让 `api/` 不再是一个“大路由文件”，而是按资源分开。
 
 建议动作：
-- 把 `agent_prototype/api/routes.py` 拆成 `api/routes/` 目录
+- 把 `backend/api/routes.py` 拆成 `api/routes/` 目录
 - 按资源切分为：
   - `run_routes.py`
   - `session_routes.py`
@@ -120,12 +120,12 @@ Backend Architecture
 ## 建议关注的文件
 | 当前文件 | 优化方向 | 是否优先动 |
 |---|---|---|
-| `agent_prototype/api/routes.py` | 按资源拆路由 | 是 |
-| `agent_prototype/application/run_service.py` | 只保留 `/run` 主编排 | 是 |
-| `agent_prototype/application/skill_service.py` | 视增长再拆 | 否 |
-| `agent_prototype/skills/skill_loader.py` | 视增长再拆 | 否 |
-| `agent_prototype/tools/tool_registry.py` | 视增长再拆 | 否 |
-| `agent_prototype/trace/` | 决定是否落地 | 视需求 |
+| `backend/api/routes.py` | 按资源拆路由 | 是 |
+| `backend/application/run_service.py` | 只保留 `/run` 主编排 | 是 |
+| `backend/application/skill_service.py` | 视增长再拆 | 否 |
+| `backend/skills/skill_loader.py` | 视增长再拆 | 否 |
+| `backend/tools/tool_registry.py` | 视增长再拆 | 否 |
+| `backend/trace/` | 决定是否落地 | 视需求 |
 
 ## 范围内
 - 拆路由
@@ -164,4 +164,4 @@ Backend Architecture
 - 全量测试通过，现有分层边界没有回流。
 
 ## 验证
-- `python3 -m unittest discover -s agent_prototype/tests -p 'test_*.py' -v`
+- `python3 -m unittest discover -s backend/tests -p 'test_*.py' -v`

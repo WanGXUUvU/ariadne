@@ -42,7 +42,7 @@
 
 ### 需要改的层：
 *   **数据库迁移层**：Alembic 增加 Session 表 `parent_session_id` / `fork_message_index` 字段迁移。
-*   **后端 API 路由层**：在 `agent_prototype/api/` 中增加 `/sessions/{id}/fork` 路由。
+*   **后端 API 路由层**：在 `backend/api/` 中增加 `/sessions/{id}/fork` 路由。
 *   **后端服务层**：在 `SqliteSessionStore` 增加 `fork_session` 复制逻辑。
 *   **前端逻辑层**：[useWorkspace.ts](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/composables/useWorkspace.ts) 增加调用 fork API 逻辑并切换路由。
 *   **前端 UI 组件**：修改 [SessionSidebar.vue](file:///Users/wangxu/Documents/AGENT%20Build/frontend/src/components/SessionSidebar.vue) 支持分支 Badge 或嵌套树展现。
