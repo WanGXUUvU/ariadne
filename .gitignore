@@ -28,6 +28,5 @@ BUILD_PLAN.md
 STATUS.md
 STYLE.md
 
-# 补充规范文档（本地草稿）
-specs/SUPP-03-token-aware-compaction.md
-specs/SUPP-04-unified-timeline-persistence.md
+# 任务卡与规范文档（本地草稿）
+specs/
