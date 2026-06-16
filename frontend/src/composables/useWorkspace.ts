@@ -556,6 +556,7 @@ export function useWorkspace() {
     deleteSession: sessionState.deleteSession,
     renameSession: sessionState.renameSession,
     toggleSkill: resources.toggleSkill,
+    loadSkills: resources.loadSkills,
     availableAgents: resources.availableAgents,
     customAgents: computed(() => resources.availableAgents.value.filter(agent => !agent.is_builtin)),
     saveAgent: resources.saveAgent,

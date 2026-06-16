@@ -14,6 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
+  (e: 'skills-changed'): void;
 }>();
 
 // ── 导航与标签页管理 ──
@@ -23,6 +24,7 @@ const TABS = [
   { id: 'general', name: '常规' },
   { id: 'appearance', name: '外观' },
   { id: 'providers', name: '配置' },
+  { id: 'skills', name: '自定义技能' },
 ] as const;
 
 const currentTabName = computed(() => {
@@ -58,6 +60,12 @@ const isLoading = ref(true);
 const showAddForm = ref(false);
 const errorMsg = ref<string | null>(null);
 
+// 自定义技能状态管理
+const skillRoots = ref<{ name: string; path: string }[]>([]);
+const showAddSkillRootForm = ref(false);
+const newRootName = ref('');
+const newRootPath = ref('');
+
 // 编辑 Provider
 const editingProviderId = ref<number | null>(null);
 const editForm = ref({ name: '', base_url: '', api_key: '' });
@@ -71,6 +79,55 @@ const newProvider = ref({
 
 // ── 行为方法 ──
 
+const loadSkillRoots = async () => {
+  try {
+    const settings = await settingsApi.getSettingsFile();
+    const roots = settings?.skills?.roots || [];
+    skillRoots.value = roots.map((item: any) => ({
+      name: item.name || '',
+      path: item.path || ''
+    }));
+  } catch (err: any) {
+    errorMsg.value = '获取技能路径失败: ' + err.message;
+  }
+};
+
+const saveSkillRoots = async (newRoots: { name: string; path: string }[]) => {
+  try {
+    const settings = await settingsApi.getSettingsFile();
+    if (!settings.skills) {
+      settings.skills = {};
+    }
+    settings.skills.roots = newRoots;
+    await settingsApi.updateSettingsFile(settings);
+    skillRoots.value = newRoots;
+    emit('skills-changed');
+  } catch (err: any) {
+    errorMsg.value = '保存技能路径失败: ' + err.message;
+  }
+};
+
+const handleAddSkillRoot = async () => {
+  if (!newRootName.value.trim() || !newRootPath.value.trim()) {
+    errorMsg.value = '请填写路径别名和绝对路径';
+    return;
+  }
+  const updatedRoots = [
+    ...skillRoots.value,
+    { name: newRootName.value.trim(), path: newRootPath.value.trim() }
+  ];
+  await saveSkillRoots(updatedRoots);
+  newRootName.value = '';
+  newRootPath.value = '';
+  showAddSkillRootForm.value = false;
+};
+
+const handleDeleteSkillRoot = async (index: number) => {
+  if (!confirm('确定要删除此技能路径吗？')) return;
+  const updatedRoots = skillRoots.value.filter((_, idx) => idx !== index);
+  await saveSkillRoots(updatedRoots);
+};
+
 // 加载所有 Provider 及其对应的 ModelSettings
 const loadAllData = async () => {
   try {
@@ -78,8 +135,9 @@ const loadAllData = async () => {
     errorMsg.value = null;
     const provs = await settingsApi.listProviders();
     providers.value = provs;
+    await loadSkillRoots();
   } catch (err: any) {
-    errorMsg.value = '加载 Provider 列表失败: ' + err.message;
+    errorMsg.value = '加载设置失败: ' + err.message;
   } finally {
     isLoading.value = false;
   }
@@ -291,6 +349,9 @@ const selectTheme = (themeId: string) => {
                 <line x1="1" y1="14" x2="7" y2="14"></line>
                 <line x1="9" y1="8" x2="15" y2="8"></line>
                 <line x1="17" y1="16" x2="23" y2="16"></line>
+              </template>
+              <template v-else-if="tab.id === 'skills'">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
               </template>
             </svg>
             <span class="nav-label">{{ tab.name }}</span>
@@ -552,6 +613,64 @@ const selectTheme = (themeId: string) => {
                     </table>
                   </div>
                 </Transition>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 自定义技能配置面板 (Skills Config) -->
+          <div v-if="activeTab === 'skills'" class="settings-panel-view">
+            <div class="view-description">配置自定义技能 (Skills) 的扫描根目录。系统将扫描该目录下的所有子文件夹，若包含 SKILL.md 则自动加载该技能。</div>
+            
+            <div class="provider-list">
+              <!-- Add Skill Root Toggle Card -->
+              <div class="provider-card ghost-add-card" :class="{ 'form-open': showAddSkillRootForm }">
+                <div class="ghost-card-trigger" @click="showAddSkillRootForm = !showAddSkillRootForm">
+                  <span class="ghost-icon">{{ showAddSkillRootForm ? '✕' : '＋' }}</span>
+                  <span class="ghost-text">{{ showAddSkillRootForm ? '关闭新增表单' : '配置并新增技能扫描路径 (Add Skill Root)' }}</span>
+                </div>
+
+                <!-- Inline Add Form -->
+                <Transition name="expand">
+                  <div v-if="showAddSkillRootForm" class="add-provider-inline-form">
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label>路径别名 (Name)</label>
+                        <input v-model="newRootName" type="text" placeholder="例如: my-skills, custom-skills" />
+                      </div>
+                      <div class="form-group" style="grid-column: span 2;">
+                        <label>绝对路径 (Absolute Path)</label>
+                        <input v-model="newRootPath" type="text" placeholder="例如: /Users/username/my-skills" />
+                      </div>
+                    </div>
+                    <div class="form-actions">
+                      <button class="save-btn" @click="handleAddSkillRoot">保存路径</button>
+                    </div>
+                  </div>
+                </Transition>
+              </div>
+
+              <!-- Real Skill Roots list -->
+              <div v-if="skillRoots.length === 0" class="models-empty">
+                暂未配置任何自定义技能路径。
+              </div>
+              <div v-else v-for="(root, index) in skillRoots" :key="index" class="provider-card">
+                <div class="provider-card-header">
+                  <div class="prov-info">
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="opacity: 0.7; margin-right: 4px;">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span class="prov-name">{{ root.name }}</span>
+                    <span class="prov-url mono-text">{{ root.path }}</span>
+                  </div>
+                  <div class="prov-actions">
+                    <button class="delete-icon-btn" @click="handleDeleteSkillRoot(index)" title="删除路径">
+                      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

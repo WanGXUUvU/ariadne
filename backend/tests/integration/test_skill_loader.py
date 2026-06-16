@@ -1,6 +1,8 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+import json
 
 from backend.skills.loader import list_skills
 
@@ -9,6 +11,7 @@ class TestSkillLoader(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root_path = Path(self.temp_dir.name)
+        self.test_settings_path = self.root_path / "settings.json"
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -33,12 +36,20 @@ class TestSkillLoader(unittest.TestCase):
             "name: Broken Skill\n# Missing frontmatter\n",
         )
 
-        results = list_skills(
-            [
-                ("project-opencode", project_skills_root),
-                ("user-codex", user_skills_root),
-            ]
-        )
+        # 写入包含自定义 roots 的 settings.json
+        settings_data = {
+            "skills": {
+                "roots": [
+                    {"name": "project-opencode", "path": str(project_skills_root)},
+                    {"name": "user-codex", "path": str(user_skills_root)},
+                ]
+            }
+        }
+        self.test_settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.test_settings_path.write_text(json.dumps(settings_data), encoding="utf-8")
+
+        with patch("backend.infra.config.settings.SETTINGS_PATH", self.test_settings_path):
+            results = list_skills()
 
         self.assertEqual(len(results), 2)
         by_name = {item.name: item for item in results}
@@ -47,19 +58,27 @@ class TestSkillLoader(unittest.TestCase):
 
     def test_list_skills_applies_disabled_config(self):
         project_skills_root = self.root_path / "project-skills"
-        config_path = self.root_path / "skill-config.json"
 
         self._write_skill(
             project_skills_root,
             "alpha-skill",
             "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
         )
-        config_path.write_text('{"disabled": ["Alpha Skill"]}', encoding="utf-8")
 
-        results = list_skills(
-            [("project-opencode", project_skills_root)],
-            config_path=config_path,
-        )
+        # 写入同时包含 roots 和 disabled 的 settings.json
+        settings_data = {
+            "skills": {
+                "roots": [
+                    {"name": "project-opencode", "path": str(project_skills_root)}
+                ],
+                "disabled": ["Alpha Skill"]
+            }
+        }
+        self.test_settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.test_settings_path.write_text(json.dumps(settings_data), encoding="utf-8")
+
+        with patch("backend.infra.config.settings.SETTINGS_PATH", self.test_settings_path):
+            results = list_skills()
 
         self.assertEqual(len(results), 1)
         self.assertFalse(results[0].enabled)

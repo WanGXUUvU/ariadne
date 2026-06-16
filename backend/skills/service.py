@@ -20,7 +20,6 @@ from backend.skills.loader import (
     list_skills as loader_list_skills,
     save_skill_config,
     load_skill_config,
-    DEFAULT_PROTECTED_SKILL_NAMES,
 )
 
 
@@ -53,9 +52,6 @@ class SkillService:
     def disable_skill(self, skill_name: str) -> SkillSummary:
         """停用指定的技能"""
         self._get_skill_or_raise(skill_name)
-
-        if skill_name in DEFAULT_PROTECTED_SKILL_NAMES:
-            raise ValueError(f"Skill is protected and cannot be disabled: {skill_name}")
 
         config = load_skill_config()
         config.disabled.add(skill_name)
