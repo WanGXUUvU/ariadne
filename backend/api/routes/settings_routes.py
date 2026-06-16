@@ -133,3 +133,22 @@ def patch_model_api(
         )
     except ValueError as exc:
         return error_response(status.HTTP_404_NOT_FOUND, "model_not_found", str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Settings.json File Management
+# ---------------------------------------------------------------------------
+
+from backend.infra.config.settings import load_settings, save_settings
+
+@router.get("/file")
+def get_settings_file_api() -> dict:
+    """获取完整的 settings.json 配置数据。"""
+    return load_settings()
+
+
+@router.post("/file")
+def update_settings_file_api(payload: dict) -> dict:
+    """更新完整的 settings.json 配置数据。"""
+    save_settings(payload)
+    return {"status": "success"}

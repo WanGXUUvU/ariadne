@@ -295,6 +295,7 @@ onMounted(() => {
     <SettingsPanel
       :isOpen="showSettingsModal"
       @close="() => { showSettingsModal = false; workspace.loadEnabledModels(); }"
+      @skills-changed="workspace.loadSkills()"
     />
   </div>
 </template>

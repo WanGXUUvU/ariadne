@@ -1,4 +1,5 @@
 import unittest
+import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -794,16 +795,14 @@ class TestAgentApi(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "session_not_found")
         self.assertEqual(response.json()["error"]["message"], "Session not found")
 
-    @patch("backend.skills.loader.get_default_skill_config_path")
-    @patch("backend.skills.loader.get_default_skill_roots")
+    @patch("backend.skills.loader.get_skills_roots")
     def test_list_skills_endpoint_returns_summaries(
         self,
-        mock_get_default_skill_roots,
-        mock_get_default_skill_config_path,
+        mock_get_skills_roots,
     ):
         project_skills_root = Path(self.temp_dir.name) / "project-skills"
         user_skills_root = Path(self.temp_dir.name) / "user-skills"
-        config_path = Path(self.temp_dir.name) / ".agent" / "skill-config.json"
+        config_path = Path(self.temp_dir.name) / ".agent" / "settings.json"
 
         self._write_skill(
             project_skills_root,
@@ -816,74 +815,73 @@ class TestAgentApi(unittest.TestCase):
             "name: Broken Skill\n# Missing frontmatter\n",
         )
 
-        mock_get_default_skill_roots.return_value = [
+        mock_get_skills_roots.return_value = [
             ("project-opencode", project_skills_root),
             ("user-codex", user_skills_root),
         ]
-        mock_get_default_skill_config_path.return_value = config_path
 
-        response = self.client.get("/skills")
+        with patch("backend.infra.config.settings.SETTINGS_PATH", config_path):
+            response = self.client.get("/skills")
 
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(len(data), 2)
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertEqual(len(data), 2)
 
-        by_name = {item["name"]: item for item in data}
+            by_name = {item["name"]: item for item in data}
 
-        self.assertEqual(by_name["Alpha Skill"]["description"], "Alpha summary")
-        self.assertEqual(
-            by_name["Alpha Skill"]["path"], "project-opencode/alpha-skill/SKILL.md"
-        )
-        self.assertTrue(by_name["Alpha Skill"]["enabled"])
-        self.assertIsNone(by_name["Alpha Skill"]["error"])
+            self.assertEqual(by_name["Alpha Skill"]["description"], "Alpha summary")
+            self.assertEqual(
+                by_name["Alpha Skill"]["path"], (project_skills_root / "alpha-skill" / "SKILL.md").as_posix()
+            )
+            self.assertTrue(by_name["Alpha Skill"]["enabled"])
+            self.assertIsNone(by_name["Alpha Skill"]["error"])
 
-        self.assertFalse(by_name["broken-skill"]["enabled"])
-        self.assertEqual(
-            by_name["broken-skill"]["path"], "user-codex/broken-skill/SKILL.md"
-        )
-        self.assertIn("Missing frontmatter", by_name["broken-skill"]["error"])
+            self.assertFalse(by_name["broken-skill"]["enabled"])
+            self.assertEqual(
+                by_name["broken-skill"]["path"], (user_skills_root / "broken-skill" / "SKILL.md").as_posix()
+            )
+            self.assertIn("Missing frontmatter", by_name["broken-skill"]["error"])
 
-    @patch("backend.skills.loader.get_default_skill_config_path")
-    @patch("backend.skills.loader.get_default_skill_roots")
+    @patch("backend.skills.loader.get_skills_roots")
     def test_disable_and_enable_skill_endpoints_update_config(
         self,
-        mock_get_default_skill_roots,
-        mock_get_default_skill_config_path,
+        mock_get_skills_roots,
     ):
         project_skills_root = Path(self.temp_dir.name) / "project-skills"
-        config_path = Path(self.temp_dir.name) / ".agent" / "skill-config.json"
+        config_path = Path(self.temp_dir.name) / ".agent" / "settings.json"
 
         self._write_skill(
             project_skills_root,
             "alpha-skill",
             "---\nname: Alpha Skill\ndescription: Alpha summary\n---\n# Alpha\n",
         )
-        mock_get_default_skill_roots.return_value = [
+        mock_get_skills_roots.return_value = [
             ("project-opencode", project_skills_root)
         ]
-        mock_get_default_skill_config_path.return_value = config_path
 
-        disable_response = self.client.post("/skills/Alpha Skill/disable")
+        with patch("backend.infra.config.settings.SETTINGS_PATH", config_path):
+            disable_response = self.client.post("/skills/Alpha Skill/disable")
 
-        self.assertEqual(disable_response.status_code, 200)
-        self.assertFalse(disable_response.json()["enabled"])
-        self.assertEqual(
-            config_path.read_text(encoding="utf-8"),
-            '{\n  "disabled": [\n    "Alpha Skill"\n  ]\n}',
-        )
+            self.assertEqual(disable_response.status_code, 200)
+            self.assertFalse(disable_response.json()["enabled"])
+            self.assertEqual(
+                json.loads(config_path.read_text(encoding="utf-8")),
+                {"skills": {"disabled": ["Alpha Skill"]}},
+            )
 
-        list_response = self.client.get("/skills")
+            list_response = self.client.get("/skills")
 
-        self.assertEqual(list_response.status_code, 200)
-        self.assertFalse(list_response.json()[0]["enabled"])
+            self.assertEqual(list_response.status_code, 200)
+            self.assertFalse(list_response.json()[0]["enabled"])
 
-        enable_response = self.client.post("/skills/Alpha Skill/enable")
+            enable_response = self.client.post("/skills/Alpha Skill/enable")
 
-        self.assertEqual(enable_response.status_code, 200)
-        self.assertTrue(enable_response.json()["enabled"])
-        self.assertEqual(
-            config_path.read_text(encoding="utf-8"), '{\n  "disabled": []\n}'
-        )
+            self.assertEqual(enable_response.status_code, 200)
+            self.assertTrue(enable_response.json()["enabled"])
+            self.assertEqual(
+                json.loads(config_path.read_text(encoding="utf-8")),
+                {"skills": {"disabled": []}},
+            )
 
     @patch(
         "backend.core.adapters.chat_completions.ChatCompletionsAdapter.generate"

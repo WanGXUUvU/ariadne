@@ -37,3 +37,6 @@ STYLE.md
 
 # 任务卡与规范文档（本地草稿）
 specs/
+
+# 本地设置文件
+.agent/settings.json

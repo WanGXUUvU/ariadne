@@ -106,4 +106,17 @@ export const settingsApi = {
   listEnabledModels(): Promise<ModelSetting[]> {
     return fetchSettings<ModelSetting[]>('/settings/models?enabled=true');
   },
+
+  /** 获取 settings.json 物理文件内容 */
+  getSettingsFile(): Promise<any> {
+    return fetchSettings<any>('/settings/file');
+  },
+
+  /** 更新 settings.json 物理文件内容 */
+  updateSettingsFile(data: any): Promise<any> {
+    return fetchSettings<any>('/settings/file', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
