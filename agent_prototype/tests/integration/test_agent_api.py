@@ -748,7 +748,7 @@ class TestAgentApi(unittest.TestCase):
         self.assertNotIn("state_json", data[0])
         self.assertEqual(data[0]["message_count"], 4)
         self.assertEqual(data[0]["last_reply_preview"], "first reply")
-        self.assertEqual(data[0]["last_agent_name"], "default")
+        self.assertEqual(data[0]["last_agent_name"], "software_engineer")
         self.assertIn("created_at", data[0])
         self.assertIn("updated_at", data[0])
 

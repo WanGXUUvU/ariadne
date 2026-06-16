@@ -16,10 +16,14 @@ from agent_prototype.tools.types import RiskLevel
 - 下游流向：外部互联网 Tavily 物理 API。
 """
 
-import os, httpx, json
-from agent_prototype.tools.types import ToolDefinition
+import json
+import os
+
+import httpx
+
 from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.tools.types import RiskLevel
+from agent_prototype.tools.types import ToolDefinition
 
 
 def web_search(query: str, num_results: int = 5) -> ToolResult:

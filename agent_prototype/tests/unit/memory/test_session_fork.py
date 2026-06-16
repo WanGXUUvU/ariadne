@@ -9,7 +9,6 @@ from agent_prototype.infra.db.orm_models import (
     SessionRunEventRecord,
     ToolCallRecord,
 )
-from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.memory.session.service import SessionService
 from agent_prototype.memory.session.types import CreateSessionInput, ForkSessionInput
@@ -83,11 +82,6 @@ class TestSessionFork(unittest.TestCase):
         forked_id = fork_summary.session_id
 
         # 4. 验证会话表字段与元数据拷贝
-        parent_db = (
-            self.db.query(SessionRecord)
-            .filter(SessionRecord.session_id == parent_id)
-            .first()
-        )
         forked_db = (
             self.db.query(SessionRecord)
             .filter(SessionRecord.session_id == forked_id)

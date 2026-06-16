@@ -12,26 +12,26 @@
 import logging
 from typing import AsyncIterator
 
-logger = logging.getLogger(__name__)
-
 from agent_prototype.execution.persistence.run_recorder import RunRecorder
 from agent_prototype.execution.persistence.types import (
-    RunInput,
     RunContext,
     RunFinalStatus,
+    RunInput,
 )
 from agent_prototype.execution.runtime.agent_runner import AgentRunner
 from agent_prototype.execution.runtime.run_lifecycle import (
-    RunEventItem,
-    RunStatusItem,
-    RunLifecycleParams,
     RunLifecycle,
+    RunLifecycleParams,
+    RunEventItem,
     TextDeltaItem,
     ThinkingDeltaItem,
+    RunStatusItem,
 )
 from agent_prototype.execution.streaming.sse import _sse_frame
 from agent_prototype.execution.streaming.types import StreamFrame
 from agent_prototype.observation.tool_tracer import ToolTracer
+
+logger = logging.getLogger(__name__)
 
 
 class RunSSEBridge:

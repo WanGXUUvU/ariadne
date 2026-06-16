@@ -22,15 +22,16 @@ from typing import AsyncIterator, Optional, Union
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
 from agent_prototype.core.types import ChatMessage, ToolCall
+from agent_prototype.execution.runtime.tool_batch import ToolBatchItem, build_tool_batch
 from agent_prototype.execution.runtime.types import RunEvent
+from agent_prototype.execution.runtime.types import ToolBatchResult
 from agent_prototype.execution.runtime.vfs import RunVfsRegistry
+from agent_prototype.security.approval.checker import needs_approval
+from agent_prototype.security.middleware.base import MiddlewarePipeline, ToolCallContext
 from agent_prototype.security.policy.types import ApprovalPolicy
+from agent_prototype.security.sandbox.middleware import SandboxMiddleware
 from agent_prototype.tools.registry import ToolRegistry
 from agent_prototype.tools.result_types import ToolResult
-from agent_prototype.security.middleware.base import MiddlewarePipeline, ToolCallContext
-from agent_prototype.security.sandbox.middleware import SandboxMiddleware
-from agent_prototype.execution.runtime.tool_batch import build_tool_batch, ToolBatchItem
-from agent_prototype.security.approval.checker import needs_approval
 
 # ── 线程池 ────────────────────────────────────────────────────────────────────
 
@@ -42,10 +43,6 @@ _tool_thread_pool = ThreadPoolExecutor(
 
 TOOL_TIMEOUT = 120  # 单次工具调用最长等待秒数
 
-
-# ── 数据类 ────────────────────────────────────────────────────────────────────
-
-from agent_prototype.execution.runtime.types import ToolBatchResult
 
 # ── 同步工具执行 ──────────────────────────────────────────────────────────────
 
@@ -92,9 +89,6 @@ def handle_tool_calls(
             and tool_call.function.name not in allow_tool_names
         ):
             raise ValueError(f"Tool not allowed: {tool_call.function.name}")
-
-        # 为同步工具执行构造轻量 Context，确保下沉沙箱生效
-        from agent_prototype.security.middleware.base import ToolCallContext
 
         context = ToolCallContext(
             tool_name=tool_call.function.name,

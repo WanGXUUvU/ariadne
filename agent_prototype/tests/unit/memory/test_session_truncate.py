@@ -4,13 +4,11 @@ from sqlalchemy.orm import sessionmaker
 
 from agent_prototype.infra.db.engine import Base
 from agent_prototype.infra.db.orm_models import (
-    SessionRecord,
     SessionRunRecord,
     SessionRunEventRecord,
     ToolCallRecord,
     PendingApproval,
 )
-from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.memory.session.service import SessionService
 from agent_prototype.memory.session.types import CreateSessionInput

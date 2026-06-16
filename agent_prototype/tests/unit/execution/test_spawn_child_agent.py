@@ -135,6 +135,8 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         ):
 
             mock_instance = MagicMock()
+            mock_instance.state = RunState()
+            mock_instance.last_usage = None
             mock_instance.execute.return_value = fake_output
             MockAgent.return_value = mock_instance
             staged_vfs = MagicMock()
@@ -206,6 +208,8 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
             ),
         ):
             mock_instance = MagicMock()
+            mock_instance.state = RunState()
+            mock_instance.last_usage = None
             mock_instance.execute.side_effect = RuntimeError("child failed")
             MockAgent.return_value = mock_instance
 
@@ -265,6 +269,8 @@ class TestSpawnChildAgentPersistence(unittest.TestCase):
         ):
 
             mock_instance = MagicMock()
+            mock_instance.state = RunState()
+            mock_instance.last_usage = None
             mock_instance.execute.return_value = fake_output
             MockAgent.return_value = mock_instance
 

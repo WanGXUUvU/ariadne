@@ -7,21 +7,22 @@
 4. 多个子 Agent 并行 spawn，全部完成
 """
 
-_MOCK_PATH = "agent_prototype.execution.child_run_launcher.AgentRunner"
-_BUILDER_MOCK_PATH = (
-    "agent_prototype.execution.run_context_factory.RunContextFactory.create_adapter"
-)
-
 import json
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
+from agent_prototype.execution.runtime.types import RunState
 from agent_prototype.tools.registry import build_run_registry
 from agent_prototype.execution.service import RunService
 from agent_prototype.tests.helpers.db import make_sqlite_test_db
 from agent_prototype.tests.helpers.factories import build_run_output
+
+_MOCK_PATH = "agent_prototype.execution.child_run_launcher.AgentRunner"
+_BUILDER_MOCK_PATH = (
+    "agent_prototype.execution.run_context_factory.RunContextFactory.create_adapter"
+)
 
 
 class TestSpawnReturnsRunIdImmediately(unittest.TestCase):
@@ -57,7 +58,8 @@ class TestSpawnReturnsRunIdImmediately(unittest.TestCase):
             ),
             patch(_MOCK_PATH) as MockAgent,
         ):
-
+            MockAgent.return_value.state = RunState()
+            MockAgent.return_value.last_usage = None
             MockAgent.return_value.execute.return_value = build_run_output("done")
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.create_launcher(
@@ -110,7 +112,8 @@ class TestCheckChildStatus(unittest.TestCase):
             ),
             patch(_MOCK_PATH) as MockAgent,
         ):
-
+            MockAgent.return_value.state = RunState()
+            MockAgent.return_value.last_usage = None
             MockAgent.return_value.execute.return_value = build_run_output("结果X")
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.create_launcher(
@@ -198,7 +201,8 @@ class TestWaitChildAgent(unittest.TestCase):
             ),
             patch(_MOCK_PATH) as MockAgent,
         ):
-
+            MockAgent.return_value.state = RunState()
+            MockAgent.return_value.last_usage = None
             MockAgent.return_value.execute.return_value = build_run_output("最终答案")
             registry = build_run_registry(
                 child_dispatcher=run_service.child_dispatcher.create_launcher(
@@ -287,7 +291,8 @@ class TestParallelSpawn(unittest.TestCase):
                 self.session_local,
             ),
         ):
-
+            MockAgent.return_value.state = RunState()
+            MockAgent.return_value.last_usage = None
             MockAgent.return_value.execute.side_effect = [
                 build_run_output(f"结果{i}") for i in range(len(tasks))
             ]
