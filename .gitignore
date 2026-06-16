@@ -21,6 +21,13 @@ __pycache__/
 # 本地开发脚本
 dev.sh
 
+# Claude Code 本地配置
+AGENTS.md
+CLAUDE.md
+BUILD_PLAN.md
+STATUS.md
+STYLE.md
+
 # 补充规范文档（本地草稿）
 specs/SUPP-03-token-aware-compaction.md
 specs/SUPP-04-unified-timeline-persistence.md
