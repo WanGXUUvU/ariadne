@@ -16,6 +16,10 @@ __pycache__/
 # 文档（本地维护）
 docs/
 
+# 数据库迁移（不使用 Alembic）
+alembic.ini
+alembic/
+
 # 数据库文件
 *.db
 *.db-shm
