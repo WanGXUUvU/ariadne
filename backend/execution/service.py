@@ -30,6 +30,7 @@ from backend.observation.tool_tracer import ToolTracer
 from backend.security.approval.store import SqliteApprovalStore
 from backend.memory.session.store import SessionStore
 from backend.memory.run.store import RunTraceStore
+from backend.execution.runtime.types import RunState
 from backend.tools.registry import build_run_registry
 from backend.execution.persistence.types import (
     RunInput,
@@ -157,6 +158,7 @@ class RunService:
         agent_name: Optional[str],
     ) -> dict:
         """保存被中止 run 的当前状态。"""
+        state = self.store.get(session_id) or RunState()
         self.recorder.finalize_run(
             RunFinalizationInput(
                 session_id=session_id,
@@ -165,6 +167,7 @@ class RunService:
                 user_input=user_input,
                 reply=reply,
                 agent_name=agent_name,
+                state=state,
             )
         )
         return {"ok": True}
