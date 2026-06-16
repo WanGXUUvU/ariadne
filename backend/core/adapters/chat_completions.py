@@ -15,7 +15,6 @@ import time
 from typing import Any, AsyncIterator, Optional
 
 import asyncio
-import httpx
 
 import requests
 
@@ -327,7 +326,7 @@ class ChatCompletionsAdapter(ModelAdapter):
         initial_delay = 1.0  # 初始等待 1.0s
         backoff_factor = 2.0  # 乘数因子
 
-        ctx = None  # 用来保存 httpx 的 Stream 上下文管理器
+        ctx = None  # 用来保存 requests 的 Stream 上下文管理器
         response = None  # 用来保存成功的响应对象
         self._reset_think_state()
         # 异步地帮我创建一个网络客户端，并且无论如何，等我退出这段代码时，异步地帮我把连接池全部关闭

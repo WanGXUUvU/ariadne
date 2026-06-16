@@ -19,7 +19,7 @@ from backend.tools.types import RiskLevel
 import json
 import os
 
-import httpx
+import requests
 
 from backend.tools.result_types import ToolResult
 from backend.tools.types import RiskLevel
@@ -48,7 +48,7 @@ def web_search(query: str, num_results: int = 5) -> ToolResult:
         )
 
     try:
-        response = httpx.post(
+        response = requests.post(
             "https://api.tavily.com/search",
             json={
                 "api_key": api_key,
