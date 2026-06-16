@@ -38,7 +38,9 @@ def web_search(query: str, num_results: int = 5) -> ToolResult:
 
     if not api_key:
         return ToolResult(
-            ok=False, content="WEB_SEARCH_API_KEY 未配置", metadata={"tool_name": "web_search"}
+            ok=False,
+            content="WEB_SEARCH_API_KEY 未配置",
+            metadata={"tool_name": "web_search"},
         )
 
     try:

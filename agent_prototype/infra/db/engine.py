@@ -19,7 +19,6 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-
 # ── 连接配置 ──────────────────────────────────────────────────────────────────
 
 DATABASE_URL = "sqlite:///./agent_session.db"
@@ -44,7 +43,9 @@ def set_wal_mode(dbapi_conn, connection_record):
     - connection_record: SQLAlchemy 的连接记录。
     """
     dbapi_conn.execute("PRAGMA journal_mode=WAL")
-    dbapi_conn.execute("PRAGMA synchronous=NORMAL")  # WAL 下 NORMAL 已足够安全，写入更快
+    dbapi_conn.execute(
+        "PRAGMA synchronous=NORMAL"
+    )  # WAL 下 NORMAL 已足够安全，写入更快
 
 
 # ── ORM 基类 & 会话工厂 ───────────────────────────────────────────────────────

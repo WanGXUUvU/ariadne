@@ -26,7 +26,14 @@ class SandboxPathResolver:
             # 如果不是合法 JSON，直接放行，让上层 ToolRegistry 解析报错
             return True, arguments, None
 
-        path_keys = {"path", "file_path", "dir_path", "filename", "filepath", "directory"}
+        path_keys = {
+            "path",
+            "file_path",
+            "dir_path",
+            "filename",
+            "filepath",
+            "directory",
+        }
         sandbox_root = Path(workspace_path).resolve()
         modified = False
 
@@ -42,7 +49,9 @@ class SandboxPathResolver:
                     resolved_p = (sandbox_root / p_str).resolve()
 
                 # 校验防越界逃逸
-                is_inside = (sandbox_root in resolved_p.parents) or (resolved_p == sandbox_root)
+                is_inside = (sandbox_root in resolved_p.parents) or (
+                    resolved_p == sandbox_root
+                )
                 if not is_inside:
                     logger.error(
                         f"[SandboxPathResolver] 沙箱安全拦截！路径越界逃逸: {v} -> {resolved_p}"

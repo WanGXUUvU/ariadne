@@ -27,7 +27,11 @@ class SqliteWorkspaceStore:
         会给出来的结果：
         - List[WorkspaceRecord]: 排好序的工作空间记录列表。
         """
-        return self.db.query(WorkspaceRecord).order_by(WorkspaceRecord.created_at.desc()).all()
+        return (
+            self.db.query(WorkspaceRecord)
+            .order_by(WorkspaceRecord.created_at.desc())
+            .all()
+        )
 
     def get_by_path(self, path: str) -> Optional[WorkspaceRecord]:
         """根据文件夹在电脑上的绝对物理路径，去数据库里查查有没有对它的注册记录。
@@ -38,7 +42,9 @@ class SqliteWorkspaceStore:
         会给出来的结果：
         - Optional[WorkspaceRecord]: 查到的工作空间记录，如果没有注册过这个路径，就返回 None。
         """
-        return self.db.query(WorkspaceRecord).filter(WorkspaceRecord.path == path).first()
+        return (
+            self.db.query(WorkspaceRecord).filter(WorkspaceRecord.path == path).first()
+        )
 
     def save(self, workspace: WorkspaceRecord) -> None:
         """把一个新创建的工作空间记录塞进数据库暂存区（但不立即保存，等待上层服务统一发话进行 commit 提交）。

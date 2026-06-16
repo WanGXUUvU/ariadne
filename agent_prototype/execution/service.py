@@ -65,7 +65,9 @@ class RunService:
         self.child_dispatcher = ChildRunLauncher(db)
         self.trace_query = TraceQueryService(db, self._run_store)
 
-    def _create_agent_runner(self, ctx, run_id: str, run_input: RunInput) -> AgentRunner:
+    def _create_agent_runner(
+        self, ctx, run_id: str, run_input: RunInput
+    ) -> AgentRunner:
         """基于运行物料和协作者构造 AgentRunner。"""
         return AgentRunner(
             state=ctx.state,

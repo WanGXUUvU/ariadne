@@ -14,7 +14,12 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from agent_prototype.core.types import ChatMessage, ModelAdapter, ModelRequest, ModelConfig
+from agent_prototype.core.types import (
+    ChatMessage,
+    ModelAdapter,
+    ModelRequest,
+    ModelConfig,
+)
 
 COMPACT_SUMMARY_PREFIX = (
     "[COMPACT_SUMMARY]\n"
@@ -124,7 +129,9 @@ def extract_compact_summary(raw_output: str) -> str:
     summary_match = re.search(r"<summary>([\s\S]*?)</summary>", text, re.IGNORECASE)
     if summary_match:
         return summary_match.group(1).strip()
-    return re.sub(r"<analysis>[\s\S]*?</analysis>", "", text, flags=re.IGNORECASE).strip()
+    return re.sub(
+        r"<analysis>[\s\S]*?</analysis>", "", text, flags=re.IGNORECASE
+    ).strip()
 
 
 def build_compact_summary_message(summary_text: str) -> ChatMessage:

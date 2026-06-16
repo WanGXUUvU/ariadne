@@ -41,6 +41,7 @@ def read_file(path: str, __context__=None) -> str:
         raise ValueError(f"Not a file: {path}")
     return target.read_text(encoding="utf-8")
 
+
 READ_FILE_SCHEMA = {  # 给模型看的说明
     "type": "function",
     "function": {

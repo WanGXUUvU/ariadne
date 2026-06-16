@@ -82,6 +82,7 @@ class ToolRegistry:  # 工具注册中心
 
         if workspace_path:
             from agent_prototype.security.sandbox.resolver import SandboxPathResolver
+
             ok, modified_args, err_msg = SandboxPathResolver.resolve_and_rewrite(
                 name, arguments, workspace_path
             )
@@ -115,9 +116,15 @@ class ToolRegistry:  # 工具注册中心
             return ToolResult(
                 ok=False,
                 error=ToolError(
-                    code="invalid_arguments", tool_name=name, message="Invalid JSON arguments"
+                    code="invalid_arguments",
+                    tool_name=name,
+                    message="Invalid JSON arguments",
                 ),
-                metadata={"tool_name": name, "raw_arguments": arguments, "debug": str(exc)},
+                metadata={
+                    "tool_name": name,
+                    "raw_arguments": arguments,
+                    "debug": str(exc),
+                },
             )
         try:  # 尝试执行工具
             import inspect
@@ -129,13 +136,17 @@ class ToolRegistry:  # 工具注册中心
         except TypeError as exc:
             return ToolResult(
                 ok=False,
-                error=ToolError(code="invalid_arguments", tool_name=name, message=str(exc)),
+                error=ToolError(
+                    code="invalid_arguments", tool_name=name, message=str(exc)
+                ),
                 metadata={"tool_name": name},
             )
         except Exception as exc:
             return ToolResult(
                 ok=False,
-                error=ToolError(code="tool_runtime_error", tool_name=name, message=str(exc)),
+                error=ToolError(
+                    code="tool_runtime_error", tool_name=name, message=str(exc)
+                ),
                 metadata={"tool_name": name},
             )
 

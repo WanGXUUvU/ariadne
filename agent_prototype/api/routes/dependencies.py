@@ -87,7 +87,9 @@ def get_resume_run_service(db: Session = Depends(get_db)) -> ResumeRunService:
     return ResumeRunService(db)
 
 
-def get_agent_definition_service(db: Session = Depends(get_db)) -> AgentDefinitionService:
+def get_agent_definition_service(
+    db: Session = Depends(get_db),
+) -> AgentDefinitionService:
     """提供 AgentDefinitionService 实例（含 Agent 定义 CRUD）。"""
     return AgentDefinitionService(db)
 

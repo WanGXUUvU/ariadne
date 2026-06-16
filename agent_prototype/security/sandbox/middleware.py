@@ -32,12 +32,16 @@ class SandboxMiddleware(BaseMiddleware):
         - ToolResult: 工具的运行结果。如果工具未被允许，会直接返回
         TOOL_NOT_ALLOWED；否则原样放行。
         """
-        logger.info(f"[SandboxMiddleware] 正在执行工具白名单校验: {context.tool_name}...")
+        logger.info(
+            f"[SandboxMiddleware] 正在执行工具白名单校验: {context.tool_name}..."
+        )
 
         # 1. ：工具名称准入校验 (AOP Tool Restriction)
         allow_tool_names = context.allow_tool_names
         if allow_tool_names is not None and context.tool_name not in allow_tool_names:
-            logger.warning(f"[SandboxMiddleware] 工具未被当前 Agent 允许调用: {context.tool_name}")
+            logger.warning(
+                f"[SandboxMiddleware] 工具未被当前 Agent 允许调用: {context.tool_name}"
+            )
             return ToolResult(
                 ok=False,
                 content=None,

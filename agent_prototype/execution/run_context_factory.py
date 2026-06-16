@@ -32,7 +32,11 @@ from agent_prototype.context.compaction import HistoryCompactor
 from agent_prototype.core.adapters.chat_completions import ChatCompletionsAdapter
 from agent_prototype.execution.persistence.types import RunInput, RunContext
 from agent_prototype.execution.runtime.types import RunState
-from agent_prototype.infra.db.orm_models import ModelSetting, ProviderConfig, SessionRecord
+from agent_prototype.infra.db.orm_models import (
+    ModelSetting,
+    ProviderConfig,
+    SessionRecord,
+)
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.memory.summary.service import CompactService
 from agent_prototype.prompt.builder import (
@@ -63,7 +67,9 @@ class RunContextFactory:
         # 读取 session 最新状态快照，作为本轮运行起点。
         state = self.store.get(session_id) or RunState()
 
-        context_tokens = record.context_tokens if record and record.context_tokens else 0
+        context_tokens = (
+            record.context_tokens if record and record.context_tokens else 0
+        )
         session_type = record.session_type if record else "assistant"
         workspace_path = record.workspace_path if record else None
 
@@ -80,8 +86,12 @@ class RunContextFactory:
             )
             state = compact_result.state
 
-        effective_agent_name = self._resolve_effective_agent_name(run_input, session_type)
-        definition = AgentDefinitionService(self.db).load_definition(effective_agent_name)
+        effective_agent_name = self._resolve_effective_agent_name(
+            run_input, session_type
+        )
+        definition = AgentDefinitionService(self.db).load_definition(
+            effective_agent_name
+        )
 
         assembler = ContextAssembler(
             self.db,
@@ -117,7 +127,11 @@ class RunContextFactory:
 
     def _load_record(self, session_id: str) -> Optional[SessionRecord]:
         """读取 session 主记录。"""
-        return self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
+        return (
+            self.db.query(SessionRecord)
+            .filter(SessionRecord.session_id == session_id)
+            .first()
+        )
 
     def _resolve_context_length(
         self,
@@ -152,7 +166,9 @@ class RunContextFactory:
     def _resolve_approval_policy(self, record: Optional[SessionRecord]):
         """根据 session 权限档位选择审批策略。"""
         profile_name = (
-            record.permission_profile if record and record.permission_profile else "conservative"
+            record.permission_profile
+            if record and record.permission_profile
+            else "conservative"
         )
         return PROFILES.get(profile_name, PROFILES["conservative"]).approval_policy
 
@@ -165,8 +181,14 @@ class RunContextFactory:
         if record is None:
             record = self._load_record(session_id)
 
-        if record is None or record.model_provider_id is None or record.model_id is None:
-            raise ValueError("当前会话未配置模型，请在设置中选择 Provider 和模型后再开始对话")
+        if (
+            record is None
+            or record.model_provider_id is None
+            or record.model_id is None
+        ):
+            raise ValueError(
+                "当前会话未配置模型，请在设置中选择 Provider 和模型后再开始对话"
+            )
 
         provider = (
             self.db.query(ProviderConfig)

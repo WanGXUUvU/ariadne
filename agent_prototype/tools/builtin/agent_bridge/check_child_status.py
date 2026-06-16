@@ -19,7 +19,9 @@ from agent_prototype.tools.types import RiskLevel
 import json
 
 
-def build_check_child_status_tool(status_checker: Callable[[list[str]], dict]) -> ToolDefinition:
+def build_check_child_status_tool(
+    status_checker: Callable[[list[str]], dict],
+) -> ToolDefinition:
     """这是一个“子智能体状态查询工具的加工厂（构建函数）”。
     它接收一个用来真正干活的查询回调函数，然后把真正的工具定义（ToolDefinition）给加工并打包出来。
 

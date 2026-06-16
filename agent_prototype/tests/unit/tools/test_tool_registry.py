@@ -15,13 +15,17 @@ class TestToolRegistry(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_default_registry_exposes_echo_tool(self):
-        tool_names = [schema["function"]["name"] for schema in self.registry.get_tool_schemas()]
+        tool_names = [
+            schema["function"]["name"] for schema in self.registry.get_tool_schemas()
+        ]
         self.assertIn("echo_tool", tool_names)
 
     def test_execute_read_file_tool_call(self):
         file_path = Path(self.temp_dir.name) / "sample.txt"
         file_path.write_text("hello registry", encoding="utf-8")
-        result = self.registry.execute_tool_call("read_file", f'{{"path":"{file_path}"}}')
+        result = self.registry.execute_tool_call(
+            "read_file", f'{{"path":"{file_path}"}}'
+        )
         self.assertTrue(result.ok)
         self.assertEqual(result.content, "hello registry")
 
@@ -30,7 +34,9 @@ class TestToolRegistry(unittest.TestCase):
         folder_path.mkdir()
         (folder_path / "b.txt").write_text("b", encoding="utf-8")
         (folder_path / "a.txt").write_text("a", encoding="utf-8")
-        result = self.registry.execute_tool_call("list_dir", f'{{"path":"{folder_path}"}}')
+        result = self.registry.execute_tool_call(
+            "list_dir", f'{{"path":"{folder_path}"}}'
+        )
         self.assertTrue(result.ok)
         self.assertEqual(result.content, "a.txt\nb.txt")
 

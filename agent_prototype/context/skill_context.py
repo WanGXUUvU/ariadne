@@ -43,7 +43,9 @@ class SkillContextService:
     ):
         """通过依赖注入接收技能和 prompt 构建回调。"""
         module = sys.modules[__name__]
-        self._list_skills = list_skills or getattr(module, "list_skills", default_list_skills)
+        self._list_skills = list_skills or getattr(
+            module, "list_skills", default_list_skills
+        )
         self._load_skill_content = load_skill_content or getattr(
             module,
             "load_skill_content",

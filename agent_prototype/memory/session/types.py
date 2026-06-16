@@ -60,9 +60,12 @@ class SessionSummary(BaseModel):
 
 class TruncateSessionInput(BaseModel):
     """截断 session 的领域输入结构体。"""
+
     message_index: int = Field(ge=0)
+
 
 class ForkSessionInput(BaseModel):
     """派生分支会话的领域输入结构体。"""
+
     message_index: int = Field(ge=0)
     new_content: Optional[str] = None

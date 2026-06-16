@@ -21,7 +21,11 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 # ── 本地模块 ──────────────────────────────────────────────────────────────────
-from agent_prototype.infra.db.orm_models import PendingApproval, SessionRecord, SessionRunRecord
+from agent_prototype.infra.db.orm_models import (
+    PendingApproval,
+    SessionRecord,
+    SessionRunRecord,
+)
 from agent_prototype.security.approval.store import SqliteApprovalStore
 
 

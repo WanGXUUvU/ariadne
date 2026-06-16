@@ -18,7 +18,9 @@ from agent_prototype.tools.result_types import ToolResult
 from agent_prototype.tools.types import RiskLevel
 
 
-def build_spawn_child_agent_tool(child_dispatcher: Callable[[str, str], str]) -> ToolDefinition:
+def build_spawn_child_agent_tool(
+    child_dispatcher: Callable[[str, str], str],
+) -> ToolDefinition:
     """这是一个“派发（召唤）子智能体工具的加工厂（构建函数）”。
     它接收一个用来真正分发任务的回调函数，然后将“召唤子智能体小帮手”这个工具的定义（ToolDefinition）给加工并打包出来。
 

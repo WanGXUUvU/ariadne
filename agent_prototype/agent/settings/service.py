@@ -40,7 +40,9 @@ class SettingsService:
     def _provider_to_out(self, record: ProviderConfig) -> ProviderOut:
         """将数据库供应商记录转换为含 API Key 脱敏的 DTO 输出对象。"""
         key = record.api_key or ""
-        hint = ("****" + key[-4:]) if len(key) >= 4 else ("*" * len(key)) if key else None
+        hint = (
+            ("****" + key[-4:]) if len(key) >= 4 else ("*" * len(key)) if key else None
+        )
         return ProviderOut(
             id=record.id,
             name=record.name,
@@ -67,7 +69,9 @@ class SettingsService:
 
     def create_provider(self, name: str, base_url: str, api_key: str) -> ProviderOut:
         """添加并保存一个新的模型供应商配置。"""
-        record = self.store.create_provider(name=name, base_url=base_url, api_key=api_key)
+        record = self.store.create_provider(
+            name=name, base_url=base_url, api_key=api_key
+        )
         self.db.commit()
         self.db.refresh(record)
         return self._provider_to_out(record)
@@ -86,7 +90,11 @@ class SettingsService:
     ) -> ProviderOut:
         """局部更新指定供应商的配置属性。"""
         record = self.store.patch_provider(
-            provider_id, name=name, base_url=base_url, api_key=api_key, is_default=is_default
+            provider_id,
+            name=name,
+            base_url=base_url,
+            api_key=api_key,
+            is_default=is_default,
         )
         if record is None:
             raise ValueError(f"Provider {provider_id} not found")
@@ -105,15 +113,22 @@ class SettingsService:
         """获取具体模型列表，支持按供应商 ID 或是否启用进行过滤。"""
         return [
             self._model_to_out(r)
-            for r in self.store.list_models(provider_id=provider_id, enabled_only=enabled_only)
+            for r in self.store.list_models(
+                provider_id=provider_id, enabled_only=enabled_only
+            )
         ]
 
     def patch_model(
-        self, model_db_id: int, enabled: Optional[bool] = None, display_name: Optional[str] = None
+        self,
+        model_db_id: int,
+        enabled: Optional[bool] = None,
+        display_name: Optional[str] = None,
     ) -> ModelOut:
         """更新模型的启用状态或展示别名。"""
         enabled_int = int(enabled) if enabled is not None else None
-        record = self.store.patch_model(model_db_id, enabled=enabled_int, display_name=display_name)
+        record = self.store.patch_model(
+            model_db_id, enabled=enabled_int, display_name=display_name
+        )
         if record is None:
             raise ValueError(f"ModelSetting {model_db_id} not found")
         self.db.commit()
@@ -155,7 +170,11 @@ class SettingsService:
 
     def sync_provider_models(self, provider_id: int) -> list[ModelOut]:
         """向指定供应商同步获取可用模型，并物理同步写入本地数据库。"""
-        provider = self.db.query(ProviderConfig).filter(ProviderConfig.id == provider_id).first()
+        provider = (
+            self.db.query(ProviderConfig)
+            .filter(ProviderConfig.id == provider_id)
+            .first()
+        )
         if provider is None:
             raise ValueError(f"Provider {provider_id} not found")
 

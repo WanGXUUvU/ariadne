@@ -40,8 +40,10 @@ class ToolResult(BaseModel):
     error: Optional[ToolError] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-class ToolState(str,Enum):
+
+class ToolState(str, Enum):
     """工具写入的vfs状态。"""
-    STAGED="staged"
-    COMMITTED="committed"
-    ROLLED_BACK="rolled_back"
+
+    STAGED = "staged"
+    COMMITTED = "committed"
+    ROLLED_BACK = "rolled_back"

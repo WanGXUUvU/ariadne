@@ -3,7 +3,10 @@ import unittest
 
 from agent_prototype.core.types import ChatMessage
 from agent_prototype.infra.db.orm_models import SessionRunRecord
-from agent_prototype.security.approval.service import ApprovalRunNotPaused, ApprovalService
+from agent_prototype.security.approval.service import (
+    ApprovalRunNotPaused,
+    ApprovalService,
+)
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.tests.helpers.db import make_sqlite_test_db
 

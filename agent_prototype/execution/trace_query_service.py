@@ -40,7 +40,9 @@ class TraceQueryService:
             for row in event_rows:
                 tool_result = None
                 if row.tool_result_json:
-                    tool_result = ToolResult.model_validate(json.loads(row.tool_result_json))
+                    tool_result = ToolResult.model_validate(
+                        json.loads(row.tool_result_json)
+                    )
                 events.append(
                     RunEvent(
                         index=row.event_index,

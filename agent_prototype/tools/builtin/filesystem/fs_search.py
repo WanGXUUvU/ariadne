@@ -59,8 +59,12 @@ def search_text(query: str, path: str = ".", __context__=None) -> str:
 
         try:
             # 🟢 读文件时优先走 VFS（有暂存内容就用暂存内容，否则读磁盘）
-            content = vfs.read_text(str(file_path)) if vfs else file_path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, FileNotFoundError):
+            content = (
+                vfs.read_text(str(file_path))
+                if vfs
+                else file_path.read_text(encoding="utf-8")
+            )
+        except UnicodeDecodeError, FileNotFoundError:
             continue
 
         for line_no, line in enumerate(content.splitlines(), start=1):
@@ -81,6 +85,7 @@ def search_text(query: str, path: str = ".", __context__=None) -> str:
                     matches.append(f"{staged_path}:{line_no}: {line.strip()}")
 
     return "\n".join(matches) if matches else f"No matches for: {query}"
+
 
 SEARCH_TEXT_SCHEMA = {  # 给模型看的工具说明
     "type": "function",

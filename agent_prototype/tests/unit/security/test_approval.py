@@ -18,7 +18,6 @@ from agent_prototype.execution.runtime.tool_runner import async_handle_tool_call
 from agent_prototype.tools.registry import ToolRegistry
 from agent_prototype.tools.types import ToolDefinition
 
-
 # ── 辅助：构造一个 fake ToolRegistry，只返回指定的 risk_level ──────────────
 
 
@@ -146,7 +145,9 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_never_policy_executes_write_tool_directly(self):
         """NEVER policy：WRITE 工具直接执行，不产生 approval_required 事件。"""
         registry = make_registry(RiskLevel.WRITE)
-        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.NEVER))
+        events = self._run(
+            collect_events(registry, [make_tool_call()], ApprovalPolicy.NEVER)
+        )
         types = [e.type for e in events]
         self.assertNotIn("approval_required", types)
         self.assertIn("tool_result", types)
@@ -154,7 +155,9 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_untrusted_policy_blocks_write_tool(self):
         """UNTRUSTED policy：WRITE 工具被拦截，产生 approval_required，不产生 tool_result。"""
         registry = make_registry(RiskLevel.WRITE)
-        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.UNTRUSTED))
+        events = self._run(
+            collect_events(registry, [make_tool_call()], ApprovalPolicy.UNTRUSTED)
+        )
         types = [e.type for e in events]
         self.assertIn("approval_required", types)
         self.assertNotIn("tool_result", types)
@@ -162,7 +165,9 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_on_request_policy_allows_write_tool(self):
         """ON_REQUEST policy：WRITE 工具直接执行，不产生 approval_required 事件。"""
         registry = make_registry(RiskLevel.WRITE)
-        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST))
+        events = self._run(
+            collect_events(registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST)
+        )
         types = [e.type for e in events]
         self.assertNotIn("approval_required", types)
         self.assertIn("tool_result", types)
@@ -170,7 +175,9 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
     def test_on_request_policy_blocks_danger_tool(self):
         """ON_REQUEST policy：DANGER 工具被拦截，产生 approval_required。"""
         registry = make_registry(RiskLevel.DANGER)
-        events = self._run(collect_events(registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST))
+        events = self._run(
+            collect_events(registry, [make_tool_call()], ApprovalPolicy.ON_REQUEST)
+        )
         types = [e.type for e in events]
         self.assertIn("approval_required", types)
         self.assertNotIn("tool_result", types)
@@ -217,7 +224,9 @@ class TestAsyncHandleToolCallsApproval(unittest.TestCase):
         base_messages = [ChatMessage(role="user", content="run mixed tools")]
         captured = {}
 
-        def callback(tool_call_id, tool_name, arguments, saved_messages, event_index, batch_id):
+        def callback(
+            tool_call_id, tool_name, arguments, saved_messages, event_index, batch_id
+        ):
             captured["tool_call_id"] = tool_call_id
             captured["tool_name"] = tool_name
             captured["saved_messages"] = saved_messages

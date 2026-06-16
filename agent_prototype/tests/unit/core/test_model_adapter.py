@@ -116,8 +116,12 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         self.assertEqual(response.usage.input_tokens, 12)
         self.assertEqual(response.usage.output_tokens, 8)
         self.assertEqual(response.usage.total_tokens, 20)
-        self.assertEqual(mock_post.call_args.kwargs["json"]["messages"][0]["role"], "user")
-        self.assertEqual(mock_post.call_args.kwargs["json"]["messages"][0]["content"], "你好")
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"]["messages"][0]["role"], "user"
+        )
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"]["messages"][0]["content"], "你好"
+        )
 
     def test_parse_delta_splits_combined_fields_in_stable_order(self):
         adapter = ChatCompletionsAdapter()
@@ -140,11 +144,14 @@ class TestChatCompletionsAdapter(unittest.TestCase):
             finish_reason="tool_calls",
         )
 
-        self.assertEqual([event.type for event in events], [
-            "thinking_delta",
-            "content_delta",
-            "tool_call_delta",
-        ])
+        self.assertEqual(
+            [event.type for event in events],
+            [
+                "thinking_delta",
+                "content_delta",
+                "tool_call_delta",
+            ],
+        )
         self.assertEqual(events[0].thinking_delta, "先想")
         self.assertEqual(events[1].content_delta, "我先查一下")
         self.assertEqual(events[2].tool_call_delta["tool_calls"][0]["id"], "call_001")
@@ -169,10 +176,13 @@ class TestChatCompletionsAdapter(unittest.TestCase):
             finish_reason="tool_calls",
         )
 
-        self.assertEqual([event.type for event in events], [
-            "content_delta",
-            "tool_call_delta",
-        ])
+        self.assertEqual(
+            [event.type for event in events],
+            [
+                "content_delta",
+                "tool_call_delta",
+            ],
+        )
         self.assertEqual(events[0].content_delta, "我先查一下")
         self.assertEqual(events[1].tool_call_delta["tool_calls"][0]["id"], "call_001")
 
@@ -248,7 +258,9 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             adapter.generate(request)
 
-        self.assertIn("failed due to network/timeout error after 3 retries", str(ctx.exception))
+        self.assertIn(
+            "failed due to network/timeout error after 3 retries", str(ctx.exception)
+        )
         self.assertEqual(mock_post.call_count, 4)  # original + 3 retries
         self.assertEqual(mock_sleep.call_count, 3)
         mock_sleep.assert_any_call(1.0)

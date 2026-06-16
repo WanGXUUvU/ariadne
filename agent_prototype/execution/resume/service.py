@@ -71,7 +71,9 @@ class ResumeRunService:
         self.recorder = RunRecorder(db)
         self.session_store = SessionStore(db)
 
-    async def resume_run(self, approval_id: str, rejected: bool = False) -> AsyncIterator[str]:
+    async def resume_run(
+        self, approval_id: str, rejected: bool = False
+    ) -> AsyncIterator[str]:
         """执行审批结果并拉起智能体继续运行！
         它会先去读审批记录，把之前的聊天历史原样倒回智能体内存，
         如果用户“同意”就真正去执行那个敏感工具，拿回工具执行结果；如果用户“拒绝”就构造一个被拒绝的失败结果。
@@ -158,7 +160,9 @@ class ResumeRunService:
         )
         event_index += 1
         state.messages.append(
-            ChatMessage(role="tool", tool_call_id=approval.tool_call_id, content=content)
+            ChatMessage(
+                role="tool", tool_call_id=approval.tool_call_id, content=content
+            )
         )
 
         # ── 如果同 batch 还有 pending approval，保存当前审批结果后继续暂停 ──
@@ -177,8 +181,12 @@ class ResumeRunService:
                     is_resume=True,
                 )
             )
-            yield _sse_frame(StreamFrame(type="resume", data={"run_id": approval.run_id}))
-            yield _sse_frame(StreamFrame(type="run_event", data=tool_result_event.model_dump()))
+            yield _sse_frame(
+                StreamFrame(type="resume", data={"run_id": approval.run_id})
+            )
+            yield _sse_frame(
+                StreamFrame(type="run_event", data=tool_result_event.model_dump())
+            )
             yield _sse_frame(
                 StreamFrame(
                     type="paused",
@@ -198,7 +206,9 @@ class ResumeRunService:
         self.db.commit()
 
         yield _sse_frame(StreamFrame(type="resume", data={"run_id": approval.run_id}))
-        yield _sse_frame(StreamFrame(type="run_event", data=tool_result_event.model_dump()))
+        yield _sse_frame(
+            StreamFrame(type="run_event", data=tool_result_event.model_dump())
+        )
 
         # ── 构造 AgentRunner，继续流式运转 ────────────────────────────────────
         runtime_factory = RunContextFactory(self.db)
@@ -254,7 +264,9 @@ class ResumeRunService:
 
         async for item in lifecycle.iterate():
             if isinstance(item, TextDeltaItem):
-                yield _sse_frame(StreamFrame(type="delta", data={"content": item.content}))
+                yield _sse_frame(
+                    StreamFrame(type="delta", data={"content": item.content})
+                )
             elif isinstance(item, ThinkingDeltaItem):
                 yield _sse_frame(
                     StreamFrame(type="thinking_delta", data={"content": item.content})
@@ -265,13 +277,17 @@ class ResumeRunService:
                 )
             elif isinstance(item, RunStatusItem):
                 if item.status == RunFinalStatus.PAUSED:
-                    next_pending = self.approval_store.get_next_pending_for_batch(batch_id)
+                    next_pending = self.approval_store.get_next_pending_for_batch(
+                        batch_id
+                    )
                     yield _sse_frame(
                         StreamFrame(
                             type="paused",
                             data={
                                 "run_id": approval.run_id,
-                                "approval_id": next_pending.id if next_pending else None,
+                                "approval_id": (
+                                    next_pending.id if next_pending else None
+                                ),
                             },
                         )
                     )

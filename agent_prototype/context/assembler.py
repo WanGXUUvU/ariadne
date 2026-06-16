@@ -45,7 +45,8 @@ class ContextAssembler:
         self.db = db
         self.skill_service = SkillContextService(
             list_skills=list_skills or skill_context_module.list_skills,
-            load_skill_content=load_skill_content or skill_context_module.load_skill_content,
+            load_skill_content=load_skill_content
+            or skill_context_module.load_skill_content,
             build_skill_catalog_prompt=build_skill_catalog_prompt,
             build_runtime_system_prompt=build_runtime_system_prompt,
         )
@@ -58,9 +59,11 @@ class ContextAssembler:
         definition: AgentDefinition,
     ) -> AssembledContext:
         """读取工作区文本上下文并产出运行期系统提示词。"""
-        local_rules_text, agent_soul_text, user_profile_text = self._load_workspace_context(
-            workspace_path,
-            session_type,
+        local_rules_text, agent_soul_text, user_profile_text = (
+            self._load_workspace_context(
+                workspace_path,
+                session_type,
+            )
         )
 
         runtime_definition = self.skill_service.build_runtime_definition_with_skills(
@@ -104,6 +107,8 @@ class ContextAssembler:
         try:
             content = path.read_text(encoding="utf-8").strip()
         except Exception:
-            logging.getLogger(__name__).warning("Failed to read %s", path, exc_info=True)
+            logging.getLogger(__name__).warning(
+                "Failed to read %s", path, exc_info=True
+            )
             return None
         return content or None

@@ -11,7 +11,9 @@ from typing import Optional
 
 def open_folder_dialog() -> Optional[str]:
     """调起 macOS 文件夹选择弹窗，支持 60s 超时和取消。"""
-    script = 'POSIX path of (choose folder with prompt "Select a folder for the workspace")'
+    script = (
+        'POSIX path of (choose folder with prompt "Select a folder for the workspace")'
+    )
 
     try:
         result = subprocess.run(

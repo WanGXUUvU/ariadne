@@ -126,7 +126,9 @@ class TestAgent(unittest.TestCase):
         )
 
         agent = AgentRunner(model_adapter=fake_adapter)
-        output = agent.execute(RunInput(session_id="session-a", user_input="帮我测试工具"))
+        output = agent.execute(
+            RunInput(session_id="session-a", user_input="帮我测试工具")
+        )
 
         self.assertEqual(output.reply, "final reply")
         self.assertEqual(len(fake_adapter.calls), 2)
@@ -153,7 +155,9 @@ class TestAgent(unittest.TestCase):
         )
 
         agent = AgentRunner(model_adapter=fake_adapter)
-        output = agent.execute(RunInput(session_id="session-a", user_input="帮我测试错误 trace"))
+        output = agent.execute(
+            RunInput(session_id="session-a", user_input="帮我测试错误 trace")
+        )
 
         self.assertEqual(output.reply, "final reply after error")
         self.assertEqual(len(fake_adapter.calls), 2)

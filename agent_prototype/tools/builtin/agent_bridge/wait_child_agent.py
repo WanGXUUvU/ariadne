@@ -45,26 +45,35 @@ def build_wait_child_agent_tool(child_waiter: Callable[[str], str]) -> ToolDefin
             return ToolResult(
                 ok=True,
                 content=reply,
-                metadata={"tool_name": "wait_child_agent", "child_run_id": child_run_id},
+                metadata={
+                    "tool_name": "wait_child_agent",
+                    "child_run_id": child_run_id,
+                },
             )
         except LookupError as e:  # 当 ID 未找到时抛出 LookupError
             return ToolResult(
                 ok=False,
-                error=ToolError(code="not_found", tool_name="wait_child_agent", message=str(e)),
+                error=ToolError(
+                    code="not_found", tool_name="wait_child_agent", message=str(e)
+                ),
                 metadata={"tool_name": "wait_child_agent"},
             )
         except TimeoutError:
             return ToolResult(
                 ok=False,
                 error=ToolError(
-                    code="timeout", tool_name="wait_child_agent", message="timed out after 120s"
+                    code="timeout",
+                    tool_name="wait_child_agent",
+                    message="timed out after 120s",
                 ),
                 metadata={"tool_name": "wait_child_agent"},
             )
         except Exception as e:
             return ToolResult(
                 ok=False,
-                error=ToolError(code="child_error", tool_name="wait_child_agent", message=str(e)),
+                error=ToolError(
+                    code="child_error", tool_name="wait_child_agent", message=str(e)
+                ),
                 metadata={"tool_name": "wait_child_agent"},
             )
 
@@ -94,5 +103,8 @@ def build_wait_child_agent_tool(child_waiter: Callable[[str], str]) -> ToolDefin
     }
 
     return ToolDefinition(
-        name="wait_child_agent", schema=SCHEMA, handler=wait_child_agent, risk_level=RiskLevel.SAFE
+        name="wait_child_agent",
+        schema=SCHEMA,
+        handler=wait_child_agent,
+        risk_level=RiskLevel.SAFE,
     )

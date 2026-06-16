@@ -44,7 +44,9 @@ class ToolTracer:
         self.db.commit()
         return record_id
 
-    def on_tool_finish(self, record_id: int, status: str, result_json: Optional[str]) -> None:
+    def on_tool_finish(
+        self, record_id: int, status: str, result_json: Optional[str]
+    ) -> None:
         """工具执行完毕时，更新 tool_call 记录状态。"""
         self.run_store.finish_tool_call(
             record_id=record_id,

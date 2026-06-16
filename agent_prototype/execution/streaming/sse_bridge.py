@@ -15,7 +15,11 @@ from typing import AsyncIterator
 logger = logging.getLogger(__name__)
 
 from agent_prototype.execution.persistence.run_recorder import RunRecorder
-from agent_prototype.execution.persistence.types import RunInput, RunContext, RunFinalStatus
+from agent_prototype.execution.persistence.types import (
+    RunInput,
+    RunContext,
+    RunFinalStatus,
+)
 from agent_prototype.execution.runtime.agent_runner import AgentRunner
 from agent_prototype.execution.runtime.run_lifecycle import (
     RunEventItem,

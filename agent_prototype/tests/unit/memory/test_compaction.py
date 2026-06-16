@@ -15,7 +15,9 @@ class TestCompaction(unittest.TestCase):
             "<summary>final structured summary</summary>"
         )
 
-        self.assertEqual(extract_compact_summary(raw_output), "final structured summary")
+        self.assertEqual(
+            extract_compact_summary(raw_output), "final structured summary"
+        )
 
     def test_build_compact_prompt_includes_all_messages(self):
         messages = [

@@ -59,7 +59,9 @@ def load_skill_config(config_path: Optional[Path] = None) -> SkillConfig:
         raw_data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         logger.warning(
-            "Failed to parse skill config at %s, falling back to empty", path, exc_info=True
+            "Failed to parse skill config at %s, falling back to empty",
+            path,
+            exc_info=True,
         )
         return SkillConfig(disabled=set())
 
@@ -95,8 +97,12 @@ def save_skill_config(config: SkillConfig, config_path: Optional[Path] = None) -
 
 def get_default_skill_roots() -> list[tuple[str, Path]]:
     """输入：无。输出：默认 skill 根目录列表。"""
-    repo_root = Path(__file__).resolve().parents[2]  # 从当前文件反推至仓库根目录 (parents[2])
-    package_root = Path(__file__).resolve().parents[1]  # 反推至 agent_prototype 根目录 (parents[1])
+    repo_root = (
+        Path(__file__).resolve().parents[2]
+    )  # 从当前文件反推至仓库根目录 (parents[2])
+    package_root = (
+        Path(__file__).resolve().parents[1]
+    )  # 反推至 agent_prototype 根目录 (parents[1])
     home_root = Path.home()
     return [
         ("opencode", repo_root / ".opencode" / "skills"),
@@ -116,7 +122,10 @@ def list_skills(
     use_cache = skill_roots is None and config_path is None
     if use_cache:
         now = _time.monotonic()
-        if _list_skills_cache is not None and now - _list_skills_cache_ts < _LIST_SKILLS_TTL:
+        if (
+            _list_skills_cache is not None
+            and now - _list_skills_cache_ts < _LIST_SKILLS_TTL
+        ):
             return _list_skills_cache
 
     roots = skill_roots or get_default_skill_roots()
@@ -146,7 +155,9 @@ def list_skills(
     return result
 
 
-def _load_skill_summary(skill_file: Path, source_name: str, root_path: Path) -> SkillSummary:
+def _load_skill_summary(
+    skill_file: Path, source_name: str, root_path: Path
+) -> SkillSummary:
     """输入：单个 SKILL.md 路径、来源名、来源根目录。输出：一个 SkillSummary。"""
     safe_relative_path = skill_file.relative_to(root_path).as_posix()
     safe_path = f"{source_name}/{safe_relative_path}"
@@ -158,7 +169,9 @@ def _load_skill_summary(skill_file: Path, source_name: str, root_path: Path) -> 
         description_value = metadata.get("description")
         description = str(description_value) if description_value is not None else None
 
-        return SkillSummary(name=name, description=description, path=safe_path, enabled=True)
+        return SkillSummary(
+            name=name, description=description, path=safe_path, enabled=True
+        )
 
     except Exception as exc:
         return SkillSummary(
@@ -207,7 +220,9 @@ def load_skill_content(
                 content = skill_file.read_text(encoding="utf-8")
                 metadata = _parse_frontmatter(content)
             except Exception:
-                logger.warning("Failed to parse skill file %s, skipping", skill_file, exc_info=True)
+                logger.warning(
+                    "Failed to parse skill file %s, skipping", skill_file, exc_info=True
+                )
                 continue
 
             current_name = str(metadata.get("name") or skill_file.parent.name)

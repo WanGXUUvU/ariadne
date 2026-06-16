@@ -77,7 +77,10 @@ class ChildRunLauncher:
                 future: Future[RunLifecycleResultItem] = _global_futures[run_id]
                 if future.done():
                     if future.exception():
-                        result[run_id] = {"status": "error", "error": str(future.exception())}
+                        result[run_id] = {
+                            "status": "error",
+                            "error": str(future.exception()),
+                        }
                     else:
                         result[run_id] = {
                             "status": "done",
@@ -130,7 +133,12 @@ class ChildRunLauncher:
         RunVfsRegistry.create(child_run_id)
         try:
             from agent_prototype.infra.db.orm_models import SessionRecord
-            session_rec = db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
+
+            session_rec = (
+                db.query(SessionRecord)
+                .filter(SessionRecord.session_id == session_id)
+                .first()
+            )
             workspace_path = None
             if session_rec:
                 path_val = getattr(session_rec, "workspace_path", None)
@@ -182,7 +190,9 @@ class ChildRunLauncher:
                 .first()
             )
             if run_record is None:
-                raise LookupError(f"child run {child_run_id} not found after finalization")
+                raise LookupError(
+                    f"child run {child_run_id} not found after finalization"
+                )
             run_record.parent_run_id = parent_run_id
             db.commit()
             return result

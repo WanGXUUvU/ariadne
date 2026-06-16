@@ -103,7 +103,11 @@ class RunTraceStore:
         """保存"部分/未完成"的运行记录（流式输出或者中间被掐断时的保存操作）。"""
         events = events or []
 
-        existing = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        existing = (
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.run_id == run_id)
+            .first()
+        )
         if existing:
             if events and existing.event_count == 0:
                 for index, event in enumerate(events):
@@ -117,7 +121,9 @@ class RunTraceStore:
                             tool_name=event_dict.get("tool_name"),
                             tool_call_id=event_dict.get("tool_call_id"),
                             tool_result_json=(
-                                json.dumps(event_dict.get("tool_result"), ensure_ascii=False)
+                                json.dumps(
+                                    event_dict.get("tool_result"), ensure_ascii=False
+                                )
                                 if event_dict.get("tool_result")
                                 else None
                             ),
@@ -173,7 +179,11 @@ class RunTraceStore:
                 )
             )
 
-        record = self.db.query(SessionRecord).filter(SessionRecord.session_id == session_id).first()
+        record = (
+            self.db.query(SessionRecord)
+            .filter(SessionRecord.session_id == session_id)
+            .first()
+        )
         if record:
             record.state_json = json.dumps(state.model_dump(), ensure_ascii=False)
 
@@ -184,24 +194,34 @@ class RunTraceStore:
         self, session_id: str, run_id: Optional[str] = None
     ) -> list[SessionRunRecord]:
         """列出某个会话的所有运行记录。"""
-        query = self.db.query(SessionRunRecord).filter(SessionRunRecord.session_id == session_id)
+        query = self.db.query(SessionRunRecord).filter(
+            SessionRunRecord.session_id == session_id
+        )
         if run_id is not None:
             query = query.filter(SessionRunRecord.run_id == run_id)
-        return query.order_by(SessionRunRecord.created_at.asc(), SessionRunRecord.id.asc()).all()
+        return query.order_by(
+            SessionRunRecord.created_at.asc(), SessionRunRecord.id.asc()
+        ).all()
 
     def list_run_events(self, run_id: str) -> list[SessionRunEventRecord]:
         """获取某一次运行中发生的全部步骤事件。"""
         return (
             self.db.query(SessionRunEventRecord)
             .filter(SessionRunEventRecord.run_id == run_id)
-            .order_by(SessionRunEventRecord.event_index.asc(), SessionRunEventRecord.id.asc())
+            .order_by(
+                SessionRunEventRecord.event_index.asc(), SessionRunEventRecord.id.asc()
+            )
             .all()
         )
 
-    def append_run_events(self, *, run_id, new_events: list[RunEvent], final_reply: str) -> None:
+    def append_run_events(
+        self, *, run_id, new_events: list[RunEvent], final_reply: str
+    ) -> None:
         """给一次运行追加新的步骤事件，并更新它的最终答复。"""
         run_record = (
-            self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.run_id == run_id)
+            .first()
         )
         if not run_record:
             raise ValueError(f"run_id{run_id} not found")
@@ -231,12 +251,19 @@ class RunTraceStore:
             next_index += 1
 
         run_record.reply = final_reply
-        run_record.event_count = (max_index + 1 if max_index is not None else 0) + len(new_events)
+        run_record.event_count = (max_index + 1 if max_index is not None else 0) + len(
+            new_events
+        )
         run_record.run_status = "completed"
         run_record.finished_at = sqlfunc.now()
 
     def create_tool_call(
-        self, *, run_id: str, tool_name: str, tool_call_id: Optional[str], input_json: Optional[str]
+        self,
+        *,
+        run_id: str,
+        tool_name: str,
+        tool_call_id: Optional[str],
+        input_json: Optional[str],
     ) -> int:
         """工具开始运行之前，创建一条工具调用记录。"""
         record = ToolCallRecord(
@@ -250,11 +277,15 @@ class RunTraceStore:
         self.db.flush()
         return record.id
 
-    def finish_tool_call(self, *, record_id: int, status: str, result_json: Optional[str]) -> None:
+    def finish_tool_call(
+        self, *, record_id: int, status: str, result_json: Optional[str]
+    ) -> None:
         """当一个工具跑完了，更新对应的工具调用记录。"""
         from sqlalchemy import func
 
-        record = self.db.query(ToolCallRecord).filter(ToolCallRecord.id == record_id).first()
+        record = (
+            self.db.query(ToolCallRecord).filter(ToolCallRecord.id == record_id).first()
+        )
         if record:
             record.status = status
             record.result_json = result_json
@@ -265,7 +296,11 @@ class RunTraceStore:
         from sqlalchemy import func
 
         self.db.flush()
-        record = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        record = (
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.run_id == run_id)
+            .first()
+        )
         if record:
             record.run_status = status
             if status == "completed":
@@ -274,13 +309,21 @@ class RunTraceStore:
     def update_run_active(self, *, run_id: str, is_active: int) -> None:
         """设置一次运行是否为活跃状态。"""
         self.db.flush()
-        record = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        record = (
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.run_id == run_id)
+            .first()
+        )
         if record:
             record.is_active = str(is_active)
 
     def get_run_detail(self, run_id: str):
         """获取某一次运行的详细内容。"""
-        run = self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+        run = (
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.run_id == run_id)
+            .first()
+        )
         if not run:
             return None, []
         tool_calls = (
@@ -344,10 +387,14 @@ class RunTraceStore:
             .all()
         )
 
-    def append_run_events_partial(self, *, run_id: str, new_events: list[RunEvent]) -> None:
+    def append_run_events_partial(
+        self, *, run_id: str, new_events: list[RunEvent]
+    ) -> None:
         """给一次 run 追加事件，但不修改 completed 状态和最终 reply。"""
         run_record = (
-            self.db.query(SessionRunRecord).filter(SessionRunRecord.run_id == run_id).first()
+            self.db.query(SessionRunRecord)
+            .filter(SessionRunRecord.run_id == run_id)
+            .first()
         )
         if not run_record:
             raise ValueError(f"run_id {run_id} not found")
@@ -378,5 +425,7 @@ class RunTraceStore:
             )
             next_index += 1
 
-        run_record.event_count = (max_index + 1 if max_index is not None else 0) + len(new_events)
+        run_record.event_count = (max_index + 1 if max_index is not None else 0) + len(
+            new_events
+        )
         run_record.finished_at = sqlfunc.now()

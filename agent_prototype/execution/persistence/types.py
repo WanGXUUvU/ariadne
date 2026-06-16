@@ -17,6 +17,7 @@ from agent_prototype.core.types import ModelUsage
 from agent_prototype.execution.runtime.types import RunEvent, RunState
 from agent_prototype.security.policy.types import ApprovalPolicy
 
+
 @dataclass
 class RunContext:
     """智能体单次运行所需的稳定背景物料。
@@ -85,6 +86,7 @@ class FinalizeRunInput(BaseModel):
     user_input: str
     reply: str = Field(validation_alias="partial_reply")
     agent_name: Optional[str] = None
+
 
 class RunFinalStatus(str, Enum):
     """一次 run 的统一终态。"""

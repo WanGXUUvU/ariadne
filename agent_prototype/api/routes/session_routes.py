@@ -50,6 +50,7 @@ def create_session_api(
     """
     return service.create_session(payload)
 
+
 @router.post("/sessions/{session_id}/fork", response_model=SessionSummary)
 def fork_session_api(
     session_id: str,
@@ -129,7 +130,9 @@ def read_session_api(
     """
     record, state = service.get_session(session_id)
     if record is None or state is None:
-        return error_response(status.HTTP_404_NOT_FOUND, "session_not_found", "Session not found")
+        return error_response(
+            status.HTTP_404_NOT_FOUND, "session_not_found", "Session not found"
+        )
 
     workspace_exists = True
     if record.workspace_path:

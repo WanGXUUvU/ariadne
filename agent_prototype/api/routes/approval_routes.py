@@ -18,7 +18,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from agent_prototype.security.approval.service import ApprovalRunNotPaused, ApprovalService
+from agent_prototype.security.approval.service import (
+    ApprovalRunNotPaused,
+    ApprovalService,
+)
 from agent_prototype.execution.resume.service import ResumeRunService
 from agent_prototype.api.routes.dependencies import (
     get_approval_service,
@@ -29,7 +32,9 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 
 @router.get("/{approval_id}")
-def get_approval_api(approval_id: str, service: ApprovalService = Depends(get_approval_service)):
+def get_approval_api(
+    approval_id: str, service: ApprovalService = Depends(get_approval_service)
+):
     """这个函数是用来查询单条审批工单信息的。
 
     如果 Agent 在执行某个敏感工具前被暂停了需要人去确认，你就可以用这个接口把它的状态和详细审批请求查出来。

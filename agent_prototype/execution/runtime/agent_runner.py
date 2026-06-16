@@ -27,7 +27,6 @@ from agent_prototype.execution.runtime.tool_runner import (
     async_handle_tool_calls,
 )
 
-
 # ── AgentRunner ───────────────────────────────────────────────────────────────
 
 
@@ -82,7 +81,9 @@ class AgentRunner:
         events: list[RunEvent] = []
         event_index = 0
 
-        self.state.messages.append(ChatMessage(role="user", content=run_input.user_input))
+        self.state.messages.append(
+            ChatMessage(role="user", content=run_input.user_input)
+        )
         self.state.step += 1
 
         while True:
@@ -171,7 +172,9 @@ class AgentRunner:
                     last_user = msg
                     break
             if not (last_user and last_user.content == run_input.user_input):
-                self.state.messages.append(ChatMessage(role="user", content=run_input.user_input))
+                self.state.messages.append(
+                    ChatMessage(role="user", content=run_input.user_input)
+                )
         self.state.step += 1
 
         while True:
@@ -230,12 +233,14 @@ class AgentRunner:
                         type="assistant_text",
                         content=raw_leadin,
                     )
-                    event_index+=1
-                self.state.messages.append(ChatMessage(
-                    role="assistant",
-                    content=raw_leadin if raw_leadin.strip() else None,
-                    tool_calls=tool_calls,
-                ))
+                    event_index += 1
+                self.state.messages.append(
+                    ChatMessage(
+                        role="assistant",
+                        content=raw_leadin if raw_leadin.strip() else None,
+                        tool_calls=tool_calls,
+                    )
+                )
 
                 tool_batch_result = None
                 async for item in async_handle_tool_calls(
@@ -265,7 +270,7 @@ class AgentRunner:
                     raise RuntimeError("tool turn missing result")
                 event_index = tool_batch_result.next_event_index
                 continue
-            if finish_reason=="stop":
+            if finish_reason == "stop":
                 raw_reply = "".join(raw_reply_chunks)
                 _, final_event, assistant_message = build_reply(raw_reply, event_index)
                 yield final_event

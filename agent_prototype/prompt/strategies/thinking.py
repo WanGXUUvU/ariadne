@@ -26,7 +26,10 @@ THINKING_STYLES = {
     "deepseek_style": {
         # DeepSeek 全系列（V4/R1/R2 等）：thinking.type + reasoning_effort 双字段格式
         # thinking.type 控制开关，reasoning_effort 控制深度
-        "enable_payload": {"thinking": {"type": "enabled"}, "reasoning_effort": "{effort}"},
+        "enable_payload": {
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "{effort}",
+        },
         "disable_payload": {"thinking": {"type": "disabled"}},
         "effort_levels": ["low", "medium", "high"],
         "default_effort": "medium",
@@ -56,7 +59,9 @@ THINKING_STYLES = {
     "claude_style": {
         # Anthropic Claude Extended Thinking：budget_tokens 控制思考深度
         # low≈4K / medium≈10K / high≈32K tokens
-        "enable_payload": {"thinking": {"type": "enabled", "budget_tokens": "{effort}"}},
+        "enable_payload": {
+            "thinking": {"type": "enabled", "budget_tokens": "{effort}"}
+        },
         "disable_payload": {"thinking": {"type": "disabled"}},
         "effort_levels": ["low", "medium", "high"],
         "effort_map": {"low": 4000, "medium": 10000, "high": 32000},

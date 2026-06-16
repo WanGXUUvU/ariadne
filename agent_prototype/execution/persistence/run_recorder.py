@@ -12,6 +12,8 @@ from agent_prototype.memory.run.store import RunTraceStore
 from agent_prototype.memory.session.store import SessionStore
 from agent_prototype.security.approval.store import SqliteApprovalStore
 from agent_prototype.tools.result_types import ToolState
+
+
 class RunRecorder:
     """run 终态统一持久化入口。"""
 
@@ -41,8 +43,11 @@ class RunRecorder:
 
     def _finalize_completed(self, finalization: RunFinalizationInput) -> None:
         for event in finalization.events:
-            if event.tool_result and event.tool_result.metadata.get("state")=="staged":
-                event.tool_result.metadata["state"]=ToolState.COMMITTED.value
+            if (
+                event.tool_result
+                and event.tool_result.metadata.get("state") == "staged"
+            ):
+                event.tool_result.metadata["state"] = ToolState.COMMITTED.value
         if finalization.is_resume:
             if finalization.owns_session:
                 self.store.save_state(
@@ -102,7 +107,6 @@ class RunRecorder:
                 session_id=finalization.session_id,
                 run_id=finalization.run_id,
                 agent_name=finalization.agent_name,
-    
                 user_input=finalization.user_input,
                 reply=finalization.reply,
                 state=finalization.state,
@@ -121,8 +125,11 @@ class RunRecorder:
     ) -> None:
         state = self._ensure_user_message(finalization.state, finalization.user_input)
         for event in finalization.events:
-            if event.tool_result and event.tool_result.metadata.get("state")=="staged":
-                event.tool_result.metadata["state"]=ToolState.ROLLED_BACK.value
+            if (
+                event.tool_result
+                and event.tool_result.metadata.get("state") == "staged"
+            ):
+                event.tool_result.metadata["state"] = ToolState.ROLLED_BACK.value
         if finalization.is_resume:
             if finalization.owns_session:
                 self.store.save_state(
@@ -138,7 +145,6 @@ class RunRecorder:
                 session_id=finalization.session_id,
                 run_id=finalization.run_id,
                 agent_name=finalization.agent_name,
-    
                 user_input=finalization.user_input,
                 reply=finalization.reply,
                 state=state,
