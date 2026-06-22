@@ -8,7 +8,6 @@ from backend.core.adapters.chat_completions import ChatCompletionsAdapter
 
 
 class TestChatCompletionsAdapter(unittest.TestCase):
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.requests.post")
     def test_generate_wraps_http_error_with_runtime_error(self, mock_post):
         mock_response = Mock()
@@ -19,7 +18,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         )
         mock_post.return_value = mock_response
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="你好")],
             tools=[],
@@ -35,7 +34,6 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         mock_response.raise_for_status.assert_called_once()
         mock_response.json.assert_not_called()
 
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.requests.post")
     def test_generate_raises_when_choices_missing(self, mock_post):
         mock_response = Mock()
@@ -43,7 +41,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         mock_response.json.return_value = {}
         mock_post.return_value = mock_response
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="你好")],
             tools=[],
@@ -55,7 +53,6 @@ class TestChatCompletionsAdapter(unittest.TestCase):
 
         self.assertEqual(str(ctx.exception), "LLM response missing choices")
 
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.requests.post")
     def test_generate_raises_when_message_missing(self, mock_post):
         mock_response = Mock()
@@ -63,7 +60,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         mock_response.json.return_value = {"choices": [{}]}
         mock_post.return_value = mock_response
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="你好")],
             tools=[],
@@ -75,7 +72,6 @@ class TestChatCompletionsAdapter(unittest.TestCase):
 
         self.assertEqual(str(ctx.exception), "LLM response missing message")
 
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.requests.post")
     def test_generate_returns_model_response(self, mock_post):
         mock_response = Mock()
@@ -100,7 +96,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         }
         mock_post.return_value = mock_response
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="你好")],
             tools=[],
@@ -186,7 +182,6 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         self.assertEqual(events[0].content_delta, "我先查一下")
         self.assertEqual(events[1].tool_call_delta["tool_calls"][0]["id"], "call_001")
 
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.requests.post")
     @patch("backend.core.adapters.chat_completions.time.sleep")
     def test_generate_retry_success(self, mock_sleep, mock_post):
@@ -227,7 +222,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
 
         mock_post.side_effect = [mock_resp_429, mock_resp_503, mock_resp_200]
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="Test")],
             tools=[],
@@ -241,14 +236,13 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         mock_sleep.assert_any_call(1.0)
         mock_sleep.assert_any_call(2.0)
 
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.requests.post")
     @patch("backend.core.adapters.chat_completions.time.sleep")
     def test_generate_retry_exhausted(self, mock_sleep, mock_post):
         # Mock requests.post always raising a Timeout exception
         mock_post.side_effect = requests.exceptions.Timeout("Connection timed out")
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="Test")],
             tools=[],
@@ -267,7 +261,6 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         mock_sleep.assert_any_call(2.0)
         mock_sleep.assert_any_call(4.0)
 
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.httpx.AsyncClient")
     @patch("backend.core.adapters.chat_completions.asyncio.sleep")
     def test_async_stream_generate_retry_success(self, mock_sleep, mock_client_cls):
@@ -312,7 +305,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
 
         mock_client.stream.side_effect = [mock_ctx_429, mock_ctx_200]
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="Test")],
             tools=[],
@@ -339,7 +332,6 @@ class TestChatCompletionsAdapter(unittest.TestCase):
         self.assertEqual(mock_client.stream.call_count, 2)
         mock_sleep.assert_called_once_with(1.0)
 
-    @patch.dict("os.environ", {"API_KEY": "test-key"}, clear=False)
     @patch("backend.core.adapters.chat_completions.httpx.AsyncClient")
     @patch("backend.core.adapters.chat_completions.asyncio.sleep")
     def test_async_stream_generate_retry_exhausted(self, mock_sleep, mock_client_cls):
@@ -359,7 +351,7 @@ class TestChatCompletionsAdapter(unittest.TestCase):
 
         mock_client.stream.return_value = mock_ctx
 
-        adapter = ChatCompletionsAdapter()
+        adapter = ChatCompletionsAdapter(api_key="test-key")
         request = ModelRequest(
             messages=[ChatMessage(role="user", content="Test")],
             tools=[],

@@ -10,7 +10,6 @@
 """
 
 import json
-import os
 import time
 from typing import Any, AsyncIterator, Optional
 
@@ -44,7 +43,7 @@ class ChatCompletionsAdapter(ModelAdapter):
         extra_payload: Optional[dict] = None,
         thinking_style: str = "none",
     ):
-        self.api_key = api_key or os.environ.get("API_KEY")
+        self.api_key = api_key
         self.base_url = base_url
         self.model = model
         self.extra_payload = extra_payload or {}
