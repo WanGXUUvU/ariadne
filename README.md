@@ -16,6 +16,51 @@
 
 Ariadne 是一个统一 AI 工作台，目标是在同一产品内承载对话式工作流与开发者工作流，并提供稳定的运行时、工具调用和状态管理能力。
 
+## 系统架构
+
+```mermaid
+flowchart LR
+    subgraph Surfaces["Surfaces"]
+        Web["Web Workspace<br/>Vue 3 + Vite"]
+        APIClient["CLI / API Client"]
+    end
+
+    subgraph Backend["Ariadne Backend"]
+        Router["FastAPI Routes<br/>SSE / Session / Agent APIs"]
+        App["Application Services<br/>Run / Session / Agent / Trace"]
+        Runtime["Agent Runtime<br/>Context Assembly -> Model Loop -> Tool Loop"]
+        Tools["Tool Registry<br/>Built-in Tools / Child Agent Bridge"]
+        Guard["Sandbox + Approval<br/>Workspace Guard / Risk Gate"]
+        Memory["Session / Context / Trace<br/>Persistence & Replay"]
+    end
+
+    subgraph Integrations["Integrations"]
+        Model["LLM Adapters<br/>OpenAI-compatible models"]
+        MCP["MCP / External Tools"]
+        DB["SQLite / SQLAlchemy"]
+    end
+
+    Web --> Router
+    APIClient --> Router
+    Router --> App
+    App --> Runtime
+    Runtime --> Model
+    Runtime --> Tools
+    Tools --> Guard
+    Guard --> MCP
+    App --> Memory
+    Memory --> DB
+    App --> DB
+```
+
+架构要点：
+
+- `FastAPI Routes` 暴露运行、会话、Agent 与流式 SSE 接口，承接 Web Workspace 和外部客户端请求。
+- `Application Services` 负责编排运行生命周期、会话管理、Trace 查询与 Agent 管理，不直接承载底层工具细节。
+- `Agent Runtime` 将一次运行拆分为上下文装配、模型调用、工具循环、结果回填和状态收口，降低主链路耦合。
+- `Tool Registry + Sandbox + Approval` 统一处理工具注册、执行边界、风险分级和人工审批恢复。
+- `Session / Context / Trace` 持久化运行事件、会话状态与回放数据，为多轮协作和问题追踪提供基础。
+
 ## 核心特性
 
 - 流式对话与结构化事件输出
