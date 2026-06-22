@@ -10,12 +10,6 @@
 
 <p align="center">
   <a href="https://github.com/WanGXUUvU/ariadne">GitHub</a>
-  ·
-  <a href="./BUILD_PLAN.md">Build Plan</a>
-  ·
-  <a href="./STATUS.md">Current Status</a>
-  ·
-  <a href="./docs/database-schema.md">Database Schema</a>
 </p>
 
 ## What Is Ariadne
@@ -89,16 +83,3 @@ cd frontend
 npm install
 npm run dev
 ```
-
-## Development Notes
-
-- `STATUS.md` is the current source of truth for active work.
-- `BUILD_PLAN.md` tracks longer-term product direction.
-- `specs/` contains task cards and completed refactor records.
-
-## Documentation
-
-- [Build Plan](./BUILD_PLAN.md)
-- [Current Status](./STATUS.md)
-- [Database Schema](./docs/database-schema.md)
-- [Rename Plan](./docs/rename-plan.md)
