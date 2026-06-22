@@ -17,14 +17,6 @@
 - 下游流向：路由解析分发到 backend/api/routes/* 控制器。
 """
 
-try:
-    from dotenv import load_dotenv
-except ModuleNotFoundError:  # pragma: no cover - optional local dev dependency
-    load_dotenv = None
-
-if load_dotenv is not None:
-    load_dotenv()
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
