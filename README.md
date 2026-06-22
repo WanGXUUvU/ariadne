@@ -5,70 +5,70 @@
 </p>
 
 <p align="center">
-  Unified AI workspace runtime for streaming chat, tool execution, approval control, trace persistence, and multi-agent workflows.
+  统一 AI 工作台运行时，覆盖流式对话、工具执行、权限审批、运行追踪与多 Agent 协作。
 </p>
 
 <p align="center">
   <a href="https://github.com/WanGXUUvU/ariadne">GitHub</a>
 </p>
 
-## What Is Ariadne
+## 项目简介
 
-Ariadne is a unified AI workspace that brings conversation workflows and developer workflows into one product surface.
+Ariadne 是一个统一 AI 工作台，目标是在同一产品内承载对话式工作流与开发者工作流。
 
-Current focus:
+当前重点能力：
 
-- Agent runtime with layered execution flow
-- Streaming SSE output with structured events
-- Tool registry, sandbox isolation, and approval recovery
-- Session, context, and trace persistence
-- Skill and agent extensions
-- Multi-agent dispatch and run lineage tracking
+- 分层 `Agent Runtime`
+- 基于 `SSE` 的流式输出与结构化事件流
+- `Tool Registry`、沙箱隔离与审批恢复
+- `Session / Context / Trace` 持久化
+- `Skill / Agent` 扩展
+- `Multi-Agent` 调度与运行链路追踪
 
-## Core Capabilities
+## 核心能力
 
 ### Agent Runtime
 
-- Layered runtime split across `RunService`, `RunContextFactory`, `AgentRunner`, `RunLifecycle`, and `RunRecorder`
-- Stable execution flow for context assembly, model/tool loop, finalization, and persistence
-- Run-scoped VFS with commit / rollback semantics for coding workflows
+- 运行时按 `RunService`、`RunContextFactory`、`AgentRunner`、`RunLifecycle`、`RunRecorder` 分层拆分
+- 覆盖上下文装配、模型与工具循环、运行收口和状态持久化
+- 提供 run 级 `VFS`，支持文件改动提交 / 回滚语义
 
-### Tool Execution
+### 工具执行
 
-- Unified `Tool Registry` with whitelisting, argument parsing, result normalization, and risk classification
-- Built-in filesystem, search, utility, and agent bridge tools
-- Approval-aware async tool execution pipeline
+- 统一 `Tool Registry`，支持白名单校验、参数解析、结果标准化和风险分级
+- 内置文件系统、搜索、基础工具和 Agent Bridge 工具
+- 提供带审批能力的异步工具执行链路
 
-### State And Trace
+### 状态与追踪
 
-- Session state persistence and history recovery
-- Context compression and replayable run trace
-- Parent / child run tracking for multi-agent workflows
+- 支持会话状态持久化与历史消息恢复
+- 支持上下文压缩与可回放的运行轨迹
+- 支持父子 Run 关联与多 Agent 运行追踪
 
-### Safety And Control
+### 安全与控制
 
-- Sandbox path rewriting and workspace isolation
-- Permission profiles and approval policies
-- Pause / resume flow for high-risk tool calls
+- 统一处理沙箱路径重写与工作区隔离
+- 支持权限档位与审批策略配置
+- 支持高风险工具调用的暂停 / 恢复流程
 
-## Tech Stack
+## 技术栈
 
-- Backend: Python, FastAPI, SQLAlchemy, SQLite
-- Frontend: Vue 3, TypeScript, Vite
-- Runtime: SSE streaming, tool middleware, session persistence, approval workflow
+- 后端：Python、FastAPI、SQLAlchemy、SQLite
+- 前端：Vue 3、TypeScript、Vite
+- 运行时：SSE Streaming、工具中间件、会话持久化、审批流程
 
-## Repository Layout
+## 仓库结构
 
 ```text
-backend/   FastAPI APIs, runtime, tools, security, memory, MCP
-frontend/  Web workspace UI built with Vue 3 + Vite
-docs/      Project docs, schema notes, architecture assets
-specs/     Task cards and archived implementation records
+backend/   FastAPI API、Runtime、Tools、Security、Memory、MCP
+frontend/  基于 Vue 3 + Vite 的 Web Workspace
+docs/      项目文档、数据结构说明与架构资源
+specs/     任务卡与历史实现记录
 ```
 
-## Quick Start
+## 快速开始
 
-### Backend
+### 后端
 
 ```bash
 python3 -m compileall backend/
@@ -76,7 +76,7 @@ python3 -m unittest discover -s backend/tests -p 'test_*.py' -v
 cd backend && python3 -m api.app
 ```
 
-### Frontend
+### 前端
 
 ```bash
 cd frontend
