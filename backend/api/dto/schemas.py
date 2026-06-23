@@ -10,8 +10,8 @@
 """
 
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+from typing import Literal, Optional
+from pydantic import BaseModel, Field
 
 from backend.execution.runtime.types import RunEvent, RunState
 from backend.memory.session.types import SessionSummary
@@ -128,6 +128,74 @@ class PatchProviderInput(BaseModel):
 class PatchModelInput(BaseModel):
     enabled: Optional[bool] = None
     display_name: Optional[str] = None
+
+
+class CreateMcpServerInput(BaseModel):
+    server_id: str
+    display_name: Optional[str] = None
+    transport: Literal["stdio", "streamable_http"]
+    enabled: bool = True
+    required: bool = False
+    startup_timeout_sec: int = 10
+    tool_timeout_sec: int = 30
+    command: Optional[str] = None
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    cwd: Optional[str] = None
+    url: Optional[str] = None
+    bearer_token_env_var: Optional[str] = None
+    http_headers: dict[str, str] = Field(default_factory=dict)
+    env_http_headers: dict[str, str] = Field(default_factory=dict)
+
+
+class PatchMcpServerInput(BaseModel):
+    display_name: Optional[str] = None
+    transport: Optional[Literal["stdio", "streamable_http"]] = None
+    enabled: Optional[bool] = None
+    required: Optional[bool] = None
+    startup_timeout_sec: Optional[int] = None
+    tool_timeout_sec: Optional[int] = None
+    command: Optional[str] = None
+    args: Optional[list[str]] = None
+    env: Optional[dict[str, str]] = None
+    cwd: Optional[str] = None
+    url: Optional[str] = None
+    bearer_token_env_var: Optional[str] = None
+    http_headers: Optional[dict[str, str]] = None
+    env_http_headers: Optional[dict[str, str]] = None
+
+
+class McpServerOut(BaseModel):
+    server_id: str
+    display_name: Optional[str] = None
+    transport: Literal["stdio", "streamable_http"]
+    enabled: bool
+    required: bool
+    startup_timeout_sec: int
+    tool_timeout_sec: int
+    command: Optional[str] = None
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    cwd: Optional[str] = None
+    url: Optional[str] = None
+    bearer_token_env_var: Optional[str] = None
+    http_headers: dict[str, str] = Field(default_factory=dict)
+    env_http_headers: dict[str, str] = Field(default_factory=dict)
+    runtime_status: str = "not_started"
+    tool_count: int = 0
+    last_error: Optional[str] = None
+
+
+class McpReloadError(BaseModel):
+    server_id: str
+    message: str
+
+
+class McpReloadOut(BaseModel):
+    ok: bool
+    connected_servers: int
+    failed_servers: int
+    errors: list[McpReloadError] = Field(default_factory=list)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

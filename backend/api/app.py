@@ -17,11 +17,26 @@
 - 下游流向：路由解析分发到 backend/api/routes/* 控制器。
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from backend.mcp.mcp_manager import get_mcp_server_manager
 from .routes import router
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    mcp_server_manager = get_mcp_server_manager()
+    mcp_server_manager.start()
+    try:
+        yield
+    finally:
+        mcp_server_manager.stop()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

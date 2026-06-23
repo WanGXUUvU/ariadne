@@ -35,6 +35,7 @@ from backend.security.approval.service import ApprovalService
 from backend.execution.resume.service import ResumeRunService
 from backend.agent.definition import AgentDefinitionService
 from backend.agent.settings import SettingsService
+from backend.mcp.service import McpSettingsService
 from backend.memory.workspace.service import WorkspaceService
 
 
@@ -97,6 +98,11 @@ def get_agent_definition_service(
 def get_settings_service(db: Session = Depends(get_db)) -> SettingsService:
     """提供 SettingsService 实例（含 Provider/Model 设置）。"""
     return SettingsService(db)
+
+
+def get_mcp_settings_service() -> McpSettingsService:
+    """提供 McpSettingsService 实例（含 MCP 配置与 runtime reload）。"""
+    return McpSettingsService()
 
 
 def get_workspace_service(db: Session = Depends(get_db)) -> WorkspaceService:

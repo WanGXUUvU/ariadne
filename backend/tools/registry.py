@@ -18,10 +18,11 @@
 - 不做具体安全策略的评估与拦截拦截（由安全中间件负责）。
 - 不持久化工具调用 Trace（由 ToolTracer 负责）。
 """
-
 import json  # 解析工具参数 JSON
 from typing import Optional, Callable, Any  # 类型标注
 
+from backend.mcp.bridge import build_mcp_tool_definitions
+from backend.mcp.mcp_manager import get_mcp_server_manager
 from backend.tools.types import RiskLevel
 from backend.tools.types import ToolDefinition
 from backend.tools.result_types import ToolError, ToolResult
@@ -178,8 +179,19 @@ def build_run_registry(
     status_checker: Callable[[list[str]], dict],
     child_waiter: Callable[[str], str],
 ) -> ToolRegistry:
-    """为一次运行流构建包含基础内置及子任务调度桥接工具的专属注册表。"""
     registry = DEFAULT_TOOL_REGISTRY.clone()
+
+    mcp_server_manager = get_mcp_server_manager()
+    try:
+        discovered_mcp_tools = mcp_server_manager.list_all_tools()
+    except RuntimeError as exc:
+        print(f"[MCP] skip tool registration: {exc}")
+        discovered_mcp_tools = []
+
+    mcp_tool_definitions = build_mcp_tool_definitions(discovered_mcp_tools)
+    for tool in mcp_tool_definitions:
+        registry.register(tool)
+
     registry.register(build_spawn_child_agent_tool(child_dispatcher))
     registry.register(build_check_child_status_tool(status_checker))
     registry.register(build_wait_child_agent_tool(child_waiter))

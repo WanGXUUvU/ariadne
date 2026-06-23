@@ -20,11 +20,20 @@ from fastapi import APIRouter, Depends, status
 from backend.agent.settings.types import ModelOut, ProviderOut
 from backend.api.dto.schemas import (
     CreateProviderInput,
+    CreateMcpServerInput,
+    McpReloadOut,
+    McpServerOut,
     PatchModelInput,
+    PatchMcpServerInput,
     PatchProviderInput,
 )
 from backend.agent.settings import SettingsService
-from backend.api.routes.dependencies import error_response, get_settings_service
+from backend.mcp.service import McpSettingsService
+from backend.api.routes.dependencies import (
+    error_response,
+    get_mcp_settings_service,
+    get_settings_service,
+)
 
 router = APIRouter(prefix="/settings")
 
@@ -133,6 +142,85 @@ def patch_model_api(
         )
     except ValueError as exc:
         return error_response(status.HTTP_404_NOT_FOUND, "model_not_found", str(exc))
+
+
+# ---------------------------------------------------------------------------
+# MCP Servers
+# ---------------------------------------------------------------------------
+
+
+@router.get("/mcp/servers", response_model=list[McpServerOut])
+def list_mcp_servers_api(
+    service: McpSettingsService = Depends(get_mcp_settings_service),
+) -> list[McpServerOut]:
+    """列出全部 MCP server 配置摘要及其运行时状态。"""
+    return service.list_servers()
+
+
+@router.get("/mcp/servers/{server_id}", response_model=McpServerOut)
+def get_mcp_server_api(
+    server_id: str,
+    service: McpSettingsService = Depends(get_mcp_settings_service),
+) -> McpServerOut:
+    """读取单条 MCP server 详情。"""
+    try:
+        return service.get_server(server_id)
+    except LookupError as exc:
+        return error_response(status.HTTP_404_NOT_FOUND, "mcp_server_not_found", str(exc))
+
+
+@router.post(
+    "/mcp/servers",
+    response_model=McpServerOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_mcp_server_api(
+    payload: CreateMcpServerInput,
+    service: McpSettingsService = Depends(get_mcp_settings_service),
+) -> McpServerOut:
+    """新增一条 MCP server 配置。"""
+    try:
+        return service.create_server(payload.model_dump())
+    except ValueError as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST, "invalid_mcp_server", str(exc))
+
+
+@router.patch("/mcp/servers/{server_id}", response_model=McpServerOut)
+def patch_mcp_server_api(
+    server_id: str,
+    payload: PatchMcpServerInput,
+    service: McpSettingsService = Depends(get_mcp_settings_service),
+) -> McpServerOut:
+    """局部更新一条 MCP server 配置。"""
+    try:
+        return service.patch_server(server_id, payload.model_dump(exclude_unset=True))
+    except LookupError as exc:
+        return error_response(status.HTTP_404_NOT_FOUND, "mcp_server_not_found", str(exc))
+    except ValueError as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST, "invalid_mcp_server", str(exc))
+
+
+@router.delete("/mcp/servers/{server_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_mcp_server_api(
+    server_id: str,
+    service: McpSettingsService = Depends(get_mcp_settings_service),
+) -> None:
+    """删除一条 MCP server 配置。"""
+    try:
+        service.delete_server(server_id)
+    except LookupError as exc:
+        return error_response(status.HTTP_404_NOT_FOUND, "mcp_server_not_found", str(exc))
+
+
+@router.post("/mcp/reload", response_model=McpReloadOut)
+def reload_mcp_runtime_api(
+    service: McpSettingsService = Depends(get_mcp_settings_service),
+) -> McpReloadOut:
+    """按最新 settings.json 重新启动 MCP runtime。"""
+    try:
+        return service.reload_runtime()
+    except Exception as exc:
+        return error_response(status.HTTP_400_BAD_REQUEST, "mcp_reload_failed", str(exc))
 
 
 # ---------------------------------------------------------------------------
