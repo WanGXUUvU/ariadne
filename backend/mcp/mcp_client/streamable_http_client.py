@@ -1,5 +1,4 @@
 from datetime import timedelta
-import os
 
 import httpx
 from mcp import ClientSession
@@ -23,24 +22,11 @@ class StreamableHttpMcpClient:
         self._get_session_id = None
 
     def _build_headers(self) -> dict[str, str]:
-        """把静态 headers、环境变量 headers 和 bearer token 合并成请求头。"""
+        """把 settings 里的静态 headers 和 bearer token 合并成请求头。"""
         headers = dict(self.config.http_headers)
 
-        for header_name, env_var_name in self.config.env_http_headers.items():
-            env_value = os.getenv(env_var_name)
-            if env_value is None:
-                raise ValueError(
-                    f"missing environment variable for header {header_name}: {env_var_name}"
-                )
-            headers[header_name] = env_value
-
-        if self.config.bearer_token_env_var:
-            token = os.getenv(self.config.bearer_token_env_var)
-            if token is None:
-                raise ValueError(
-                    f"missing bearer token environment variable: {self.config.bearer_token_env_var}"
-                )
-            headers["Authorization"] = f"Bearer {token}"
+        if self.config.bearer_token:
+            headers["Authorization"] = f"Bearer {self.config.bearer_token}"
 
         return headers
 

@@ -143,9 +143,8 @@ class CreateMcpServerInput(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     cwd: Optional[str] = None
     url: Optional[str] = None
-    bearer_token_env_var: Optional[str] = None
+    bearer_token: Optional[str] = None
     http_headers: dict[str, str] = Field(default_factory=dict)
-    env_http_headers: dict[str, str] = Field(default_factory=dict)
 
 
 class PatchMcpServerInput(BaseModel):
@@ -160,9 +159,8 @@ class PatchMcpServerInput(BaseModel):
     env: Optional[dict[str, str]] = None
     cwd: Optional[str] = None
     url: Optional[str] = None
-    bearer_token_env_var: Optional[str] = None
+    bearer_token: Optional[str] = None
     http_headers: Optional[dict[str, str]] = None
-    env_http_headers: Optional[dict[str, str]] = None
 
 
 class McpServerOut(BaseModel):
@@ -178,9 +176,8 @@ class McpServerOut(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     cwd: Optional[str] = None
     url: Optional[str] = None
-    bearer_token_env_var: Optional[str] = None
+    bearer_token: Optional[str] = None
     http_headers: dict[str, str] = Field(default_factory=dict)
-    env_http_headers: dict[str, str] = Field(default_factory=dict)
     runtime_status: str = "not_started"
     tool_count: int = 0
     last_error: Optional[str] = None

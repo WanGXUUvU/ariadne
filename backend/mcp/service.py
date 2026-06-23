@@ -39,9 +39,8 @@ class McpSettingsService:
 
         if transport == "streamable_http":
             normalized["url"] = raw_server.get("url")
-            normalized["bearer_token_env_var"] = raw_server.get("bearer_token_env_var")
+            normalized["bearer_token"] = raw_server.get("bearer_token")
             normalized["http_headers"] = raw_server.get("http_headers", {})
-            normalized["env_http_headers"] = raw_server.get("env_http_headers", {})
             return normalized
 
         return normalized
@@ -105,9 +104,8 @@ class McpSettingsService:
             "env": normalized.get("env", {}),
             "cwd": normalized.get("cwd"),
             "url": normalized.get("url"),
-            "bearer_token_env_var": normalized.get("bearer_token_env_var"),
+            "bearer_token": normalized.get("bearer_token"),
             "http_headers": normalized.get("http_headers", {}),
-            "env_http_headers": normalized.get("env_http_headers", {}),
             "runtime_status": runtime_info["runtime_status"],
             "tool_count": runtime_info["tool_count"],
             "last_error": runtime_info["last_error"],

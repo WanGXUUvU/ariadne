@@ -29,6 +29,5 @@ class StdioMcpServerConfig(McpServerConfig):
 @dataclass(frozen=True)
 class StreamableHttpMcpServerConfig(McpServerConfig):
     url: str = ""
-    bearer_token_env_var: str | None = None
+    bearer_token: str | None = None
     http_headers: dict[str, str] = field(default_factory=dict)
-    env_http_headers: dict[str, str] = field(default_factory=dict)

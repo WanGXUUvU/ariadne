@@ -68,9 +68,8 @@ def build_mcp_server_config(
             startup_timeout_sec=startup_timeout_sec,
             tool_timeout_sec=tool_timeout_sec,
             url=url,
-            bearer_token_env_var=raw_config.get("bearer_token_env_var"),
+            bearer_token=raw_config.get("bearer_token"),
             http_headers=raw_config.get("http_headers", {}),
-            env_http_headers=raw_config.get("env_http_headers", {}),
         )
 
     raise ValueError(f"server {sever_id}: unsupported transport {transport}")
