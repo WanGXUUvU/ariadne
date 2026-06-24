@@ -118,13 +118,14 @@ public class SessionViewModel: ObservableObject {
         throw lastError ?? NetworkError.invalidResponse
     }
     
-    public func createNewSession(workspacePath: String? = nil, workspaceName: String? = nil) async {
+    public func createNewSession(workspacePath: String? = nil, workspaceName: String? = nil, sessionType: String = "coding") async {
         do {
             let sessionName = "Session \(sessions.count + 1)"
             let newSession = try await AriadneNetworkService.shared.createSession(
                 workspacePath: workspacePath,
                 workspaceName: workspaceName,
-                sessionName: sessionName
+                sessionName: sessionName,
+                sessionType: sessionType
             )
             self.sessions.insert(newSession, at: 0)
             await selectSession(newSession.sessionId)

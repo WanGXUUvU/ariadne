@@ -43,122 +43,328 @@ struct ContentView: View {
 struct WelcomeView: View {
     @EnvironmentObject var viewModel: SessionViewModel
     @State private var isHoveringNew = false
-    @State private var isHoveringWorkspace = false
+    @State private var isHoveringAssistant = false
+    
+    @State private var logoRotation1: Double = 0
+    @State private var logoRotation2: Double = 0
     
     var body: some View {
-        VStack(spacing: 30) {
-            Spacer()
-            
-            // Premium Gradient Logo placeholder
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.blue, Color.purple, Color.pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+        ScrollView {
+            VStack(spacing: 36) {
+                Spacer().frame(height: 40)
+                
+                // 🌀 Premium Circular Radar Logo with Infinite Rotation
+                ZStack {
+                    // Outer dashed ring
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.teal, Color.blue, Color.clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 6])
                         )
-                    )
-                    .frame(width: 80, height: 80)
-                    .blur(radius: 8)
-                    .opacity(0.6)
-                
-                Image(systemName: "square.stack.3d.up.fill")
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            
-            VStack(spacing: 10) {
-                Text("Welcome to Ariadne")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                Text("Native macOS desktop companion for local python agent runtime")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 450)
-            }
-            
-            HStack(spacing: 20) {
-                // New Session Button
-                Button(action: {
-                    Task {
-                        await viewModel.createNewSession()
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: "plus.bubble.fill")
-                        Text("New Coding Session")
-                    }
-                    .padding()
-                    .frame(width: 220)
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                    .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
-                }
-                .buttonStyle(.plain)
-                .scaleEffect(isHoveringNew ? 1.02 : 1.0)
-                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isHoveringNew)
-                .onHover { isHoveringNew = $0 }
-                
-                // Select Workspace
-                Button(action: {
-                    // Create session with workspace selection placeholder
-                    Task {
-                        if let firstWorkspace = viewModel.workspaces.first {
-                            await viewModel.createNewSession(
-                                workspacePath: firstWorkspace.path,
-                                workspaceName: firstWorkspace.name
+                        .frame(width: 100, height: 100)
+                        .rotationEffect(.degrees(logoRotation1))
+                    
+                    // Inner dashed ring
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.purple, Color.pink, Color.clear],
+                                startPoint: .bottom,
+                                endPoint: .top
+                            ),
+                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [6, 4])
+                        )
+                        .frame(width: 76, height: 76)
+                        .rotationEffect(.degrees(logoRotation2))
+                    
+                    // Glassmorphic core
+                    Circle()
+                        .fill(.thinMaterial)
+                        .frame(width: 52, height: 52)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                        )
+                        .shadow(color: Color.purple.opacity(0.15), radius: 10)
+                    
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.primary, .secondary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                        } else {
-                            await viewModel.createNewSession()
+                        )
+                }
+                .onAppear {
+                    withAnimation(.linear(duration: 16).repeatForever(autoreverses: false)) {
+                        logoRotation1 = 360
+                    }
+                    withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
+                        logoRotation2 = -360
+                    }
+                }
+                
+                // Typography Header
+                VStack(spacing: 8) {
+                    Text("ARIADNE // CLIENT")
+                        .font(.system(size: 24, weight: .black, design: .monospaced))
+                        .tracking(2.0)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.primary, .secondary],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    
+                    Text("Native macOS desktop companion for local python agent runtime")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 400)
+                }
+                
+                // Quick Action Buttons
+                HStack(spacing: 20) {
+                    // New Coding Session Card Button
+                    Button(action: {
+                        Task {
+                            await viewModel.createNewSession(sessionType: "coding")
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "terminal.fill")
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("New Coding Session")
+                                    .fontWeight(.bold)
+                                Text("Workspace tools loaded")
+                                    .font(.caption2)
+                                    .opacity(0.8)
+                            }
+                        }
+                        .padding(.vertical, 14)
+                        .padding(.horizontal, 20)
+                        .frame(width: 220)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.blue, Color.blue.opacity(0.75)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                        .shadow(color: Color.blue.opacity(0.2), radius: 8, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                    .scaleEffect(isHoveringNew ? 1.02 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isHoveringNew)
+                    .onHover { isHoveringNew = $0 }
+                    
+                    // New Assistant Session Card Button
+                    Button(action: {
+                        Task {
+                            await viewModel.createNewSession(sessionType: "assistant")
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("New Assistant Session")
+                                    .fontWeight(.bold)
+                                Text("General QA & brainstorming")
+                                    .font(.caption2)
+                                    .opacity(0.8)
+                            }
+                        }
+                        .padding(.vertical, 14)
+                        .padding(.horizontal, 20)
+                        .frame(width: 220)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.purple, Color.purple.opacity(0.75)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                        .shadow(color: Color.purple.opacity(0.2), radius: 8, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                    .scaleEffect(isHoveringAssistant ? 1.02 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isHoveringAssistant)
+                    .onHover { isHoveringAssistant = $0 }
+                }
+                
+                // Recent Projects & Sessions Sections
+                VStack(alignment: .leading, spacing: 24) {
+                    if !viewModel.workspaces.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("RECENT PROJECT WORKSPACES")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .tracking(1.2)
+                            
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(viewModel.workspaces.prefix(4)) { ws in
+                                    RecentWorkspaceCard(ws: ws)
+                                }
+                            }
                         }
                     }
-                }) {
-                    HStack {
-                        Image(systemName: "folder.badge.plus")
-                        Text("Start with Workspace")
+                    
+                    let assistantSessions = viewModel.sessions.filter { $0.sessionType == "assistant" }
+                    if !assistantSessions.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("RECENT ASSISTANT SESSIONS")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .tracking(1.2)
+                            
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(assistantSessions.prefix(4)) { session in
+                                    RecentSessionCard(session: session)
+                                }
+                            }
+                        }
                     }
-                    .padding()
-                    .frame(width: 220)
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                    )
-                    .cornerRadius(12)
                 }
-                .buttonStyle(.plain)
-                .scaleEffect(isHoveringWorkspace ? 1.02 : 1.0)
-                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isHoveringWorkspace)
-                .onHover { isHoveringWorkspace = $0 }
+                .frame(width: 460)
+                .padding(.top, 16)
+                
+                Spacer()
+                
+                // Footer connection indicator
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                    Text("Connected to \(viewModel.serverURLString)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.bottom, 24)
             }
-            .padding(.top, 20)
-            
-            Spacer()
-            
-            // Footer displaying server connection status
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 8, height: 8)
-                Text("Connected to \(viewModel.serverURLString)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.bottom, 30)
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             LinearGradient(
                 colors: [
                     Color(NSColor.windowBackgroundColor),
-                    Color(NSColor.underPageBackgroundColor).opacity(0.5)
+                    Color(NSColor.underPageBackgroundColor).opacity(0.3)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
         )
+    }
+}
+
+struct RecentWorkspaceCard: View {
+    @EnvironmentObject var viewModel: SessionViewModel
+    let ws: WorkspaceSummary
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: {
+            Task {
+                await viewModel.createNewSession(workspacePath: ws.path, workspaceName: ws.name, sessionType: "coding")
+            }
+        }) {
+            HStack(spacing: 10) {
+                Image(systemName: "folder.fill")
+                    .font(.title3)
+                    .foregroundColor(.blue)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ws.name)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    Text(ws.path)
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Text("→")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .opacity(isHovered ? 1.0 : 0.4)
+            }
+            .padding(10)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isHovered ? Color.blue.opacity(0.3) : Color.primary.opacity(0.06), lineWidth: 1.5)
+            )
+            .scaleEffect(isHovered ? 1.02 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+}
+
+struct RecentSessionCard: View {
+    @EnvironmentObject var viewModel: SessionViewModel
+    let session: SessionSummary
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: {
+            Task {
+                await viewModel.selectSession(session.sessionId)
+            }
+        }) {
+            HStack(spacing: 10) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.caption)
+                    .foregroundColor(.purple)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.sessionName ?? "Untitled Session")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    Text(session.sessionId.prefix(8))
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Text("→")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .opacity(isHovered ? 1.0 : 0.4)
+            }
+            .padding(10)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isHovered ? Color.purple.opacity(0.3) : Color.primary.opacity(0.06), lineWidth: 1.5)
+            )
+            .scaleEffect(isHovered ? 1.02 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
 
