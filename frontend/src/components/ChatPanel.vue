@@ -338,8 +338,8 @@ defineExpose({
   gap: 5px;
   padding: 3px 8px;
   border-radius: 99px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   flex-shrink: 0;
 }
 .status-dot {
@@ -403,8 +403,8 @@ defineExpose({
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   border-radius: 8px;
   cursor: pointer;
   color: var(--text-secondary);
@@ -412,8 +412,8 @@ defineExpose({
   transition: background 0.15s, border-color 0.15s;
 }
 .agent-trigger:hover, .agent-trigger.open {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.15);
+  background: var(--bg-active);
+  border-color: var(--border-strong);
   color: var(--text-primary);
 }
 .agent-dot {
@@ -443,13 +443,13 @@ defineExpose({
   right: 0;
   min-width: 200px;
   /* 💡 磨砂半透明高阶材质，配合光晕阴影 */
-  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.85);
+  background: var(--bg-panel);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 4px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), var(--shadow-glow);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), var(--shadow-glow);
   z-index: 100;
 }
 .agent-option {
@@ -468,7 +468,7 @@ defineExpose({
   transition: background 0.1s, color 0.1s;
 }
 .agent-option:hover {
-  background: rgba(255,255,255,0.06);
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 .agent-option.selected {
@@ -496,15 +496,15 @@ defineExpose({
   justify-content: center;
   width: 30px;
   height: 30px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   border-radius: 8px;
   cursor: pointer;
   color: var(--text-secondary);
   transition: background 0.15s, color 0.15s;
 }
 .icon-btn:hover {
-  background: rgba(255,255,255,0.08);
+  background: var(--bg-active);
   color: var(--text-primary);
 }
 .icon-btn:disabled {

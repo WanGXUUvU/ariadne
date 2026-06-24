@@ -12,6 +12,7 @@ const props = defineProps<{
   pendingApprovalInfo?: ApprovalInfo | null;
   pendingApprovalInfos?: ApprovalInfo[];
   isProcessingApproval?: boolean;
+  isThinkingActive?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -64,7 +65,11 @@ const hasPendingApprovalInChunk = computed(() => {
 <template>
   <div v-if="chunk.type === 'thinking'" class="thinking-container">
     <button class="timeline-toggle" @click="emit('toggle')">
-      <span class="toggle-verb thinking-verb">思考过程</span>
+      <span v-if="isThinkingActive" class="thinking-active-pill">
+        <span class="thinking-heartbeat"></span>
+        思考中...
+      </span>
+      <span v-else class="toggle-verb thinking-verb">思考过程</span>
       
       <!-- 如果包含挂起审批，增加醒目的橙色指示器 -->
       <span v-if="hasPendingApprovalInChunk" class="pending-warning-pill font-mono">
@@ -144,6 +149,17 @@ const hasPendingApprovalInChunk = computed(() => {
   margin-right: 2px;
   animation: heartbeatPulse 2.2s infinite ease-in-out;
   flex-shrink: 0;
+}
+
+.thinking-active-pill {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-emerald, #34D399);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .thinking-verb {

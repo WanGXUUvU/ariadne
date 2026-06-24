@@ -231,7 +231,7 @@ watch(() => props.modelId, () => {
   gap: 5px;
   padding: 4px 8px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-dim);
   border-radius: 6px;
   color: var(--text-secondary, #999);
   font-size: 11px;
@@ -243,12 +243,12 @@ watch(() => props.modelId, () => {
 }
 .ms-trigger:hover:not(:disabled) {
   color: var(--text-primary, #eee);
-  border-color: rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
 }
 .ms-trigger.open {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-strong);
+  background: var(--bg-active);
   color: var(--text-primary, #eee);
 }
 .ms-trigger.empty {
@@ -285,13 +285,13 @@ watch(() => props.modelId, () => {
   min-width: 220px;
   max-height: 240px;
   overflow-y: auto;
-  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.85) !important;
+  background: var(--bg-panel) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-strong) !important;
   border-radius: 10px;
   padding: 4px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), var(--shadow-glow);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), var(--shadow-glow);
   z-index: 100;
 }
 
@@ -312,12 +312,12 @@ watch(() => props.modelId, () => {
   transition: background 0.1s, color 0.1s;
 }
 .ms-option:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-hover);
   color: var(--text-primary, #eee);
 }
 .ms-option.selected {
   color: var(--text-primary, #eee);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-active);
 }
 
 .ms-opt-name {
@@ -353,7 +353,7 @@ watch(() => props.modelId, () => {
   gap: 4px;
   padding: 4px 8px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-dim);
   border-radius: 6px;
   color: var(--text-muted, #666);
   font-size: 11px;
@@ -363,7 +363,7 @@ watch(() => props.modelId, () => {
 }
 .ms-thinking-toggle:hover {
   color: var(--text-secondary, #999);
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: var(--border-strong);
 }
 .ms-thinking-toggle.on {
   color: var(--accent);
@@ -409,7 +409,7 @@ watch(() => props.modelId, () => {
 .ms-effort-pill {
   padding: 3px 8px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-dim);
   border-radius: 5px;
   color: var(--text-muted, #666);
   font-size: 10.5px;
@@ -418,7 +418,7 @@ watch(() => props.modelId, () => {
   line-height: 1;
 }
 .ms-effort-pill:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--border-strong);
   color: var(--text-secondary, #999);
 }
 .ms-effort-pill.active {
@@ -447,7 +447,7 @@ watch(() => props.modelId, () => {
   letter-spacing: 0.05em;
   color: var(--text-muted, #666);
   pointer-events: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-dim);
   margin-bottom: 2px;
 }
 </style>

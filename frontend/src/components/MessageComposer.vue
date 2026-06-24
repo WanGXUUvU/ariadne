@@ -603,17 +603,17 @@ defineExpose({
 .composer-wrapper {
   display: flex;
   align-items: flex-end;
-  /* 💡 玻璃拟态设计：半透明背景 + 强毛玻璃磨砂 */
-  background: rgba(var(--bg-panel-rgb, 15, 15, 19), 0.6) !important;
+  /* 💡 玻璃拟态设计：基于当前主题底色 + 强毛玻璃磨砂 */
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.6) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  /* 💡 极细的透亮白边 */
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  /* 💡 极细的透亮边框 */
+  border: 1px solid var(--border-dim);
   border-radius: 20px;
   padding: 10px 14px;
   /* 💡 平滑弹性过渡 */
   transition: border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.01);
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.01);
   position: relative;
 }
 
@@ -697,8 +697,8 @@ defineExpose({
 }
 .key-hint kbd {
   font-family: var(--font-mono, monospace);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   border-radius: 3px;
   padding: 1px 4px;
   font-size: 9px;
@@ -730,9 +730,9 @@ defineExpose({
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--border-dim);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-hover);
   cursor: pointer;
   color: var(--text-secondary, #aaa);
   font-size: 11px;
@@ -743,8 +743,8 @@ defineExpose({
 }
 .profile-trigger:hover:not(:disabled) {
   color: var(--text-primary, #eee);
-  border-color: rgba(255,255,255,0.15);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-strong);
+  background: var(--bg-active);
 }
 
 /* 呼吸质感环形灯 */
@@ -824,11 +824,11 @@ defineExpose({
   overflow: hidden;
 }
 .profile-menu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
 }
 .profile-menu-item.active {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--bg-active);
+  border-color: var(--border-dim);
 }
 /* 激活项左侧彩色竖条 */
 .profile-menu-item.active::before {
@@ -932,7 +932,7 @@ defineExpose({
 }
 
 .composer-ctx-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-hover);
   transform: scale(1.05);
 }
 
@@ -947,7 +947,7 @@ defineExpose({
 }
 
 .ring-bg {
-  stroke: rgba(255, 255, 255, 0.06);
+  stroke: var(--border-dim);
   stroke-width: 2.2;
   fill: none;
 }
@@ -1029,7 +1029,7 @@ defineExpose({
 
 .composer-ctx-bar-track {
   height: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-dim);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -1061,8 +1061,8 @@ defineExpose({
   gap: 6px;
   width: 100%;
   padding: 6px 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 11px;
@@ -1072,8 +1072,8 @@ defineExpose({
 }
 
 .composer-ctx-compact-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--bg-active);
+  border-color: var(--border-strong);
 }
 
 .composer-ctx-compact-btn:disabled {
