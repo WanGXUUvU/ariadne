@@ -151,14 +151,18 @@ class ToolRegistry:  # 工具注册中心
                 metadata={"tool_name": name},
             )
 
-        if isinstance(result, ToolResult):  # 如果 handler 已经返回 ToolResult
-            return result
+        if not isinstance(result, ToolResult):
+            return ToolResult(
+                ok=False,
+                error=ToolError(
+                    code="invalid_tool_result",
+                    tool_name=name,
+                    message=f"Tool {name} must return ToolResult",
+                ),
+                metadata={"tool_name": name},
+            )
 
-        return ToolResult(
-            ok=True,
-            content=str(result),
-            metadata={"tool_name": name},
-        )
+        return result
 
 
 def build_default_tool_registry() -> ToolRegistry:

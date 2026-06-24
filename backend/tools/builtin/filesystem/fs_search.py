@@ -17,6 +17,7 @@ from backend.tools.types import RiskLevel
 
 from backend.tools.types import ToolDefinition
 from backend.tools.types import RiskLevel
+from backend.tools.result_types import ToolResult
 from pathlib import Path
 
 
@@ -28,7 +29,7 @@ def _is_within_directory(root: Path, candidate: Path) -> bool:
         return False
 
 
-def search_text(query: str, path: str = ".", __context__=None) -> str:
+def search_text(query: str, path: str = ".", __context__=None) -> ToolResult:
     """这是"全文检索"的具体执行函数。
     （搜索结果同时覆盖物理磁盘文件和 VFS 暂存区中的新内容，跳过暂存删除的文件。）
     """
@@ -64,7 +65,7 @@ def search_text(query: str, path: str = ".", __context__=None) -> str:
                 if vfs
                 else file_path.read_text(encoding="utf-8")
             )
-        except UnicodeDecodeError, FileNotFoundError:
+        except (UnicodeDecodeError, FileNotFoundError):
             continue
 
         for line_no, line in enumerate(content.splitlines(), start=1):
@@ -84,7 +85,11 @@ def search_text(query: str, path: str = ".", __context__=None) -> str:
                 if query in line:
                     matches.append(f"{staged_path}:{line_no}: {line.strip()}")
 
-    return "\n".join(matches) if matches else f"No matches for: {query}"
+    return ToolResult(
+        ok=True,
+        content="\n".join(matches) if matches else f"No matches for: {query}",
+        metadata={"tool_name": "search_text", "query": query, "path": path},
+    )
 
 
 SEARCH_TEXT_SCHEMA = {  # 给模型看的工具说明

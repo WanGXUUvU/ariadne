@@ -4,6 +4,8 @@ from pathlib import Path
 
 from backend.security.middleware.base import ToolCallContext
 from backend.tools.registry import build_default_tool_registry
+from backend.tools.registry import ToolRegistry
+from backend.tools.types import ToolDefinition, RiskLevel
 
 
 class TestToolRegistry(unittest.TestCase):
@@ -116,3 +118,26 @@ class TestToolRegistry(unittest.TestCase):
         )
         self.assertFalse(result.ok)
         self.assertEqual(result.error.code, "tool_runtime_error")
+
+    def test_registry_rejects_handler_returning_raw_value(self):
+        registry = ToolRegistry()
+        registry.register(
+            ToolDefinition(
+                name="bad_tool",
+                schema={
+                    "type": "function",
+                    "function": {
+                        "name": "bad_tool",
+                        "description": "bad tool",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+                handler=lambda: "raw string",
+                risk_level=RiskLevel.SAFE,
+            )
+        )
+
+        result = registry.execute_tool_call("bad_tool", "{}")
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error.code, "invalid_tool_result")

@@ -30,7 +30,7 @@ def build_mcp_tool_definition(
         name=mcp_tool.internal_tool_name,
         schema=build_mcp_tool_schema(mcp_tool),
         handler=handler,
-        risk_level=RiskLevel.DANGER,
+        risk_level=RiskLevel.SAFE,
     )
 
 
