@@ -18,9 +18,9 @@ struct SessionSidebarView: View {
         VStack(spacing: 0) {
             // Sidebar Header
             HStack {
-                Text("Ariadne workspace")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
+                Text("ARIADNE // CLIENT")
+                    .font(.system(size: 11, weight: .black, design: .monospaced))
+                    .tracking(1.8)
                     .foregroundColor(.secondary)
                 
                 Spacer()
@@ -251,8 +251,19 @@ struct SessionSidebarView: View {
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor : (hoveredSessionId == session.sessionId ? Color.secondary.opacity(0.1) : Color.clear))
+                .fill(isSelected ?
+                    LinearGradient(
+                        colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ) : (hoveredSessionId == session.sessionId ? LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom) : LinearGradient(colors: [.clear], startPoint: .top, endPoint: .bottom))
+                )
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.white.opacity(0.15) : (hoveredSessionId == session.sessionId ? Color.primary.opacity(0.05) : Color.clear), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(isSelected ? 0.12 : 0.0), radius: 3, y: 1)
         .onTapGesture {
             if editingSessionId != session.sessionId {
                 Task {
@@ -363,15 +374,22 @@ struct ContextMeterView: View {
             // Progress Bar
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.secondary.opacity(0.2))
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.primary.opacity(0.06))
                     
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(progressColor)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: [progressColor, progressColor.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .frame(width: geo.size.width * CGFloat(min(1.0, Double(contextTokens) / Double(contextLength))))
+                        .shadow(color: progressColor.opacity(0.3), radius: 3)
                 }
             }
-            .frame(height: 5)
+            .frame(height: 6)
             
             HStack {
                 // Info button for breakdown popover
@@ -434,9 +452,13 @@ struct ContextMeterView: View {
                 .disabled(viewModel.isCompacting)
             }
         }
-        .padding(10)
-        .background(Color.secondary.opacity(0.08))
-        .cornerRadius(10)
+        .padding(12)
+        .background(.ultraThinMaterial)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
     
     private var pctText: String {

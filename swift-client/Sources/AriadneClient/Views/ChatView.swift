@@ -4,6 +4,9 @@ struct ChatView: View {
     @EnvironmentObject var viewModel: SessionViewModel
     @State private var scrollTarget: String? = nil
     
+    @State private var breathingScale: CGFloat = 1.0
+    @State private var breathingOpacity: Double = 0.5
+    
     var body: some View {
         VStack(spacing: 0) {
             // Header Bar
@@ -74,17 +77,31 @@ struct ChatView: View {
             
             // Quick status indicator
             if viewModel.isStreaming {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .controlSize(.small)
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(breathingScale)
+                        .opacity(breathingOpacity)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                                breathingScale = 1.4
+                                breathingOpacity = 1.0
+                            }
+                        }
+                    
                     Text("Agent is running...")
-                        .font(.caption)
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.secondary.opacity(0.1))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial)
                 .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                )
             }
         }
         .padding(.horizontal)
@@ -141,8 +158,15 @@ struct MessageBubbleView: View {
                             .padding(.horizontal, 12)
                             .font(.body)
                             .foregroundColor(.white)
-                            .background(Color.accentColor)
-                            .cornerRadius(12)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .cornerRadius(14)
+                            .shadow(color: Color.accentColor.opacity(0.15), radius: 4, y: 2)
                             .onTapGesture(count: 2) {
                                 editedContent = message.content ?? ""
                                 isEditing = true
@@ -171,16 +195,19 @@ struct MessageBubbleView: View {
                                         .foregroundColor(.secondary)
                                         .padding(.vertical, 4)
                                 } label: {
-                                    Text("Thinking Process")
-                                        .font(.caption)
-                                        .foregroundColor(.purple)
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "brain")
+                                        Text("Thinking Process")
+                                    }
+                                    .font(.caption)
+                                    .foregroundColor(.purple)
                                 }
                                 .padding(10)
                                 .background(Color.purple.opacity(0.04))
                                 .cornerRadius(8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.purple.opacity(0.1), lineWidth: 1)
+                                        .stroke(Color.purple.opacity(0.12), lineWidth: 1)
                                 )
                             }
                             
@@ -198,6 +225,15 @@ struct MessageBubbleView: View {
                         }
                     }
                 }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 14)
+                .background(.thinMaterial)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.03), radius: 6, y: 3)
                 
                 Spacer()
             } else if message.role == "tool" {
@@ -206,36 +242,59 @@ struct MessageBubbleView: View {
                     .foregroundColor(.orange)
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 8) {
-                            LabeledContent("Tool Call ID", value: message.toolCallId ?? "unknown")
-                            if let content = message.content {
-                                Text("Output:")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                ScrollView(.horizontal) {
-                                    Text(content)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .padding(8)
-                                        .background(Color.secondary.opacity(0.08))
-                                        .cornerRadius(6)
-                                }
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Tool Call ID:")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(message.toolCallId ?? "unknown")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        if let content = message.content {
+                            Text("OUTPUT")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.secondary)
+                            
+                            ScrollView(.horizontal) {
+                                Text(content)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .padding(10)
+                                    .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+                                    .cornerRadius(6)
+                                    .textSelection(.enabled)
                             }
                         }
-                        .padding(.vertical, 6)
-                    } label: {
-                        Text("Tool Execution Result")
-                            .font(.subheadline)
-                            .foregroundColor(.orange)
                     }
-                    .padding(10)
-                    .background(Color.orange.opacity(0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.orange.opacity(0.15), lineWidth: 1)
-                    )
-                    .cornerRadius(8)
+                    .padding(.vertical, 6)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "wrench.adjust.fill")
+                            .foregroundColor(.orange)
+                        Text("Tool: \(message.toolCallId?.prefix(8) ?? "call")")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.orange)
+                        Spacer()
+                        Text("COMPLETED")
+                            .font(.system(size: 8, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.15))
+                            .foregroundColor(.green)
+                            .cornerRadius(4)
+                    }
                 }
+                .padding(12)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orange.opacity(0.18), lineWidth: 1)
+                )
+            }
                 
                 Spacer()
             }
@@ -492,11 +551,14 @@ struct ChatComposerView: View {
             HStack(alignment: .bottom, spacing: 10) {
                 TextEditor(text: $viewModel.inputText)
                     .font(.body)
-                    .frame(minHeight: 40, maxHeight: 100)
-                    .cornerRadius(8)
+                    .frame(minHeight: 44, maxHeight: 120)
+                    .scrollContentBackground(.hidden)
+                    .padding(4)
+                    .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+                    .cornerRadius(10)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                     )
                 
                 Button(action: {
@@ -505,11 +567,12 @@ struct ChatComposerView: View {
                     }
                 }) {
                     Image(systemName: "paperplane.fill")
-                        .font(.title2)
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.accentColor)
+                        .frame(width: 36, height: 36)
+                        .background(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary.opacity(0.4) : Color.accentColor)
                         .clipShape(Circle())
+                        .shadow(color: viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.clear : Color.accentColor.opacity(0.3), radius: 4, y: 2)
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isStreaming)
