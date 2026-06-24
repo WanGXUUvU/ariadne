@@ -164,9 +164,12 @@ const handleSelectWorkspaceDialog = async () => {
 
 onMounted(() => {
   workspace.initializeWorkspace();
-  // 读取本地缓存主题并应用到 body 元素
+  // 读取本地缓存主题并应用到 body 元素（只替换 theme-* 类，保留其他类）
   const savedTheme = localStorage.getItem('agent-build-theme') || 'default';
-  document.body.className = `theme-${savedTheme}`;
+  document.body.classList.forEach(cls => {
+    if (cls.startsWith('theme-')) document.body.classList.remove(cls);
+  });
+  document.body.classList.add(`theme-${savedTheme}`);
 });
 </script>
 
@@ -531,7 +534,7 @@ onMounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-image: radial-gradient(var(--border-dim) 1px, transparent 1px);
   background-size: 24px 24px;
   mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
   -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
@@ -585,7 +588,7 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   border-radius: 50%;
-  background: rgba(10, 10, 12, 0.7);
+  background: var(--bg-elevated);
   border: 1px solid rgba(16, 185, 129, 0.35);
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
   transition: all 0.3s ease;
@@ -643,8 +646,8 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.015);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   border-radius: 10px;
   backdrop-filter: blur(8px);
 }

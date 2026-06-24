@@ -32,6 +32,24 @@ const emit = defineEmits<{
 
 const listRef = ref<HTMLElement | null>(null);
 
+// 用户向上滚动检测 - 只有用户在底部附近时才自动滚动
+const isUserScrolledUp = ref(false);
+
+const handleScroll = () => {
+  if (!listRef.value) return;
+  const { scrollTop, scrollHeight, clientHeight } = listRef.value;
+  // 如果用户距离底部超过 120px，认为用户在手动浏览历史
+  isUserScrolledUp.value = scrollHeight - scrollTop - clientHeight > 120;
+};
+
+// 监听 listRef 变化（因为是条件渲染），动态绑定/解绑滚动事件
+watch(listRef, (el, oldEl, onCleanup) => {
+  if (el) {
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    onCleanup(() => el.removeEventListener('scroll', handleScroll));
+  }
+});
+
 const editingIndex = ref<number | null>(null);
 const editingContent = ref<string>('');
 
@@ -66,16 +84,24 @@ const visibleMessages = computed(() =>
   )
 );
 
-// 流式滚动定位
+// 流式滚动定位 - 只有用户在底部附近时才自动滚动
 watch([() => visibleMessages.value.length, () => props.isLoading, () => props.isCompacting, () => props.streamingTimeline?.length], async () => {
   await nextTick();
-  if (listRef.value) {
+  if (listRef.value && !isUserScrolledUp.value) {
     listRef.value.scrollTo({
       top: listRef.value.scrollHeight,
       behavior: 'smooth'
     });
   }
 }, { deep: true });
+
+// 当新会话加载时（消息列表清空后重建），重置滚动锁定状态
+watch(() => visibleMessages.value.length, (newLen, oldLen) => {
+  // 消息数归零说明切换了会话，重置滚动状态
+  if (oldLen > 0 && newLen === 0) {
+    isUserScrolledUp.value = false;
+  }
+});
 
 // 💡 采用事件代理拦截来自子元素代码块中 Copy 按钮的点击事件，安全、快速且彻底免除 inline JS 漏洞
 const handleCodeBlockClick = (e: MouseEvent) => {
@@ -119,11 +145,33 @@ const handleCopyMessage = (content: string, index: number) => {
     console.error('📋 复制对话内容失败:', err);
   });
 };
+
+const scrollToBottom = () => {
+  if (!listRef.value) return;
+  listRef.value.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' });
+  isUserScrolledUp.value = false;
+};
 </script>
 
 <template>
   <div v-if="visibleMessages.length === 0 && !isCompacting" class="message-list empty"></div>
   <div v-else class="message-list" ref="listRef">
+    <!-- 滚动到底部浮动按钮 -->
+    <Transition name="scroll-btn">
+      <button
+        v-if="isUserScrolledUp"
+        class="scroll-to-bottom-btn"
+        @click="scrollToBottom"
+        :title="isStreaming ? 'AI 正在输出——下滑查看' : '滚动到最新消息'"
+      >
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+        <span v-if="isStreaming" class="scroll-btn-label streaming-pulse">AI 输出中</span>
+        <span v-else class="scroll-btn-label">最新</span>
+      </button>
+    </Transition>
     <template v-for="(m, idx) in visibleMessages" :key="idx">
       <!-- 💡 A-2 动态分割线注入：上一条为非活跃，当前为活跃时 -->
       <div 
@@ -388,6 +436,64 @@ const handleCopyMessage = (content: string, index: number) => {
   .message-footer {
     opacity: 0.75;
   }
+}
+
+/* ── 滚动到底部浮动按钮 ── */
+.scroll-to-bottom-btn {
+  position: sticky;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 10px;
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  margin: 0 auto;
+}
+
+.scroll-to-bottom-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 12px var(--accent-glow);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.scroll-btn-label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.scroll-btn-label.streaming-pulse {
+  color: var(--accent);
+  animation: pulse-text 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* scroll-btn transition */
+.scroll-btn-enter-active,
+.scroll-btn-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.scroll-btn-enter-from,
+.scroll-btn-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
 }
 
 .message-list {
@@ -709,8 +815,8 @@ const handleCopyMessage = (content: string, index: number) => {
   width: 100%;
   min-height: 80px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   border-radius: 8px;
   color: var(--text-primary);
   font-family: inherit;
@@ -756,13 +862,14 @@ const handleCopyMessage = (content: string, index: number) => {
 }
 
 .edit-btn.cancel {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   color: var(--text-secondary);
 }
 
 .edit-btn.cancel:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-active);
+  border-color: var(--border-strong);
   color: var(--text-primary);
 }
 

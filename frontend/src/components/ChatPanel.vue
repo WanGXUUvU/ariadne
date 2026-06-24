@@ -644,7 +644,7 @@ body.theme-light-openai .banner-glass-container {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-hover);
   border: 1px solid var(--border-dim);
   color: var(--text-secondary);
 }
@@ -655,20 +655,20 @@ body.theme-light-openai .banner-glass-container {
 }
 
 .tech-btn.icon-action-btn.success:hover {
-  background: rgba(46, 204, 113, 0.15) !important;
-  border-color: rgba(46, 204, 113, 0.4) !important;
-  color: #2ecc71 !important;
+  background: color-mix(in srgb, var(--success) 15%, transparent) !important;
+  border-color: color-mix(in srgb, var(--success) 40%, transparent) !important;
+  color: var(--success) !important;
 }
 
 .tech-btn.icon-action-btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: var(--bg-active) !important;
   border-color: var(--border-strong) !important;
 }
 
 .tech-btn.icon-action-btn.danger:hover {
-  background: rgba(255, 69, 58, 0.15) !important;
-  border-color: rgba(255, 69, 58, 0.4) !important;
-  color: var(--danger, #ff453a) !important;
+  background: color-mix(in srgb, var(--danger) 15%, transparent) !important;
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent) !important;
+  color: var(--danger) !important;
 }
 
 /* slide-fade transition */

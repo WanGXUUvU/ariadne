@@ -225,12 +225,12 @@ const getSpawnColor = (eventIndex: number) => {
 }
 
 .event-tool_result {
-  border-left: 2px solid #50E3C2;
+  border-left: 2px solid var(--success);
   padding-left: 10px;
 }
 
 .event-tool_error {
-  border-left: 2px solid #E35050;
+  border-left: 2px solid var(--danger);
   padding-left: 10px;
 }
 

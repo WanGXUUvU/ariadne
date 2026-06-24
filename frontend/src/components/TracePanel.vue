@@ -391,11 +391,11 @@ watch(
 }
 
 .event-item.tool_result {
-  border-left: 2px solid #50E3C2;
+  border-left: 2px solid var(--success);
 }
 
 .event-item.tool_error {
-  border-left: 2px solid #FF453A;
+  border-left: 2px solid var(--danger);
 }
 
 .event-item.final_answer {
@@ -443,15 +443,15 @@ watch(
 }
 
 .payload-code.success {
-  color: #50E3C2;
-  border-color: rgba(80, 227, 194, 0.2);
-  background: rgba(80, 227, 194, 0.05);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 20%, transparent);
+  background: color-mix(in srgb, var(--success) 5%, transparent);
 }
 
 .payload-code.error {
-  color: #FF453A;
-  border-color: rgba(255, 69, 58, 0.2);
-  background: rgba(255, 69, 58, 0.05);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 20%, transparent);
+  background: color-mix(in srgb, var(--danger) 5%, transparent);
 }
 
 .payload-text {
@@ -468,11 +468,11 @@ watch(
 }
 
 .result-label.ok {
-  color: #50E3C2;
+  color: var(--success);
 }
 
 .result-label.error {
-  color: #FF453A;
+  color: var(--danger);
 }
 
 .result-label.final {

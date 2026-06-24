@@ -152,11 +152,11 @@ function fmtTokens(n: number): string {
 <style scoped>
 .ctx-meter {
   width: 240px;
-  background: #1c1c24;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
   border-radius: 14px;
   padding: 16px 16px 14px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border-dim);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -166,7 +166,7 @@ function fmtTokens(n: number): string {
 .ctx-title {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   margin-bottom: 10px;
   letter-spacing: 0.01em;
 }
@@ -181,19 +181,19 @@ function fmtTokens(n: number): string {
 .ctx-count {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 .ctx-pct {
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   font-family: var(--font-mono, monospace);
 }
 
 /* 进度条 */
 .ctx-bar-track {
   height: 5px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-active);
   border-radius: 3px;
   overflow: hidden;
   display: flex;
@@ -245,7 +245,7 @@ function fmtTokens(n: number): string {
 .ctx-group-label {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin-bottom: 2px;
@@ -258,11 +258,11 @@ function fmtTokens(n: number): string {
 }
 .ctx-row-label {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 .ctx-row-pct {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   font-family: var(--font-mono, monospace);
 }
 
@@ -274,19 +274,19 @@ function fmtTokens(n: number): string {
   gap: 6px;
   width: 100%;
   padding: 9px 0;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-secondary);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .ctx-compact-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-active);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 .ctx-compact-btn:disabled {
   opacity: 0.5;

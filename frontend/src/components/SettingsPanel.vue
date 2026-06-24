@@ -299,7 +299,10 @@ const currentTheme = ref(localStorage.getItem('agent-build-theme') || 'default')
 
 const selectTheme = (themeId: string) => {
   currentTheme.value = themeId;
-  document.body.className = `theme-${themeId}`;
+  document.body.classList.forEach(cls => {
+    if (cls.startsWith('theme-')) document.body.classList.remove(cls);
+  });
+  document.body.classList.add(`theme-${themeId}`);
   localStorage.setItem('agent-build-theme', themeId);
 };
 

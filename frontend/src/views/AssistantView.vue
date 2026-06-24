@@ -40,6 +40,7 @@ const wActiveAgentId = computed(() => workspace.activeAgentId.value);
 const wTraceRuns = computed(() => workspace.traceRuns.value);
 const wIsStreaming = computed(() => workspace.isStreaming.value);
 const wStreamingTimeline = computed(() => workspace.streamingTimeline.value);
+const wStreamingPrefixTimeline = computed(() => workspace.streamingPrefixTimeline.value);
 const wLastCompletedRun = computed(() => workspace.lastCompletedRun.value);
 const wIsAwaitingApproval = computed(() => workspace.isAwaitingApproval.value);
 const wPendingApprovalInfo = computed(() => workspace.pendingApprovalInfo.value);
@@ -164,9 +165,12 @@ const handleSelectWorkspaceDialog = async () => {
 
 onMounted(() => {
   workspace.initializeWorkspace();
-  // 读取本地缓存主题并应用到 body 元素
+  // 读取本地缓存主题并应用到 body 元素（只替换 theme-* 类，保留其他类）
   const savedTheme = localStorage.getItem('agent-build-theme') || 'default';
-  document.body.className = `theme-${savedTheme}`;
+  document.body.classList.forEach(cls => {
+    if (cls.startsWith('theme-')) document.body.classList.remove(cls);
+  });
+  document.body.classList.add(`theme-${savedTheme}`);
 });
 </script>
 
@@ -205,57 +209,131 @@ onMounted(() => {
       
       <!-- 3. 主聊天面板 + 子 Agent 右侧面板 -->
       <div class="main-content-container">
-        <ChatPanel 
-          ref="chatPanelRef"
-          :messages="wMessages"
-          :isLoading="wIsChatLoading"
-          :isCompacting="wIsCompacting"
-          :error="wErrorMsg"
-          :infoMsg="wInfoMsg"
-          :hasSession="!!wActiveSessionId"
-          :sessionTitle="sessionTitle"
-          :agents="wAvailableAgents"
-          :activeAgentId="wActiveAgentId"
-          :traceRuns="wTraceRuns"
-          :isStreaming="wIsStreaming"
-          :streamingTimeline="wStreamingTimeline"
-          :lastCompletedRun="wLastCompletedRun"
-          :isAwaitingApproval="wIsAwaitingApproval"
-          :pendingApprovalInfo="wPendingApprovalInfo"
-          :pendingApprovalInfos="wPendingApprovalInfos"
-          :isProcessingApproval="wIsResolvingApproval"
-          :permissionProfile="wPermissionProfile"
-          :contextTokens="wActiveSession?.context_tokens ?? 0"
-          :contextLength="wActiveModelContextLength"
-          :sessionId="wActiveSessionId"
-          :modelId="wModelId"
-          :providerId="wModelProviderId"
-          :thinkingEnabled="wThinkingEnabled"
-          :thinkingEffort="wThinkingEffort"
-          :sessionLoading="wIsChatLoading"
-          :skills="wSkills"
-          :interruptionPendingMessage="workspace.interruptionPendingMessage.value"
-          :interruptionWaitForTool="workspace.interruptionWaitForTool.value"
-          @update:activeAgentId="(id: string) => workspace.activeAgentId.value = id"
-          @send="(text: string, skillName?: string | null) => workspace.sendMessage(text, skillName)"
-          @errorDismiss="wErrorMsg = null"
-          @infoDismiss="wInfoMsg = null"
-          @compact="workspace.compactSession"
-          @reset="workspace.resetSession"
-          @stop="workspace.stopStreaming"
-          @approve="workspace.approveAction"
-          @reject="workspace.rejectAction"
-          @approve-all="workspace.approveAllAction"
-          @update:permissionProfile="workspace.updatePermissionProfile"
-          @update:model="(val: { modelId: string | null; providerId: number | null }) => workspace.updateModelConfig({ model_id: val.modelId, model_provider_id: val.providerId })"
-          @update:thinkingEnabled="(val: boolean) => workspace.updateModelConfig({ thinking_enabled: val })"
-          @update:thinkingEffort="(val: string) => workspace.updateModelConfig({ thinking_effort: val })"
-          @retry="workspace.retryLastRun"
-          @editSubmit="workspace.editAndReRun"
-          @forceSend="workspace.forceInterruptAndSend"
-          @withdraw="handleWithdraw"
-          @discard="workspace.discardInterruption"
-        />
+        <!-- 核心工作区 + 聊天面板容器 -->
+        <div class="chat-area-container">
+          <template v-if="wActiveSessionId">
+            <ChatPanel 
+              ref="chatPanelRef"
+              :messages="wMessages"
+              :isLoading="wIsChatLoading"
+              :isCompacting="wIsCompacting"
+              :error="wErrorMsg"
+              :infoMsg="wInfoMsg"
+              :hasSession="!!wActiveSessionId"
+              :sessionTitle="sessionTitle"
+              :agents="wAvailableAgents"
+              :activeAgentId="wActiveAgentId"
+              :traceRuns="wTraceRuns"
+              :isStreaming="wIsStreaming"
+              :streamingTimeline="wStreamingTimeline"
+              :streamingPrefixTimeline="wStreamingPrefixTimeline"
+              :lastCompletedRun="wLastCompletedRun"
+              :isAwaitingApproval="wIsAwaitingApproval"
+              :pendingApprovalInfo="wPendingApprovalInfo"
+              :pendingApprovalInfos="wPendingApprovalInfos"
+              :isProcessingApproval="wIsResolvingApproval"
+              :permissionProfile="wPermissionProfile"
+              :contextTokens="wActiveSession?.context_tokens ?? 0"
+              :contextLength="wActiveModelContextLength"
+              :sessionId="wActiveSessionId"
+              :modelId="wModelId"
+              :providerId="wModelProviderId"
+              :thinkingEnabled="wThinkingEnabled"
+              :thinkingEffort="wThinkingEffort"
+              :sessionLoading="wIsChatLoading"
+              :skills="wSkills"
+              :interruptionPendingMessage="workspace.interruptionPendingMessage.value"
+              :interruptionWaitForTool="workspace.interruptionWaitForTool.value"
+              @update:activeAgentId="(id: string) => workspace.activeAgentId.value = id"
+              @send="(text: string, skillName?: string | null) => workspace.sendMessage(text, skillName)"
+              @errorDismiss="wErrorMsg = null"
+              @infoDismiss="wInfoMsg = null"
+              @compact="workspace.compactSession"
+              @reset="workspace.resetSession"
+              @stop="workspace.stopStreaming"
+              @approve="workspace.approveAction"
+              @reject="workspace.rejectAction"
+              @approve-all="workspace.approveAllAction"
+              @update:permissionProfile="workspace.updatePermissionProfile"
+              @update:model="(val: { modelId: string | null; providerId: number | null }) => workspace.updateModelConfig({ model_id: val.modelId, model_provider_id: val.providerId })"
+              @update:thinkingEnabled="(val: boolean) => workspace.updateModelConfig({ thinking_enabled: val })"
+              @update:thinkingEffort="(val: string) => workspace.updateModelConfig({ thinking_effort: val })"
+              @retry="workspace.retryLastRun"
+              @editSubmit="workspace.editAndReRun"
+              @forceSend="workspace.forceInterruptAndSend"
+              @withdraw="handleWithdraw"
+              @discard="workspace.discardInterruption"
+            />
+          </template>
+
+          <!-- 助理模式空态欢迎界面 -->
+          <template v-else>
+            <div class="assistant-launchpad">
+              <div class="launchpad-grid-overlay"></div>
+              <div class="launchpad-content">
+                <!-- 动效 Logo -->
+                <div class="assistant-logo">
+                  <div class="logo-ring logo-ring-1"></div>
+                  <div class="logo-ring logo-ring-2"></div>
+                  <div class="logo-center">
+                    <svg viewBox="0 0 24 24" width="26" height="26" stroke="url(#assistant-grad)" stroke-width="1.5" fill="none">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <svg width="0" height="0">
+                      <defs>
+                        <linearGradient id="assistant-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stop-color="var(--accent)" />
+                          <stop offset="100%" stop-color="var(--accent-blue)" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  </div>
+                </div>
+
+                <h1 class="launchpad-title">ARIADNE // ASSISTANT</h1>
+                <p class="launchpad-subtitle">
+                  A general-purpose AI assistant. Ask anything, think together.
+                </p>
+
+                <!-- 快速开始按钮 -->
+                <button class="assistant-start-btn" @click="workspace.createNewSession(null, null, undefined, 'assistant')">
+                  <span class="btn-glow-layer"></span>
+                  <span class="btn-content">
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    New Conversation
+                  </span>
+                </button>
+
+                <!-- 最近会话 -->
+                <div v-if="assistantSessions.length > 0" class="recent-section">
+                  <div class="section-header-mono">
+                    <span class="header-line"></span>
+                    <span class="header-text">RECENT CONVERSATIONS</span>
+                    <span class="header-line"></span>
+                  </div>
+                  <div class="recent-grid">
+                    <div
+                      v-for="session in assistantSessions.slice(0, 4)"
+                      :key="session.session_id"
+                      class="recent-card"
+                      @click="workspace.activeSessionId.value = session.session_id"
+                    >
+                      <div class="card-glow"></div>
+                      <span class="card-icon">💬</span>
+                      <div class="card-details">
+                        <div class="card-name">{{ session.session_name || 'Untitled conversation' }}</div>
+                        <div class="card-sub">{{ session.session_id.slice(0, 8) }}</div>
+                      </div>
+                      <span class="card-arrow">→</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
         
         <!-- 垂直分割线 + 子 Agent 右侧面板 -->
         <template v-if="openChildAgents.length > 0">
@@ -321,6 +399,268 @@ onMounted(() => {
 .divider-vertical:hover,
 .divider-vertical:active {
   background: var(--accent-blue);
+}
+
+.chat-area-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* ── 助理空态欢迎界面 ── */
+.assistant-launchpad {
+  position: relative;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+  background: transparent;
+  padding: 40px 20px;
+}
+
+.launchpad-grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(var(--border-dim) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
+  -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
+  pointer-events: none;
+}
+
+.launchpad-content {
+  max-width: 560px;
+  width: 100%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+}
+
+.assistant-logo {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.logo-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent-subtle, rgba(255,255,255,0.08));
+}
+
+.logo-ring-1 {
+  width: 70px;
+  height: 70px;
+  animation: spin-clockwise 12s linear infinite;
+  border-color: rgba(var(--accent-rgb, 255,255,255), 0.1);
+}
+
+.logo-ring-2 {
+  width: 54px;
+  height: 54px;
+  animation: spin-counter-clockwise 9s linear infinite;
+  border-color: var(--accent-subtle);
+}
+
+.logo-center {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+@keyframes spin-clockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes spin-counter-clockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.launchpad-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.launchpad-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 380px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.assistant-start-btn {
+  position: relative;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--bg-app);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 11px 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--accent-glow);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.assistant-start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-glow);
+  filter: brightness(1.1);
+}
+
+.assistant-start-btn:active {
+  transform: translateY(0);
+}
+
+.btn-glow-layer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: 0.5s;
+}
+
+.assistant-start-btn:hover .btn-glow-layer {
+  left: 100%;
+  transition: 0.7s ease-in-out;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.recent-section {
+  width: 100%;
+  max-width: 460px;
+  margin-top: 32px;
+}
+
+.section-header-mono {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.header-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-dim), transparent);
+}
+
+.header-text {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.12em;
+}
+
+.recent-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recent-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.recent-card:hover {
+  border-color: var(--accent-glow);
+  background: var(--bg-active);
+  transform: translateX(3px);
+}
+
+.card-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 20% 50%, var(--accent-subtle), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.recent-card:hover .card-glow {
+  opacity: 1;
+}
+
+.card-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.card-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  margin-top: 1px;
+}
+
+.card-arrow {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.2s, color 0.2s;
+}
+
+.recent-card:hover .card-arrow {
+  transform: translateX(3px);
+  color: var(--accent);
 }
 </style>
 

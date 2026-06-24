@@ -140,21 +140,21 @@ function formatArgs(raw: string): string {
   font-family: var(--font-mono, monospace);
   font-size: 13px;
   color: var(--text-primary, #e0c060);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-hover);
   padding: 1px 6px;
   border-radius: 4px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--border-dim);
 }
 
 .args-pre {
   margin: 0;
   padding: 6px 10px;
-  background: rgba(0,0,0,0.2);
+  background: var(--bg-code-block);
   border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid var(--border-dim);
   font-family: var(--font-mono, monospace);
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-code);
   max-height: 120px;
   overflow-y: auto;
   white-space: pre-wrap;
@@ -171,7 +171,7 @@ function formatArgs(raw: string): string {
   display: flex;
   gap: 8px;
   padding: 10px 14px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--border-dim);
 }
 
 .approval-processing-tip {
