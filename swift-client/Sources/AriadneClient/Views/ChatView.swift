@@ -128,14 +128,18 @@ struct MessageBubbleView: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     if isEditing {
                         VStack(alignment: .trailing, spacing: 6) {
-                            TextEditor(text: $editedContent)
+                            TextField("Edit message...", text: $editedContent, axis: .vertical)
                                 .font(.body)
-                                .frame(width: 320, height: 80)
+                                .lineLimit(1...5)
+                                .textFieldStyle(.plain)
+                                .padding(8)
+                                .background(Color(NSColor.textBackgroundColor).opacity(0.5))
                                 .cornerRadius(8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                                        .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                                 )
+                                .frame(width: 320)
                             
                             HStack(spacing: 8) {
                                 Button("Cancel") {
@@ -549,11 +553,12 @@ struct ChatComposerView: View {
             
             // Text Area Input
             HStack(alignment: .bottom, spacing: 10) {
-                TextEditor(text: $viewModel.inputText)
+                TextField("Send a message...", text: $viewModel.inputText, axis: .vertical)
                     .font(.body)
-                    .frame(minHeight: 44, maxHeight: 120)
-                    .scrollContentBackground(.hidden)
-                    .padding(4)
+                    .lineLimit(1...5)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
                     .background(Color(NSColor.textBackgroundColor).opacity(0.5))
                     .cornerRadius(10)
                     .overlay(
