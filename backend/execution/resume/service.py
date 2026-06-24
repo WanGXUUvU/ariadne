@@ -44,6 +44,7 @@ from backend.execution.runtime.run_lifecycle import (
     RunLifecycle,
     TextDeltaItem,
     ThinkingDeltaItem,
+    UsageItem,
 )
 from backend.execution.streaming.sse import _sse_frame
 from backend.agent.definition import AgentDefinitionService
@@ -274,6 +275,16 @@ class ResumeRunService:
             elif isinstance(item, RunEventItem):
                 yield _sse_frame(
                     StreamFrame(type="run_event", data=item.event.model_dump())
+                )
+            elif isinstance(item, UsageItem):
+                yield _sse_frame(
+                    StreamFrame(
+                        type="usage",
+                        data={
+                            "model_call_index": item.model_call_index,
+                            "usage": item.usage.model_dump(),
+                        },
+                    )
                 )
             elif isinstance(item, RunStatusItem):
                 if item.status == RunFinalStatus.PAUSED:

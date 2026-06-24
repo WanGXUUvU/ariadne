@@ -26,6 +26,7 @@ from backend.execution.runtime.run_lifecycle import (
     TextDeltaItem,
     ThinkingDeltaItem,
     RunStatusItem,
+    UsageItem,
 )
 from backend.execution.streaming.sse import _sse_frame
 from backend.execution.streaming.types import StreamFrame
@@ -93,6 +94,17 @@ class RunSSEBridge:
                         StreamFrame(
                             type="run_event",
                             data=item.event.model_dump(),
+                        )
+                    )
+
+                elif isinstance(item, UsageItem):
+                    yield _sse_frame(
+                        StreamFrame(
+                            type="usage",
+                            data={
+                                "model_call_index": item.model_call_index,
+                                "usage": item.usage.model_dump(),
+                            },
                         )
                     )
 

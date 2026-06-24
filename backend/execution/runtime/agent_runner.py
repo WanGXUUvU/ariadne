@@ -193,6 +193,7 @@ class AgentRunner:
                     finish_reason = chunk.finish_reason
                 if chunk.type == "done" and chunk.usage:
                     self.last_usage = chunk.usage
+                    yield chunk
                     continue
                 if chunk.type == "thinking_delta":
                     yield chunk

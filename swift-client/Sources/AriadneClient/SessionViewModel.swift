@@ -28,6 +28,7 @@ public class SessionViewModel: ObservableObject {
     @Published public var streamingThinking: String = ""
     @Published public var streamingReply: String = ""
     @Published public var streamingEvents: [RunEvent] = []
+    @Published public var streamingLatestUsage: UsageFrame? = nil
     @Published public var activeRunId: String? = nil
     
     // Status message for error alerts/toasts
@@ -242,6 +243,7 @@ public class SessionViewModel: ObservableObject {
         self.streamingThinking = ""
         self.streamingReply = ""
         self.streamingEvents = []
+        self.streamingLatestUsage = nil
         self.activeRunId = nil
         
         // Append user message locally for immediate UI response
@@ -312,6 +314,8 @@ public class SessionViewModel: ObservableObject {
                     } catch {
                         print("Error decoding RunEvent from stream frame data: \(error)")
                     }
+                case "usage":
+                    self.applyUsageFrame(frame)
                 case "paused":
                     print("Run paused for approval")
                 case "end":
@@ -333,6 +337,7 @@ public class SessionViewModel: ObservableObject {
         self.streamingThinking = ""
         self.streamingReply = ""
         self.streamingEvents = []
+        self.streamingLatestUsage = nil
         self.activeRunId = nil
         
         await selectSession(sessionId)
@@ -345,6 +350,7 @@ public class SessionViewModel: ObservableObject {
         self.streamingThinking = ""
         self.streamingReply = ""
         self.streamingEvents = []
+        self.streamingLatestUsage = nil
         
         do {
             try await AriadneNetworkService.shared.streamApproval(approvalId: approvalId, action: action) { [weak self] frame in
@@ -372,6 +378,8 @@ public class SessionViewModel: ObservableObject {
                     } catch {
                         print("Error decoding RunEvent from stream frame data: \(error)")
                     }
+                case "usage":
+                    self.applyUsageFrame(frame)
                 case "paused":
                     print("Run paused for approval")
                 case "end":
@@ -392,9 +400,20 @@ public class SessionViewModel: ObservableObject {
         self.streamingThinking = ""
         self.streamingReply = ""
         self.streamingEvents = []
+        self.streamingLatestUsage = nil
         self.activeRunId = nil
         
         await selectSession(sessionId)
+    }
+
+    private func applyUsageFrame(_ frame: StreamFrame) {
+        do {
+            let data = try JSONSerialization.data(withJSONObject: frame.data.mapValues { $0.value })
+            let usageFrame = try JSONDecoder().decode(UsageFrame.self, from: data)
+            streamingLatestUsage = usageFrame
+        } catch {
+            print("Error decoding UsageFrame from stream frame data: \(error)")
+        }
     }
     
     // MARK: - Workspace Dialog
@@ -640,4 +659,3 @@ public class SessionViewModel: ObservableObject {
         }
     }
 }
-

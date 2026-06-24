@@ -1,10 +1,16 @@
 import unittest
 
 from backend.agent.types import AgentDefinition
-from backend.execution.persistence.types import RunInput
-from backend.core.types import StreamChunk, ToolCall, ToolCallFunction
+from backend.execution.persistence.types import RunContext, RunInput
+from backend.core.types import ModelUsage, StreamChunk, ToolCall, ToolCallFunction
 from backend.execution.runtime.agent_runner import AgentRunner
+from backend.execution.runtime.run_lifecycle import (
+    RunLifecycle,
+    RunLifecycleParams,
+    UsageItem,
+)
 from backend.tests.helpers.factories import build_assistant_response
+from backend.security.policy.types import ApprovalPolicy
 
 
 class FakeModelAdapter:
@@ -18,8 +24,9 @@ class FakeModelAdapter:
 
 
 class FakeAsyncStreamAdapter:
-    def __init__(self, leadin_chunks):
+    def __init__(self, leadin_chunks, usages=None):
         self.leadin_chunks = list(leadin_chunks)
+        self.usages = list(usages or [])
         self.calls = []
 
     async def async_stream_generate(self, request):
@@ -28,11 +35,19 @@ class FakeAsyncStreamAdapter:
             for chunk in self.leadin_chunks:
                 yield StreamChunk(type="content_delta", content_delta=chunk)
             yield _tool_call_chunk()
-            yield StreamChunk(type="done", finish_reason="tool_calls")
+            yield StreamChunk(
+                type="done",
+                finish_reason="tool_calls",
+                usage=self.usages[0] if self.usages else None,
+            )
             return
 
         yield StreamChunk(type="content_delta", content_delta="final reply")
-        yield StreamChunk(type="done", finish_reason="stop")
+        yield StreamChunk(
+            type="done",
+            finish_reason="stop",
+            usage=self.usages[1] if len(self.usages) > 1 else None,
+        )
 
 
 def _tool_call_chunk():
@@ -65,6 +80,14 @@ def _agent_for_echo(model_adapter):
         ),
         model_adapter=model_adapter,
     )
+
+
+class FakeRecorder:
+    def __init__(self):
+        self.finalizations = []
+
+    def finalize_run(self, finalization):
+        self.finalizations.append(finalization)
 
 
 class TestAgent(unittest.TestCase):
@@ -232,3 +255,45 @@ class TestAsyncAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(tool_call_message.content)
         self.assertEqual(tool_call_message.tool_calls[0].function.name, "echo_tool")
         self.assertIsNone(fake_adapter.calls[1].messages[2].content)
+
+    async def test_lifecycle_yields_usage_for_each_model_call(self):
+        fake_adapter = FakeAsyncStreamAdapter(
+            [],
+            usages=[
+                ModelUsage(input_tokens=100, output_tokens=20, total_tokens=120),
+                ModelUsage(input_tokens=150, output_tokens=30, total_tokens=180),
+            ],
+        )
+        agent = _agent_for_echo(fake_adapter)
+        recorder = FakeRecorder()
+        ctx = RunContext(
+            state=agent.state,
+            agent_profile=agent.agent_profile,
+            adapter=fake_adapter,
+            approval_policy=ApprovalPolicy.NEVER,
+            effective_agent_name="Default Agent",
+            workspace_path="",
+            session_type="coding",
+        )
+        lifecycle = RunLifecycle(
+            RunLifecycleParams(
+                ctx=ctx,
+                agent_runner=agent,
+                recorder=recorder,
+                run_input=RunInput(session_id="session-a", user_input="帮我测试工具"),
+                run_id="run-a",
+            )
+        )
+
+        usage_items = []
+        async for item in lifecycle.iterate():
+            if isinstance(item, UsageItem):
+                usage_items.append(item)
+
+        self.assertEqual([item.model_call_index for item in usage_items], [1, 2])
+        self.assertEqual(usage_items[0].usage.output_tokens, 20)
+        self.assertEqual(usage_items[0].usage.total_tokens, 120)
+        self.assertEqual(usage_items[1].usage.input_tokens, 150)
+        self.assertEqual(usage_items[1].usage.output_tokens, 30)
+        self.assertEqual(usage_items[1].usage.total_tokens, 180)
+        self.assertEqual(recorder.finalizations[0].usage.input_tokens, 150)

@@ -23,6 +23,7 @@ class StreamFrame(BaseModel):
     - paused         : 运行因审批暂停，包含 run_id
     - resume         : 审批通过后恢复运行，包含 run_id
     - thinking_delta : 思考过程的 token 级增量内容
+    - usage          : 一次模型调用结束后返回的 token 用量
     """
 
     type: Literal[
@@ -34,5 +35,6 @@ class StreamFrame(BaseModel):
         "paused",
         "resume",
         "thinking_delta",
+        "usage",
     ]
     data: dict[str, Any]

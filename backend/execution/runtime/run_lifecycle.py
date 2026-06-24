@@ -95,11 +95,20 @@ class RunStatusItem(BaseModel):
     status: RunFinalStatus
 
 
+class UsageItem(BaseModel):
+    """一次模型调用结束后返回的 token 用量。"""
+
+    type: Literal["usage"] = "usage"
+    model_call_index: int
+    usage: ModelUsage
+
+
 RunLifecycleItem = Union[
     TextDeltaItem,
     ThinkingDeltaItem,
     RunEventItem,
     RunStatusItem,
+    UsageItem,
 ]
 
 
@@ -114,6 +123,7 @@ class RunLifecycle:
         reply_text = ""
         thinking_buf = ""
         events: list[RunEvent] = list(self.params.initial_events)
+        usage_count = 0
 
         async def _flush_thinking() -> AsyncIterator[RunLifecycleItem]:
             """把累计的 thinking 文本收束成一个正式事件。"""
@@ -149,6 +159,13 @@ class RunLifecycle:
                     chunk = item.thinking_delta or ""
                     thinking_buf += chunk
                     yield ThinkingDeltaItem(content=chunk)
+
+                elif isinstance(item, StreamChunk) and item.type == "done" and item.usage:
+                    usage_count += 1
+                    yield UsageItem(
+                        model_call_index=usage_count,
+                        usage=item.usage,
+                    )
 
                 elif isinstance(item, RunEvent):
                     if item.type in ("tool_result", "tool_error"):

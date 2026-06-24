@@ -212,8 +212,32 @@ public struct RunEvent: Codable, Identifiable, Equatable {
     }
 }
 
+public struct ModelUsage: Codable, Equatable {
+    public let inputTokens: Int?
+    public let outputTokens: Int?
+    public let totalTokens: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case totalTokens = "total_tokens"
+    }
+}
+
+public struct UsageFrame: Codable, Identifiable, Equatable {
+    public var id: Int { modelCallIndex }
+    
+    public let modelCallIndex: Int
+    public let usage: ModelUsage
+    
+    enum CodingKeys: String, CodingKey {
+        case modelCallIndex = "model_call_index"
+        case usage
+    }
+}
+
 public struct StreamFrame: Codable {
-    public let type: String // "start" | "run_event" | "delta" | "end" | "error" | "paused" | "resume" | "thinking_delta"
+    public let type: String // "start" | "run_event" | "delta" | "end" | "error" | "paused" | "resume" | "thinking_delta" | "usage"
     public let data: [String: AnyCodable]
 }
 
