@@ -308,6 +308,13 @@ const hasRunningToolInChunk = (chunk: TimelineChunk): boolean => {
   return false;
 };
 
+const isThinkingActive = (chunk: TimelineChunk): boolean => {
+  if (props.msgIndex !== 9999) return false;
+  if (chunk.type !== 'thinking') return false;
+  const hasText = getSyntheticTimeline.value.some(t => t.kind === 'text' && t.content.trim().length > 0);
+  return !hasText;
+};
+
 const isChunkCollapsed = (chunk: TimelineChunk) => {
   const id = chunk.id;
   if (collapsedChunks.value[id] !== undefined) {
@@ -324,8 +331,15 @@ const isChunkCollapsed = (chunk: TimelineChunk) => {
     return false;
   }
 
-  // If this is the active streaming message, auto-expand it!
+  // If this is the active streaming message...
   if (props.msgIndex === 9999) {
+    // If it's a thinking block and the response text has started, auto-collapse it!
+    if (chunk.type === 'thinking') {
+      const hasText = getSyntheticTimeline.value.some(t => t.kind === 'text' && t.content.trim().length > 0);
+      if (hasText) {
+        return true;
+      }
+    }
     return false;
   }
   
@@ -382,6 +396,7 @@ const handleCodeBlockClick = (e: MouseEvent) => {
         :pendingApprovalInfo="pendingApprovalInfo"
         :pendingApprovalInfos="pendingApprovalInfos"
         :isProcessingApproval="isProcessingApproval"
+        :isThinkingActive="isThinkingActive(chunk)"
         @toggle="toggleChunk(chunk.id)"
         @approve="emit('approve', $event)"
         @reject="emit('reject', $event)"

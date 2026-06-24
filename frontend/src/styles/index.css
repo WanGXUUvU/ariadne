@@ -34,6 +34,13 @@
   
   --transition-fast: all 0.15s ease;
   --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Code Blocks theme adaptation */
+  --bg-code-block: #09090b;
+  --bg-code-header: rgba(255, 255, 255, 0.02);
+  --text-code: #E4E4E7;
+  --shadow-code-block: 0 12px 32px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-code-block-hover: 0 16px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* ==================== 4种高端极客深色主题系统 (Premium Themes) ==================== */
@@ -76,6 +83,12 @@ body.theme-cyberpunk {
   --accent-subtle: rgba(167, 139, 250, 0.08);
   --accent-blue: #D946EF;
   --accent-emerald: #818CF8;
+
+  --bg-code-block: #0b071a;
+  --bg-code-header: rgba(167, 139, 250, 0.03);
+  --text-code: #f3f1fb;
+  --shadow-code-block: 0 12px 32px rgba(9, 5, 20, 0.4), 0 0 0 1px rgba(167, 139, 250, 0.05);
+  --shadow-code-block-hover: 0 16px 40px rgba(9, 5, 20, 0.5), 0 0 0 1px rgba(167, 139, 250, 0.08);
 }
 
 /* 3. 翡翠森林 (Emerald Forest - 护眼极客之境) */
@@ -96,6 +109,12 @@ body.theme-emerald {
   --accent-subtle: rgba(16, 185, 129, 0.08);
   --accent-blue: #06B6D4;
   --accent-emerald: #10B981;
+
+  --bg-code-block: #06120e;
+  --bg-code-header: rgba(16, 185, 129, 0.03);
+  --text-code: #ecfdf5;
+  --shadow-code-block: 0 12px 32px rgba(4, 13, 10, 0.4), 0 0 0 1px rgba(16, 185, 129, 0.05);
+  --shadow-code-block-hover: 0 16px 40px rgba(4, 13, 10, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.08);
 }
 
 /* 4. 琥珀古金 (Charcoal Amber - 复古暖风机械) */
@@ -116,6 +135,12 @@ body.theme-amber {
   --accent-subtle: rgba(245, 158, 11, 0.08);
   --accent-blue: #F97316;
   --accent-emerald: #D97706;
+
+  --bg-code-block: #12100c;
+  --bg-code-header: rgba(245, 158, 11, 0.03);
+  --text-code: #fffdf9;
+  --shadow-code-block: 0 12px 32px rgba(13, 12, 10, 0.4), 0 0 0 1px rgba(245, 158, 11, 0.05);
+  --shadow-code-block-hover: 0 16px 40px rgba(13, 12, 10, 0.5), 0 0 0 1px rgba(245, 158, 11, 0.08);
 }
 
 /* 5. 苹果极简 (Apple Minimalist White - Apple/Linear 雅白) */
@@ -139,6 +164,12 @@ body.theme-light-apple {
   --scrollbar-thumb-color: 0, 0, 0;
   --shadow-app: 0 1px 3px rgba(0, 0, 0, 0.05), 0 20px 40px rgba(0, 0, 0, 0.08);
   --shadow-glow: 0 0 20px rgba(0, 113, 227, 0.05);
+
+  --bg-code-block: #f5f5f7;
+  --bg-code-header: rgba(0, 0, 0, 0.02);
+  --text-code: #1d1d1f;
+  --shadow-code-block: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
+  --shadow-code-block-hover: 0 4px 16px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 /* 6. OpenAI 经典 (OpenAI Light - 经典素绿) */
@@ -162,6 +193,12 @@ body.theme-light-openai {
   --scrollbar-thumb-color: 0, 0, 0;
   --shadow-app: 0 1px 3px rgba(0, 0, 0, 0.05), 0 20px 40px rgba(0, 0, 0, 0.08);
   --shadow-glow: 0 0 20px rgba(16, 163, 127, 0.05);
+
+  --bg-code-block: #f9f9f9;
+  --bg-code-header: rgba(0, 0, 0, 0.02);
+  --text-code: #0d0d0d;
+  --shadow-code-block: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
+  --shadow-code-block-hover: 0 4px 16px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -469,18 +506,18 @@ select.tech-btn option {
 
 /* Premium Code Blocks with Headers and Copy buttons */
 .code-block {
-  background: #09090B;
+  background: var(--bg-code-block);
   border: 1px solid var(--border-dim);
   border-radius: 10px;
   overflow: hidden;
   margin: 16px 0;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  box-shadow: var(--shadow-code-block);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .code-block:hover {
   border-color: var(--border-strong);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: var(--shadow-code-block-hover);
 }
 
 .code-header {
@@ -488,7 +525,7 @@ select.tech-btn option {
   justify-content: space-between;
   align-items: center;
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-code-header);
   border-bottom: 1px solid var(--border-dim);
   user-select: none;
 }
@@ -520,8 +557,8 @@ select.tech-btn option {
 
 .copy-code-btn:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.04);
+  background: var(--bg-hover);
+  border-color: var(--border-dim);
 }
 
 .copy-code-btn:active {
@@ -553,7 +590,7 @@ select.tech-btn option {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
-  color: #E4E4E7;
+  color: var(--text-code);
   display: block;
 }
 
@@ -985,7 +1022,7 @@ textarea:focus,
   letter-spacing: 0.06em;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-strong);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-hover);
   user-select: none;
 }
 
@@ -1002,7 +1039,7 @@ textarea:focus,
 }
 
 .md-table tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-hover);
 }
 
 /* ==================== 🌌 赛博朋克深空环境流光系统 ==================== */

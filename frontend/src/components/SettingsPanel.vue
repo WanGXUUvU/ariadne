@@ -7,6 +7,7 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { settingsApi } from '../api/settings';
 import type { Provider, ModelSetting } from '../api/settings';
+import McpServersSettings from './settings/McpServersSettings.vue';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -24,6 +25,7 @@ const TABS = [
   { id: 'general', name: '常规' },
   { id: 'appearance', name: '外观' },
   { id: 'providers', name: '配置' },
+  { id: 'mcp', name: 'MCP 服务器' },
   { id: 'skills', name: '自定义技能' },
 ] as const;
 
@@ -350,6 +352,14 @@ const selectTheme = (themeId: string) => {
                 <line x1="9" y1="8" x2="15" y2="8"></line>
                 <line x1="17" y1="16" x2="23" y2="16"></line>
               </template>
+              <template v-else-if="tab.id === 'mcp'">
+                <rect x="3" y="4" width="18" height="6" rx="2"></rect>
+                <rect x="3" y="14" width="18" height="6" rx="2"></rect>
+                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                <line x1="7" y1="17" x2="7.01" y2="17"></line>
+                <line x1="11" y1="7" x2="17" y2="7"></line>
+                <line x1="11" y1="17" x2="17" y2="17"></line>
+              </template>
               <template v-else-if="tab.id === 'skills'">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
               </template>
@@ -617,7 +627,12 @@ const selectTheme = (themeId: string) => {
             </div>
           </div>
 
-          <!-- 4. 自定义技能配置面板 (Skills Config) -->
+          <!-- 4. MCP 配置面板 -->
+          <div v-if="activeTab === 'mcp'" class="settings-panel-view">
+            <McpServersSettings :is-active="activeTab === 'mcp'" />
+          </div>
+
+          <!-- 5. 自定义技能配置面板 (Skills Config) -->
           <div v-if="activeTab === 'skills'" class="settings-panel-view">
             <div class="view-description">配置自定义技能 (Skills) 的扫描根目录。系统将扫描该目录下的所有子文件夹，若包含 SKILL.md 则自动加载该技能。</div>
             

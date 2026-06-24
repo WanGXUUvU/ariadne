@@ -15,7 +15,12 @@ async function fetchSettings<T>(endpoint: string, options: RequestInit = {}): Pr
       ...options.headers,
     },
   });
-  const data = await res.json();
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : undefined;
   if (!res.ok) {
     throw new Error(data?.detail || data?.error?.message || 'Settings API Error');
   }
@@ -45,6 +50,40 @@ export interface ModelSetting {
   effort_levels: string[]; // ["low","high"] 等
   context_length: number | null;
   supports_tools: boolean;
+}
+
+export type McpTransport = 'stdio' | 'streamable_http';
+
+export interface McpServer {
+  server_id: string;
+  display_name: string | null;
+  transport: McpTransport;
+  enabled: boolean;
+  required: boolean;
+  startup_timeout_sec: number;
+  tool_timeout_sec: number;
+  command: string | null;
+  args: string[];
+  env: Record<string, string>;
+  cwd: string | null;
+  url: string | null;
+  bearer_token: string | null;
+  http_headers: Record<string, string>;
+  runtime_status: 'connected' | 'disabled' | 'not_started' | 'error';
+  tool_count: number;
+  last_error: string | null;
+}
+
+export interface McpReloadError {
+  server_id: string;
+  message: string;
+}
+
+export interface McpReloadResult {
+  ok: boolean;
+  connected_servers: number;
+  failed_servers: number;
+  errors: McpReloadError[];
 }
 
 // ─────────────────────────────────────────────
@@ -117,6 +156,46 @@ export const settingsApi = {
     return fetchSettings<any>('/settings/file', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  /** 列出全部 MCP server 配置和运行时状态 */
+  listMcpServers(): Promise<McpServer[]> {
+    return fetchSettings<McpServer[]>('/settings/mcp/servers');
+  },
+
+  /** 获取单条 MCP server 详情 */
+  getMcpServer(serverId: string): Promise<McpServer> {
+    return fetchSettings<McpServer>(`/settings/mcp/servers/${serverId}`);
+  },
+
+  /** 创建一条 MCP server 配置 */
+  createMcpServer(data: Partial<McpServer> & { server_id: string; transport: McpTransport }): Promise<McpServer> {
+    return fetchSettings<McpServer>('/settings/mcp/servers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** 更新一条 MCP server 配置 */
+  patchMcpServer(serverId: string, patch: Partial<McpServer>): Promise<McpServer> {
+    return fetchSettings<McpServer>(`/settings/mcp/servers/${serverId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+  },
+
+  /** 删除一条 MCP server 配置 */
+  deleteMcpServer(serverId: string): Promise<void> {
+    return fetchSettings<void>(`/settings/mcp/servers/${serverId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** 重载 MCP runtime，让最新配置立即生效 */
+  reloadMcpRuntime(): Promise<McpReloadResult> {
+    return fetchSettings<McpReloadResult>('/settings/mcp/reload', {
+      method: 'POST',
     });
   },
 };
