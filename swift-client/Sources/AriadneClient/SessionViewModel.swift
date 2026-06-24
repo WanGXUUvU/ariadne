@@ -406,6 +406,10 @@ public class SessionViewModel: ObservableObject {
             self.workspaces = try await AriadneNetworkService.shared.fetchWorkspaces()
             await createNewSession(workspacePath: workspace.path, workspaceName: workspace.name)
         } catch {
+            if case let NetworkError.badStatusCode(_, responseString) = error,
+               responseString.contains("dialog_cancelled") {
+                return // Silence user cancellation
+            }
             self.errorMessage = "Failed to select workspace: \(error.localizedDescription)"
         }
     }
