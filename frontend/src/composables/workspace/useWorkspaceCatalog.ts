@@ -25,6 +25,9 @@ export function useWorkspaceCatalog(errorMsg: Ref<string | null>) {
       await loadWorkspaces();
       return ws;
     } catch (err: any) {
+      if (err.message && err.message.includes('dialog_cancelled')) {
+        return null; // Silence user cancellation
+      }
       errorMsg.value = err.message || 'Folder selection failed or cancelled';
       return null;
     }
