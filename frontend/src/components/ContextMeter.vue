@@ -59,8 +59,8 @@ const breakdown = computed(() => {
 
   const sysInstr = Math.round(total * 0.033);
   const toolDefs  = Math.round(total * 0.087);
-  const msgs      = Math.round(total * 0.041);
-  const toolRes   = Math.round(total * 0.035);
+  const msgs      = Math.round(total * 0.61);
+  const toolRes   = Math.round(total * 0.27);
 
   const pct = (n: number) =>
     ctxTotal ? `${((n / ctxTotal) * 100).toFixed(1)}%` : '—';
