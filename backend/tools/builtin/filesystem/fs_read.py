@@ -17,9 +17,10 @@ from backend.tools.types import RiskLevel
 from pathlib import Path  # 方便处理文件路径
 from backend.tools.types import ToolDefinition  # 导入工具定义
 from backend.tools.types import RiskLevel
+from backend.tools.result_types import ToolResult
 
 
-def read_file(path: str, __context__=None) -> str:
+def read_file(path: str, __context__=None) -> ToolResult:
     """这是"读取文件内容"的具体执行函数。
     （读取优先查 VFS 暂存区，命中则直接返回；没有命中才降级读物理磁盘。）
     """
@@ -30,7 +31,11 @@ def read_file(path: str, __context__=None) -> str:
     if vfs is not None:
         try:
             # 🟢 委托给 VFS 处理：命中返回暂存内容，标记删除则抛 FileNotFoundError，未暂存则降级读磁盘
-            return vfs.read_text(path)
+            return ToolResult(
+                ok=True,
+                content=vfs.read_text(path),
+                metadata={"tool_name": "read_file", "path": path},
+            )
         except FileNotFoundError as exc:
             raise ValueError(f"File not found: {path}") from exc
     # 🔴 降级：没有 VFS，走原有的物理磁盘读取逻辑
@@ -39,7 +44,11 @@ def read_file(path: str, __context__=None) -> str:
         raise ValueError(f"File not found: {path}")
     if not target.is_file():
         raise ValueError(f"Not a file: {path}")
-    return target.read_text(encoding="utf-8")
+    return ToolResult(
+        ok=True,
+        content=target.read_text(encoding="utf-8"),
+        metadata={"tool_name": "read_file", "path": path},
+    )
 
 
 READ_FILE_SCHEMA = {  # 给模型看的说明

@@ -16,10 +16,11 @@ from backend.tools.types import RiskLevel
 
 from backend.tools.types import ToolDefinition
 from backend.tools.types import RiskLevel
+from backend.tools.result_types import ToolResult
 from pathlib import Path
 
 
-def list_dir(path: str) -> str:
+def list_dir(path: str) -> ToolResult:
     """这是“列出文件夹内容”的具体执行函数。
     就像你在电脑上双击打开一个文件夹，或者在命令行打 `ls` / `dir`，它会把你指定文件夹底下的所有文件和子文件夹名字按字母顺序排好，用换行符连成一大串文字拿给你看。
 
@@ -37,7 +38,11 @@ def list_dir(path: str) -> str:
     if not target.is_dir():
         raise ValueError(f"Not a directory: {path}")
     items = sorted(child.name for child in target.iterdir())
-    return "\n".join(items)
+    return ToolResult(
+        ok=True,
+        content="\n".join(items),
+        metadata={"tool_name": "list_dir", "path": path},
+    )
 
 
 LIST_DIR_SCHEMA = {  # 给模型看的工具说明
