@@ -115,13 +115,9 @@ defineExpose({
 
   <main v-else class="chat-panel">
     <header class="panel-header">
-      <!-- 左侧：会话标题 + 状态 -->
+      <!-- 左侧：会话标题 -->
       <div class="header-left">
         <span class="session-label">{{ sessionTitle }}</span>
-        <div class="status-pill" :class="{ active: isLoading || isStreaming }">
-          <span class="status-dot"></span>
-          <span class="status-text">{{ (isLoading || isStreaming) ? 'running' : 'idle' }}</span>
-        </div>
       </div>
 
       <!-- 右侧：Agent 选择 + 操作 -->

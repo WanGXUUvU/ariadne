@@ -110,11 +110,34 @@ const isUuid = (s: string) => /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{
 const sessionTitle = computed(() => {
   const s = workspace.activeSession.value;
   if (!s) return 'NEW SESSION';
+  
+  let title = '';
   const name = s.session_name;
-  if (!name || name === s.session_id || isUuid(name)) {
-    return 'Untitled #' + s.session_id.slice(0, 8);
+  if (name && name !== s.session_id && !isUuid(name)) {
+    title = name;
+  } else if (s.last_reply_preview) {
+    const preview = s.last_reply_preview.trim();
+    if (preview) {
+      const sentenceEnd = preview.match(/[。？！.?!]/);
+      let fallbackTitle = preview;
+      if (sentenceEnd && sentenceEnd.index !== undefined && sentenceEnd.index > 0) {
+        fallbackTitle = preview.slice(0, sentenceEnd.index + 1);
+      }
+      if (fallbackTitle.length > 28) {
+        fallbackTitle = fallbackTitle.slice(0, 26) + '...';
+      }
+      title = fallbackTitle;
+    }
   }
-  return name;
+  
+  if (!title) {
+    title = 'Untitled #' + s.session_id.slice(0, 8);
+  }
+  
+  if (s.workspace_name) {
+    return `[${s.workspace_name}] ${title}`;
+  }
+  return title;
 });
 
 const handleNavAction = (action: string) => {
