@@ -1025,4 +1025,42 @@ const resetMarker = RESET_MARKER_CONTENT;
 .edit-action-btn {
   margin-right: 4px;
 }
+
+.reset-alert {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.reset-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-dim);
+}
+
+.reset-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  user-select: none;
+}
+
+.reset-text span:first-child {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.reset-text span.sub {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--text-muted);
+}
 </style>
