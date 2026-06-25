@@ -172,7 +172,8 @@ class RunLifecycle:
                         reply_text = ""
                     async for flushed in _flush_thinking():
                         yield flushed
-                    events.append(item)
+                    if not item.transient:
+                        events.append(item)
                     yield RunEventItem(event=item)
 
             async for flushed in _flush_thinking():

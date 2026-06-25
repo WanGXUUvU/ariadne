@@ -4,12 +4,13 @@ import { api } from '../../api/client';
 import type {
   AgentMessage,
   ApprovalInfo,
+  StreamUsageData,
   StreamingItem,
   TraceRunSummary,
 } from '../../types';
 import type { UiAgentOption } from '../../types/ui';
 import { upsertPendingApproval } from '../../utils/approvalQueue';
-import { reconstructUiMessages, writeTimelineToStore } from './helpers';
+import { hasOpenToolCalls, reconstructUiMessages, writeTimelineToStore } from './helpers';
 
 interface SessionSpecificState {
   historyMessages: AgentMessage[];
@@ -20,6 +21,7 @@ interface SessionSpecificState {
   isStreaming: boolean;
   streamingTimeline: StreamingItem[];
   streamingPrefixTimeline: StreamingItem[];
+  streamingLatestUsage: StreamUsageData | null;
   lastCompletedRun: TraceRunSummary | null;
   errorMsg: string | null;
   isAwaitingApproval: boolean;
@@ -61,6 +63,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
     state.isChatLoading = true;
     state.isStreaming = true;
     state.streamingTimeline = [];
+    state.streamingLatestUsage = null;
     state.lastCompletedRun = null;
     state.errorMsg = null;
 
@@ -111,17 +114,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
             state.streamingTimeline = [...state.streamingTimeline, { kind: 'event', event: frame.data }];
           }
           if ((state as any).interruptionWaitForTool && (state as any).interruptionPendingMessage) {
-            let activeToolCallsCount = 0;
-            for (const item of state.streamingTimeline) {
-              if (item.kind === 'event') {
-                if (item.event.type === 'assistant_tool_call') {
-                  activeToolCallsCount++;
-                } else if (item.event.type === 'tool_result' || item.event.type === 'tool_error') {
-                  activeToolCallsCount--;
-                }
-              }
-            }
-            if (activeToolCallsCount === 0) {
+            if (!hasOpenToolCalls(state.streamingTimeline)) {
               const pendingMsg = (state as any).interruptionPendingMessage;
               const pendingSkill = (state as any).interruptionPendingSkill;
               (state as any).interruptionPendingMessage = null;
@@ -156,6 +149,8 @@ export function useRunStreaming(options: RunStreamingOptions) {
             }).catch(() => {});
           }
           onLiveRunEvent(targetSessionId, frame.data);
+        } else if (frame.type === 'usage') {
+          state.streamingLatestUsage = frame.data;
         } else if (frame.type === 'paused') {
           state.isAwaitingApproval = true;
           state.pendingApprovalInfo = state.pendingApprovalInfos[0] ?? state.pendingApprovalInfo;
@@ -170,13 +165,18 @@ export function useRunStreaming(options: RunStreamingOptions) {
               const msg = newMsgs[i];
               if (msg.role === 'assistant' &&
                   (msg.content === null || (capturedRunId && msg.run_id === capturedRunId))) {
-                newMsgs[i] = { ...msg, timeline: partialTimeline };
+                newMsgs[i] = { ...msg, timeline: partialTimeline, run_id: capturedRunId ?? undefined };
                 found = true;
                 break;
               }
             }
             if (!found) {
-              newMsgs.push({ role: 'assistant', content: null, timeline: partialTimeline });
+              newMsgs.push({
+                role: 'assistant',
+                content: null,
+                timeline: partialTimeline,
+                run_id: capturedRunId ?? undefined
+              });
             }
           }
           state.currentMessages = newMsgs;
@@ -196,6 +196,16 @@ export function useRunStreaming(options: RunStreamingOptions) {
           const activeMsgs = frame.data.state?.messages || [];
           state.traceRuns = fetchedRuns;
           state.currentMessages = reconstructUiMessages(state.traceRuns, activeMsgs);
+          // 用客户端流式累积的 timeline 替换服务端重建的，消除 end 时的视觉闪烁
+          if (capturedRunId && frozenTimeline.length > 0) {
+            const msgs = state.currentMessages;
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i].role === 'assistant' && msgs[i].run_id === capturedRunId) {
+                msgs[i] = { ...msgs[i], timeline: frozenTimeline };
+                break;
+              }
+            }
+          }
           extractChildAgents(targetSessionId, state.currentMessages, state.traceRuns);
           if (capturedRunId) {
             state.lastCompletedRun = state.traceRuns.find(r => r.run_id === capturedRunId) ?? null;
@@ -223,7 +233,8 @@ export function useRunStreaming(options: RunStreamingOptions) {
                 ...msg,
                 content: partialReply || null,
                 stopped: true,
-                timeline: frozenTimeline
+                timeline: frozenTimeline,
+                run_id: capturedRunId ?? undefined
               };
               updated = true;
               break;
@@ -234,7 +245,8 @@ export function useRunStreaming(options: RunStreamingOptions) {
               role: 'assistant',
               content: partialReply || null,
               stopped: true,
-              timeline: frozenTimeline
+              timeline: frozenTimeline,
+              run_id: capturedRunId ?? undefined
             });
           }
           state.currentMessages = newMsgs;
@@ -244,6 +256,7 @@ export function useRunStreaming(options: RunStreamingOptions) {
       state.isChatLoading = false;
       state.isStreaming = false;
       state.streamingTimeline = [];
+      state.streamingLatestUsage = null;
       state.streamAbortController = null;
       state.pendingRunId = null;
     }
@@ -285,7 +298,13 @@ export function useRunStreaming(options: RunStreamingOptions) {
     if (partialReply.trim() || frozenTimeline.length > 0) {
       state.currentMessages = [
         ...state.currentMessages,
-        { role: 'assistant', content: partialReply || null, stopped: true, timeline: frozenTimeline },
+        {
+          role: 'assistant',
+          content: partialReply || null,
+          stopped: true,
+          timeline: frozenTimeline,
+          run_id: runId ?? undefined
+        },
       ];
     }
   };

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import type { AgentMessage, TraceRunSummary, ApprovalInfo, SkillMetadata } from '../types';
+import type { AgentMessage, TraceRunSummary, ApprovalInfo, SkillMetadata, StreamUsageData } from '../types';
 import type { UiAgentOption } from '../types/ui';
 import MessageList from './MessageList.vue';
 import MessageComposer from './MessageComposer.vue';
@@ -19,6 +19,7 @@ const props = defineProps<{
   isStreaming?: boolean;
   streamingTimeline?: import('../types').StreamingItem[];
   streamingPrefixTimeline?: import('../types').StreamingItem[];
+  streamingLatestUsage?: StreamUsageData | null;
   lastCompletedRun?: TraceRunSummary | null;
   isAwaitingApproval?: boolean;
   pendingApprovalInfo?: ApprovalInfo | null;
@@ -180,6 +181,7 @@ defineExpose({
       :isStreaming="isStreaming"
       :streamingTimeline="streamingTimeline"
       :streamingPrefixTimeline="streamingPrefixTimeline"
+      :streamingLatestUsage="streamingLatestUsage"
       :lastCompletedRun="lastCompletedRun"
       :error="error"
       :isAwaitingApproval="isAwaitingApproval"
@@ -234,7 +236,7 @@ defineExpose({
 
     <MessageComposer
       ref="composerRef"
-      :disabled="isLoading || isCompacting"
+      :disabled="isCompacting"
       :messageCount="messages.length"
       :isStreaming="isStreaming"
       :permissionProfile="permissionProfile"

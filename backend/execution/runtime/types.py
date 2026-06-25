@@ -37,6 +37,7 @@ class RunEvent(BaseModel):
     tool_name: Optional[str] = None
     tool_call_id: Optional[str] = None
     tool_result: Optional[ToolResult] = None
+    transient: bool = False
 
 
 class ToolBatchResult(BaseModel):

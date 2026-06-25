@@ -34,12 +34,16 @@ cat > "$APP_NAME/Contents/Info.plist" <<EOF
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
+    <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
 </dict>
 </plist>
 EOF
+
+codesign --force --deep --sign - "$APP_NAME" >/dev/null
 
 echo "打包成功！已生成: $APP_NAME"
 echo "你可以直接双击运行它，或者运行 'open $APP_NAME'。"

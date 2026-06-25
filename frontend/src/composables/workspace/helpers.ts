@@ -18,15 +18,97 @@ export function readTimelineStore(): TimelineStore {
   }
 }
 
+const MAX_STORE_ENTRIES = 50;
+const MAX_TOOL_RESULT_LENGTH = 50_000; // 截断超大 tool_result content（~50KB）
+
+function trimTimelineForStorage(timeline: StreamingItem[]): StreamingItem[] {
+  return timeline.map(item => {
+    if (item.kind !== 'event') return item;
+    const ev = item.event;
+    if (
+      (ev.type === 'tool_result' || ev.type === 'tool_error') &&
+      ev.tool_result?.content &&
+      ev.tool_result.content.length > MAX_TOOL_RESULT_LENGTH
+    ) {
+      return {
+        kind: 'event',
+        event: {
+          ...ev,
+          tool_result: {
+            ...ev.tool_result,
+            content: ev.tool_result.content.slice(0, MAX_TOOL_RESULT_LENGTH) +
+              `\n…[truncated ${ev.tool_result.content.length - MAX_TOOL_RESULT_LENGTH} chars for storage]`,
+          },
+        },
+      };
+    }
+    return item;
+  });
+}
+
 export function writeTimelineToStore(runId: string, timeline: StreamingItem[]) {
   if (typeof window === 'undefined') return;
   const store = readTimelineStore();
-  store[runId] = timeline;
+  store[runId] = trimTimelineForStorage(timeline);
+
   const keys = Object.keys(store);
-  if (keys.length > 50) {
-    delete store[keys[0]];
+  // 超过上限时先清理
+  while (keys.length > MAX_STORE_ENTRIES) {
+    delete store[keys.shift()!];
   }
-  window.localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(store));
+
+  try {
+    window.localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(store));
+  } catch (e: unknown) {
+    // QuotaExceededError — 主动腾出空间后重试
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      const remainingKeys = Object.keys(store);
+      // 激进腾出：只保留最近 10 条
+      while (remainingKeys.length > 10) {
+        delete store[remainingKeys.shift()!];
+      }
+      try {
+        window.localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(store));
+      } catch (_retryErr) {
+        // 仍失败：只保留当前条目，并截断 tool_result
+        const fallback: TimelineStore = { [runId]: trimTimelineForStorage(timeline) };
+        try {
+          window.localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(fallback));
+        } catch (_finalErr) {
+          // 最终兜底：清空后仅存当前条目（不保留 tool results）
+          const minimal: TimelineStore = {
+            [runId]: timeline.map(item => {
+              if (item.kind === 'event') {
+                const ev = { ...item.event, tool_result: null };
+                return { kind: 'event' as const, event: ev };
+              }
+              return item;
+            }),
+          };
+          try { window.localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(minimal)); } catch { /* 静默失败 */ }
+        }
+      }
+    }
+    // 其他错误静默忽略 — localStorage 是缓存层，不应阻塞主流程
+  }
+}
+
+export function hasOpenToolCalls(timeline: StreamingItem[]): boolean {
+  const openCallIds = new Set<string>();
+
+  timeline.forEach((item, index) => {
+    if (item.kind !== 'event') return;
+    const event = item.event;
+    const key = event.tool_call_id || `${event.tool_name ?? 'tool'}:${event.index ?? index}`;
+
+    if (event.type === 'assistant_tool_call') {
+      openCallIds.add(key);
+    } else if (event.type === 'tool_result' || event.type === 'tool_error') {
+      openCallIds.delete(key);
+    }
+  });
+
+  return openCallIds.size > 0;
 }
 
 function readResetHistoryStore(): ResetHistoryStore {

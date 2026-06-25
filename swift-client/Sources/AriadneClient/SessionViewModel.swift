@@ -205,7 +205,9 @@ public class SessionViewModel: ObservableObject {
     // MARK: - Message Run / SSE Stream execution
     
     public func sendMessage() async {
-        guard let sessionId = currentSessionId, !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard !isStreaming,
+              let sessionId = currentSessionId,
+              !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
         let textToSend = inputText
         self.inputText = ""

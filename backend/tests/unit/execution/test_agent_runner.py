@@ -50,6 +50,54 @@ class FakeAsyncStreamAdapter:
         )
 
 
+class FakeMultiDeltaAsyncStreamAdapter:
+    def __init__(self):
+        self.calls = []
+
+    async def async_stream_generate(self, request):
+        self.calls.append(request)
+        if len(self.calls) == 1:
+            yield StreamChunk(
+                type="tool_call_delta",
+                tool_call_delta={
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "id": "call_001",
+                            "function": {"name": "echo_", "arguments": ""},
+                        }
+                    ]
+                },
+            )
+            yield StreamChunk(
+                type="tool_call_delta",
+                tool_call_delta={
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "function": {"name": "tool", "arguments": '{"text"'},
+                        }
+                    ]
+                },
+            )
+            yield StreamChunk(
+                type="tool_call_delta",
+                tool_call_delta={
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "function": {"arguments": ': "hello"}'},
+                        }
+                    ]
+                },
+            )
+            yield StreamChunk(type="done", finish_reason="tool_calls")
+            return
+
+        yield StreamChunk(type="content_delta", content_delta="final reply")
+        yield StreamChunk(type="done", finish_reason="stop")
+
+
 def _tool_call_chunk():
     return StreamChunk(
         type="tool_call_delta",
@@ -297,3 +345,41 @@ class TestAsyncAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(usage_items[1].usage.output_tokens, 30)
         self.assertEqual(usage_items[1].usage.total_tokens, 180)
         self.assertEqual(recorder.finalizations[0].usage.input_tokens, 150)
+
+    async def test_lifecycle_does_not_persist_transient_tool_call_deltas(self):
+        fake_adapter = FakeMultiDeltaAsyncStreamAdapter()
+        agent = _agent_for_echo(fake_adapter)
+        recorder = FakeRecorder()
+        ctx = RunContext(
+            state=agent.state,
+            agent_profile=agent.agent_profile,
+            adapter=fake_adapter,
+            approval_policy=ApprovalPolicy.NEVER,
+            effective_agent_name="Default Agent",
+            workspace_path="",
+            session_type="coding",
+        )
+        lifecycle = RunLifecycle(
+            RunLifecycleParams(
+                ctx=ctx,
+                agent_runner=agent,
+                recorder=recorder,
+                run_input=RunInput(session_id="session-a", user_input="帮我测试工具"),
+                run_id="run-a",
+            )
+        )
+
+        live_tool_call_events = []
+        async for item in lifecycle.iterate():
+            if getattr(item, "type", None) == "run_event" and item.event.type == "assistant_tool_call":
+                live_tool_call_events.append(item.event)
+
+        persisted_tool_call_events = [
+            event
+            for event in recorder.finalizations[0].events
+            if event.type == "assistant_tool_call"
+        ]
+        self.assertGreater(len(live_tool_call_events), 1)
+        self.assertEqual(len(persisted_tool_call_events), 1)
+        self.assertFalse(persisted_tool_call_events[0].transient)
+        self.assertEqual(persisted_tool_call_events[0].content, '{"text": "hello"}')

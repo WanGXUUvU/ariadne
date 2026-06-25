@@ -274,183 +274,185 @@ defineExpose({
 
 <template>
   <div class="composer-container">
-    <!-- 斜杠命令菜单 -->
-    <Transition name="slash-menu">
-      <div v-if="showSlashMenu && slashMenuItems.length > 0" class="slash-menu">
-        <div class="slash-menu-header">命令 &amp; 技能</div>
-        <div
-          v-for="(item, idx) in slashMenuItems"
-          :key="item.id"
-          class="slash-item"
-          :class="{ active: idx === slashMenuIndex, 'is-skill': item.type === 'skill' }"
-          @mousedown.prevent="selectSlashItem(item)"
-          @mouseover="slashMenuIndex = idx"
-        >
-          <div class="slash-item-main">
-            <span class="slash-item-label"><span class="slash-prefix">/</span>{{ item.label }}</span>
-            <span v-if="item.type === 'skill'" class="slash-item-tag">skill</span>
+    <div class="composer-inner">
+      <!-- 斜杠命令菜单 -->
+      <Transition name="slash-menu">
+        <div v-if="showSlashMenu && slashMenuItems.length > 0" class="slash-menu">
+          <div class="slash-menu-header">命令 &amp; 技能</div>
+          <div
+            v-for="(item, idx) in slashMenuItems"
+            :key="item.id"
+            class="slash-item"
+            :class="{ active: idx === slashMenuIndex, 'is-skill': item.type === 'skill' }"
+            @mousedown.prevent="selectSlashItem(item)"
+            @mouseover="slashMenuIndex = idx"
+          >
+            <div class="slash-item-main">
+              <span class="slash-item-label"><span class="slash-prefix">/</span>{{ item.label }}</span>
+              <span v-if="item.type === 'skill'" class="slash-item-tag">skill</span>
+            </div>
+            <span class="slash-item-desc">{{ item.description }}</span>
           </div>
-          <span class="slash-item-desc">{{ item.description }}</span>
+        </div>
+      </Transition>
+
+      <div class="composer-header mono-label">
+        <span class="composer-hint">Ask anything</span>
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <span v-if="messageCount !== undefined && messageCount > 0" class="turn-counter" :class="{ 'turn-warn': messageCount >= 10 }">
+            {{ messageCount }} msg
+          </span>
+          <span class="key-hint" v-html="sendShortcutHint"></span>
         </div>
       </div>
-    </Transition>
 
-    <div class="composer-header mono-label">
-      <span class="composer-hint">Ask anything</span>
-      <div style="display: flex; gap: 16px; align-items: center;">
-        <span v-if="messageCount !== undefined && messageCount > 0" class="turn-counter" :class="{ 'turn-warn': messageCount >= 10 }">
-          {{ messageCount }} msg
-        </span>
-        <span class="key-hint" v-html="sendShortcutHint"></span>
-      </div>
-    </div>
-
-    <!-- 权限与模型配置工具栏 -->
-    <div class="composer-toolbar">
-      <div class="profile-selector">
-        <div class="profile-dropdown-wrap" v-click-outside="() => showProfileMenu = false">
-          <button
-            class="profile-trigger"
-            :style="{ '--profile-color': currentProfile().color, '--profile-color-dim': currentProfile().colorDim }"
-            @click="showProfileMenu = !showProfileMenu"
-            :disabled="disabled && !isStreaming"
-          >
-            <span class="profile-dot-ring" :style="{ '--active-color': currentProfile().color }">
-              <span class="profile-dot-inner"></span>
-            </span>
-            <span class="profile-trigger-label">{{ currentProfile().label }}</span>
-            <svg class="profile-chevron" :class="{ open: showProfileMenu }" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-
-          <div v-if="showProfileMenu" class="profile-menu">
+      <!-- 权限与模型配置工具栏 -->
+      <div class="composer-toolbar">
+        <div class="profile-selector">
+          <div class="profile-dropdown-wrap" v-click-outside="() => showProfileMenu = false">
             <button
-              v-for="p in PROFILES"
-              :key="p.id"
-              class="profile-menu-item"
-              :class="{ active: (permissionProfile ?? 'conservative') === p.id }"
-              :style="{ '--item-color': p.color }"
-              @click="selectProfile(p.id)"
+              class="profile-trigger"
+              :style="{ '--profile-color': currentProfile().color, '--profile-color-dim': currentProfile().colorDim }"
+              @click="showProfileMenu = !showProfileMenu"
+              :disabled="disabled && !isStreaming"
             >
-              <span class="profile-dot-ring" :style="{ '--active-color': p.color }">
+              <span class="profile-dot-ring" :style="{ '--active-color': currentProfile().color }">
                 <span class="profile-dot-inner"></span>
               </span>
-              <div class="item-body">
-                <div class="item-label-row">
-                  <span class="item-label">{{ p.label }}</span>
-                  <span class="item-sub-tag" :style="{ color: p.color, background: p.colorDim }">{{ p.subtitle }}</span>
-                </div>
-                <span class="item-desc">{{ p.description }}</span>
-              </div>
-              <svg v-if="(permissionProfile ?? 'conservative') === p.id" class="item-check" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
-                <polyline points="20 6 9 17 4 12"/>
+              <span class="profile-trigger-label">{{ currentProfile().label }}</span>
+              <svg class="profile-chevron" :class="{ open: showProfileMenu }" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none">
+                <polyline points="6 9 12 15 18 9"/>
               </svg>
             </button>
+
+            <div v-if="showProfileMenu" class="profile-menu">
+              <button
+                v-for="p in PROFILES"
+                :key="p.id"
+                class="profile-menu-item"
+                :class="{ active: (permissionProfile ?? 'conservative') === p.id }"
+                :style="{ '--item-color': p.color }"
+                @click="selectProfile(p.id)"
+              >
+                <span class="profile-dot-ring" :style="{ '--active-color': p.color }">
+                  <span class="profile-dot-inner"></span>
+                </span>
+                <div class="item-body">
+                  <div class="item-label-row">
+                    <span class="item-label">{{ p.label }}</span>
+                    <span class="item-sub-tag" :style="{ color: p.color, background: p.colorDim }">{{ p.subtitle }}</span>
+                  </div>
+                  <span class="item-desc">{{ p.description }}</span>
+                </div>
+                <svg v-if="(permissionProfile ?? 'conservative') === p.id" class="item-check" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
+
+        <ModelSelector
+          v-if="sessionId"
+          :model-id="modelId"
+          :provider-id="providerId"
+          :thinking-enabled="thinkingEnabled"
+          :thinking-effort="thinkingEffort"
+          :session-loading="sessionLoading"
+          @update:model="val => emit('update:model', val)"
+          @update:thinking-enabled="val => emit('update:thinkingEnabled', val)"
+          @update:thinking-effort="val => emit('update:thinkingEffort', val)"
+        />
       </div>
 
-      <ModelSelector
-        v-if="sessionId"
-        :model-id="modelId"
-        :provider-id="providerId"
-        :thinking-enabled="thinkingEnabled"
-        :thinking-effort="thinkingEffort"
-        :session-loading="sessionLoading"
-        @update:model="val => emit('update:model', val)"
-        @update:thinking-enabled="val => emit('update:thinkingEnabled', val)"
-        @update:thinking-effort="val => emit('update:thinkingEffort', val)"
-      />
-    </div>
+      <div class="composer-wrapper" :class="{ 'is-disabled': disabled && !isStreaming, 'is-focused': isFocused, 'is-streaming': isStreaming }">
+        <span v-if="selectedSkillName" class="inline-skill-chip">
+          /{{ selectedSkillName }}<button class="inline-skill-clear" @click="clearSelectedSkill" tabindex="-1">×</button>
+        </span>
+        <textarea 
+          ref="textareaRef"
+          class="composer-input"
+          v-model="text"
+          @input="adjustHeight"
+          @keydown="handleKeyDown"
+          @focus="isFocused = true"
+          @blur="isFocused = false"
+          :placeholder="selectedSkillName ? '' : 'Ask anything or request a tool...'"
+          :disabled="disabled && !isStreaming"
+          rows="1"
+        ></textarea>
 
-    <div class="composer-wrapper" :class="{ 'is-disabled': disabled && !isStreaming, 'is-focused': isFocused, 'is-streaming': isStreaming }">
-      <span v-if="selectedSkillName" class="inline-skill-chip">
-        /{{ selectedSkillName }}<button class="inline-skill-clear" @click="clearSelectedSkill" tabindex="-1">×</button>
-      </span>
-      <textarea 
-        ref="textareaRef"
-        class="composer-input"
-        v-model="text"
-        @input="adjustHeight"
-        @keydown="handleKeyDown"
-        @focus="isFocused = true"
-        @blur="isFocused = false"
-        :placeholder="selectedSkillName ? '' : 'Ask anything or request a tool...'"
-        :disabled="disabled && !isStreaming"
-        rows="1"
-      ></textarea>
+        <!-- 💡 环形上下文窗口用量展示 (置于输入框右侧) -->
+        <div v-if="sessionId" class="composer-ctx-ring-wrap" v-click-outside="() => showComposerCtx = false">
+          <button
+            class="composer-ctx-btn"
+            :class="{ warning: usedPct >= 60 && usedPct < 80, danger: usedPct >= 80 }"
+            @click="showComposerCtx = !showComposerCtx"
+            title="Context Window Usage"
+          >
+            <svg class="ctx-ring-svg" width="26" height="26">
+              <circle cx="13" cy="13" r="10" class="ring-bg" />
+              <circle
+                cx="13"
+                cy="13"
+                r="10"
+                class="ring-progress"
+                :stroke-dasharray="strokeCircumference"
+                :stroke-dashoffset="strokeDashoffset"
+              />
+            </svg>
+            <span class="ctx-pct-text">{{ Math.round(usedPct) }}%</span>
+          </button>
 
-      <!-- 💡 环形上下文窗口用量展示 (置于输入框右侧) -->
-      <div v-if="sessionId" class="composer-ctx-ring-wrap" v-click-outside="() => showComposerCtx = false">
-        <button
-          class="composer-ctx-btn"
-          :class="{ warning: usedPct >= 60 && usedPct < 80, danger: usedPct >= 80 }"
-          @click="showComposerCtx = !showComposerCtx"
-          title="Context Window Usage"
+          <!-- 💡 玻璃拟态上下文卡片弹窗 -->
+          <Transition name="composer-ctx-pop">
+            <div v-if="showComposerCtx" class="composer-ctx-popover">
+              <div class="composer-ctx-header">
+                <span class="ctx-header-title">上下文令牌窗口</span>
+                <span class="ctx-header-desc">{{ fmtTokens(contextTokens ?? 0) }} / {{ fmtTokens(contextLength ?? 128000) }}</span>
+              </div>
+              
+              <div class="composer-ctx-bar-track">
+                <div class="composer-ctx-bar-used" :style="{ width: `${usedPct}%`, background: usedColor }" />
+              </div>
+
+              <div class="composer-ctx-meta-row">
+                <span>已使用比例</span>
+                <span class="meta-val">{{ usedPct.toFixed(1) }}%</span>
+              </div>
+
+              <button
+                class="composer-ctx-compact-btn"
+                :disabled="isCompacting || disabled"
+                @click="handleCompact"
+              >
+                <svg v-if="isCompacting" class="spin-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                <span>{{ isCompacting ? '正在压缩对话...' : '压缩当前对话' }}</span>
+              </button>
+            </div>
+          </Transition>
+        </div>
+
+        <button 
+          class="send-btn"
+          :class="{ 'is-stop': isStreaming && !text.trim() }"
+          @click="(isStreaming && !text.trim()) ? emit('stop') : handleSend()"
+          :disabled="!isStreaming && (disabled || !text.trim())"
+          :title="(isStreaming && !text.trim()) ? 'Stop generation' : 'Send'"
         >
-          <svg class="ctx-ring-svg" width="26" height="26">
-            <circle cx="13" cy="13" r="10" class="ring-bg" />
-            <circle
-              cx="13"
-              cy="13"
-              r="10"
-              class="ring-progress"
-              :stroke-dasharray="strokeCircumference"
-              :stroke-dashoffset="strokeDashoffset"
-            />
+          <!-- Stop 正方形图标 -->
+          <svg v-if="isStreaming && !text.trim()" viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="3"/>
           </svg>
-          <span class="ctx-pct-text">{{ Math.round(usedPct) }}%</span>
+          <!-- 发送箭头图标 -->
+          <svg v-else viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
         </button>
-
-        <!-- 💡 玻璃拟态上下文卡片弹窗 -->
-        <Transition name="composer-ctx-pop">
-          <div v-if="showComposerCtx" class="composer-ctx-popover">
-            <div class="composer-ctx-header">
-              <span class="ctx-header-title">上下文令牌窗口</span>
-              <span class="ctx-header-desc">{{ fmtTokens(contextTokens ?? 0) }} / {{ fmtTokens(contextLength ?? 128000) }}</span>
-            </div>
-            
-            <div class="composer-ctx-bar-track">
-              <div class="composer-ctx-bar-used" :style="{ width: `${usedPct}%`, background: usedColor }" />
-            </div>
-
-            <div class="composer-ctx-meta-row">
-              <span>已使用比例</span>
-              <span class="meta-val">{{ usedPct.toFixed(1) }}%</span>
-            </div>
-
-            <button
-              class="composer-ctx-compact-btn"
-              :disabled="isCompacting || disabled"
-              @click="handleCompact"
-            >
-              <svg v-if="isCompacting" class="spin-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-              </svg>
-              <span>{{ isCompacting ? '正在压缩对话...' : '压缩当前对话' }}</span>
-            </button>
-          </div>
-        </Transition>
       </div>
-
-      <button 
-        class="send-btn"
-        :class="{ 'is-stop': isStreaming && !text.trim() }"
-        @click="(isStreaming && !text.trim()) ? emit('stop') : handleSend()"
-        :disabled="!isStreaming && (disabled || !text.trim())"
-        :title="(isStreaming && !text.trim()) ? 'Stop generation' : 'Send'"
-      >
-        <!-- Stop 正方形图标 -->
-        <svg v-if="isStreaming && !text.trim()" viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-          <rect x="4" y="4" width="16" height="16" rx="3"/>
-        </svg>
-        <!-- 发送箭头图标 -->
-        <svg v-else viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="19" x2="12" y2="5"></line>
-          <polyline points="5 12 12 5 19 12"></polyline>
-        </svg>
-      </button>
     </div>
   </div>
 </template>
@@ -590,6 +592,14 @@ defineExpose({
   background: linear-gradient(to top, var(--bg-app) 75%, transparent);
   position: relative;
   z-index: 10;
+  width: 100%;
+}
+
+.composer-inner {
+  max-width: 1250px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
 }
 
 .composer-header {

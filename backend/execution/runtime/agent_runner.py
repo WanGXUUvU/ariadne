@@ -216,6 +216,17 @@ class AgentRunner:
                         buf["name_chunks"].append(fn.get("name", ""))
                         buf["args_chunks"].append(fn.get("arguments", ""))
 
+                        tool_name = "".join(buf["name_chunks"])
+                        if tool_name:
+                            yield RunEvent(
+                                index=event_index + idx,
+                                type="assistant_tool_call",
+                                tool_name=tool_name,
+                                tool_call_id=buf["id"] or f"stream-{idx}",
+                                content="".join(buf["args_chunks"]),
+                                transient=True,
+                            )
+
             if finish_reason == "tool_calls":
                 tool_calls = [
                     ToolCall(

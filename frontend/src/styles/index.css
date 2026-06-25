@@ -254,10 +254,8 @@ button, input, textarea, select {
   display: flex;
   width: 100%;
   height: 100%;
-  /* 💡 毛玻璃悬浮磨砂质感：高模糊度半透明背景 */
-  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.82);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  /* 💡 半透明悬浮面板：用更高不透明度替代 backdrop-filter blur，避免持续重模糊导致 CPU 100% */
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.92);
   border-radius: var(--radius-app);
   border: 1px solid var(--border-dim);
   box-shadow: var(--shadow-app);
@@ -280,9 +278,7 @@ button, input, textarea, select {
   border-right: 1px solid var(--border-dim);
   display: flex;
   flex-direction: column;
-  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.3) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.5) !important;
 }
 
 /* Premium Light Theme Sidebar Solid Background Override to match mock */
@@ -306,9 +302,7 @@ body.theme-light-openai .session-sidebar {
   border-left: 1px solid var(--border-dim);
   display: flex;
   flex-direction: column;
-  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.3) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.5) !important;
 }
 
 /* Technical Buttons */
@@ -718,20 +712,19 @@ ul.md-list > li::before {
 .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(140px);
+  filter: blur(40px);
   opacity: 0.15;
   transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
+  contain: layout style paint; /* 隔离光斑重绘，避免波及整个视口 */
 }
 
-/* 3个具有独立三维舒缓漂移路径的星云 */
+/* 3个具有独立漂移路径的星云（去接 rotate/scale，只用 translate，大幅降低 GPU 负荷） */
 .blob-1 {
   top: -10%;
   left: -10%;
   width: 50%;
   height: 50%;
   background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
-  animation: ambient-drift-1 28s ease-in-out infinite alternate;
 }
 .blob-2 {
   bottom: -15%;
@@ -739,7 +732,6 @@ ul.md-list > li::before {
   width: 55%;
   height: 55%;
   background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
-  animation: ambient-drift-2 36s ease-in-out infinite alternate;
 }
 .blob-3 {
   top: 40%;
@@ -747,7 +739,6 @@ ul.md-list > li::before {
   width: 40%;
   height: 40%;
   background: radial-gradient(circle, var(--accent-blue, #60A5FA) 0%, transparent 80%);
-  animation: ambient-drift-3 32s ease-in-out infinite alternate;
 }
 
 /* 联动各个极客深色主题的柔和偏色 */
@@ -763,28 +754,21 @@ body.theme-amber .blob-1 { background: radial-gradient(circle, rgba(245, 158, 11
 body.theme-amber .blob-2 { background: radial-gradient(circle, rgba(251, 191, 36, 0.8) 0%, transparent 85%); opacity: 0.15; }
 body.theme-amber .blob-3 { background: radial-gradient(circle, rgba(220, 38, 38, 0.8) 0%, transparent 85%); opacity: 0.12; }
 
-@keyframes ambient-drift-1 {
-  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  50% { transform: translate(12%, 18%) scale(1.15) rotate(120deg); }
-  100% { transform: translate(-8%, 5%) scale(0.9) rotate(360deg); }
-}
-@keyframes ambient-drift-2 {
-  0% { transform: translate(0, 0) scale(1.1) rotate(0deg); }
-  50% { transform: translate(-15%, -12%) scale(0.95) rotate(-180deg); }
-  100% { transform: translate(10%, 8%) scale(1.05) rotate(-360deg); }
-}
-@keyframes ambient-drift-3 {
-  0% { transform: translate(0, 0) scale(0.9) rotate(0deg); }
-  50% { transform: translate(-25%, 15%) scale(1.1) rotate(90deg); }
-  100% { transform: translate(15%, -15%) scale(1) rotate(270deg); }
-}
+/* 联动各个极客浅色模式主题的超级柔和背景偏色 */
+body.theme-light-apple .blob-1 { background: radial-gradient(circle, rgba(0, 113, 227, 0.4) 0%, transparent 85%); opacity: 0.07; }
+body.theme-light-apple .blob-2 { background: radial-gradient(circle, rgba(96, 165, 250, 0.4) 0%, transparent 85%); opacity: 0.06; }
+body.theme-light-apple .blob-3 { background: radial-gradient(circle, rgba(52, 199, 89, 0.4) 0%, transparent 85%); opacity: 0.05; }
 
-/* 💡 顶级艺术：输入框高定呼吸律动光标 */
+body.theme-light-openai .blob-1 { background: radial-gradient(circle, rgba(16, 163, 127, 0.4) 0%, transparent 85%); opacity: 0.07; }
+body.theme-light-openai .blob-2 { background: radial-gradient(circle, rgba(47, 128, 237, 0.4) 0%, transparent 85%); opacity: 0.06; }
+body.theme-light-openai .blob-3 { background: radial-gradient(circle, rgba(16, 163, 127, 0.3) 0%, transparent 85%); opacity: 0.05; }
+
+/* 输入框光标呈主题色〔只在聚焦时激活，避免常驼 infinite 动画占用 CPU〕 */
 @keyframes caret-fade {
   0%, 100% { caret-color: var(--accent); }
-  50% { caret-color: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.15); }
+  50% { caret-color: transparent; }
 }
-.composer-input {
+.composer-input:focus {
   animation: caret-fade 1.2s ease-in-out infinite;
 }
 
@@ -1040,137 +1024,4 @@ textarea:focus,
 
 .md-table tr:hover td {
   background: var(--bg-hover);
-}
-
-/* ==================== 🌌 赛博朋克深空环境流光系统 ==================== */
-.ambient-glow-blobs {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(140px);
-  opacity: 0.15;
-  transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
-}
-
-/* 3个具有独立三维舒缓漂移路径的星云 */
-.blob-1 {
-  top: -10%;
-  left: -10%;
-  width: 50%;
-  height: 50%;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
-  animation: ambient-drift-1 28s ease-in-out infinite alternate;
-}
-.blob-2 {
-  bottom: -15%;
-  right: -10%;
-  width: 55%;
-  height: 55%;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 80%);
-  animation: ambient-drift-2 36s ease-in-out infinite alternate;
-}
-.blob-3 {
-  top: 40%;
-  left: 50%;
-  width: 40%;
-  height: 40%;
-  background: radial-gradient(circle, var(--accent-blue, #60A5FA) 0%, transparent 80%);
-  animation: ambient-drift-3 32s ease-in-out infinite alternate;
-}
-
-/* 联动各个极客深色主题的柔和偏色 */
-body.theme-cyberpunk .blob-1 { background: radial-gradient(circle, rgba(167, 139, 250, 0.8) 0%, transparent 85%); opacity: 0.22; }
-body.theme-cyberpunk .blob-2 { background: radial-gradient(circle, rgba(96, 165, 250, 0.8) 0%, transparent 85%); opacity: 0.20; }
-body.theme-cyberpunk .blob-3 { background: radial-gradient(circle, rgba(236, 72, 153, 0.8) 0%, transparent 85%); opacity: 0.18; }
-
-body.theme-emerald .blob-1 { background: radial-gradient(circle, rgba(16, 185, 129, 0.8) 0%, transparent 85%); opacity: 0.18; }
-body.theme-emerald .blob-2 { background: radial-gradient(circle, rgba(52, 211, 153, 0.8) 0%, transparent 85%); opacity: 0.15; }
-body.theme-emerald .blob-3 { background: radial-gradient(circle, rgba(96, 165, 250, 0.8) 0%, transparent 85%); opacity: 0.12; }
-
-body.theme-amber .blob-1 { background: radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, transparent 85%); opacity: 0.18; }
-body.theme-amber .blob-2 { background: radial-gradient(circle, rgba(251, 191, 36, 0.8) 0%, transparent 85%); opacity: 0.15; }
-body.theme-amber .blob-3 { background: radial-gradient(circle, rgba(220, 38, 38, 0.8) 0%, transparent 85%); opacity: 0.12; }
-
-/* 联动各个极客浅色模式主题的超级柔和背景偏色 */
-body.theme-light-apple .blob-1 { background: radial-gradient(circle, rgba(0, 113, 227, 0.4) 0%, transparent 85%); opacity: 0.07; }
-body.theme-light-apple .blob-2 { background: radial-gradient(circle, rgba(96, 165, 250, 0.4) 0%, transparent 85%); opacity: 0.06; }
-body.theme-light-apple .blob-3 { background: radial-gradient(circle, rgba(52, 199, 89, 0.4) 0%, transparent 85%); opacity: 0.05; }
-
-body.theme-light-openai .blob-1 { background: radial-gradient(circle, rgba(16, 163, 127, 0.4) 0%, transparent 85%); opacity: 0.07; }
-body.theme-light-openai .blob-2 { background: radial-gradient(circle, rgba(47, 128, 237, 0.4) 0%, transparent 85%); opacity: 0.06; }
-body.theme-light-openai .blob-3 { background: radial-gradient(circle, rgba(16, 163, 127, 0.3) 0%, transparent 85%); opacity: 0.05; }
-
-@keyframes ambient-drift-1 {
-  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  50% { transform: translate(12%, 18%) scale(1.15) rotate(120deg); }
-  100% { transform: translate(-8%, 5%) scale(0.9) rotate(360deg); }
-}
-@keyframes ambient-drift-2 {
-  0% { transform: translate(0, 0) scale(1.1) rotate(0deg); }
-  50% { transform: translate(-15%, -12%) scale(0.95) rotate(-180deg); }
-  100% { transform: translate(10%, 8%) scale(1.05) rotate(-360deg); }
-}
-@keyframes ambient-drift-3 {
-  0% { transform: translate(0, 0) scale(0.9) rotate(0deg); }
-  50% { transform: translate(-25%, 15%) scale(1.1) rotate(90deg); }
-  100% { transform: translate(15%, -15%) scale(1) rotate(270deg); }
-}
-
-/* 💡 顶级艺术：输入框高定呼吸律动光标 */
-@keyframes caret-fade {
-  0%, 100% { caret-color: var(--accent); }
-  50% { caret-color: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.15); }
-}
-.composer-input {
-  animation: caret-fade 1.2s ease-in-out infinite;
-}
-
-/* 💡 弹性春季脉冲环 (Spring Shockwaves) */
-.ai-avatar-wrapper {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ai-avatar-wrapper.streaming-active .pulse-ring {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 1px solid var(--accent);
-  opacity: 0;
-  pointer-events: none;
-  animation: avatar-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-
-.ai-avatar-wrapper.streaming-active .ring-1 {
-  animation-delay: 0s;
-}
-.ai-avatar-wrapper.streaming-active .ring-2 {
-  animation-delay: 0.6s;
-}
-.ai-avatar-wrapper.streaming-active .ring-3 {
-  animation-delay: 1.2s;
-}
-
-@keyframes avatar-pulse {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
 }

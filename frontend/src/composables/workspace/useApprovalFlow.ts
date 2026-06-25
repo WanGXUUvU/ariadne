@@ -1,19 +1,44 @@
-import { ref, type Ref } from 'vue';
+import { type Ref } from 'vue';
 
 import { api } from '../../api/client';
-import type { AgentMessage, ApprovalInfo, StreamingItem, TraceRunSummary } from '../../types';
+import type { AgentMessage, ApprovalInfo, StreamUsageData, StreamingItem, TraceRunSummary } from '../../types';
 import { removePendingApproval, upsertPendingApproval } from '../../utils/approvalQueue';
 import { reconstructUiMessages, writeTimelineToStore } from './helpers';
+
+interface SessionSpecificState {
+  historyMessages: AgentMessage[];
+  currentMessages: AgentMessage[];
+  traceRuns: TraceRunSummary[];
+  isChatLoading: boolean;
+  isTraceLoading: boolean;
+  isStreaming: boolean;
+  streamingTimeline: StreamingItem[];
+  streamingPrefixTimeline: StreamingItem[];
+  streamingLatestUsage: StreamUsageData | null;
+  lastCompletedRun: TraceRunSummary | null;
+  errorMsg: string | null;
+  isAwaitingApproval: boolean;
+  pendingApprovalInfo: ApprovalInfo | null;
+  pendingApprovalInfos: ApprovalInfo[];
+  permissionProfile: string;
+  streamAbortController: AbortController | null;
+  pendingRunId: string | null;
+  pendingUserInput: string;
+  pendingAgentName: string | undefined;
+  pendingSkillName: string | null;
+}
 
 interface ApprovalFlowOptions {
   sessions: Ref<any[]>;
   activeSessionId: Ref<string | null>;
+  getSessionState: (sessionId: string) => SessionSpecificState;
   currentMessages: Ref<AgentMessage[]>;
   traceRuns: Ref<TraceRunSummary[]>;
   isStreaming: Ref<boolean>;
   isChatLoading: Ref<boolean>;
   streamingTimeline: Ref<StreamingItem[]>;
   streamingPrefixTimeline: Ref<StreamingItem[]>;
+  streamingLatestUsage: Ref<StreamUsageData | null>;
   lastCompletedRun: Ref<TraceRunSummary | null>;
   errorMsg: Ref<string | null>;
   isAwaitingApproval: Ref<boolean>;
@@ -29,125 +54,144 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
   const {
     sessions,
     activeSessionId,
-    currentMessages,
-    traceRuns,
-    isStreaming,
-    isChatLoading,
-    streamingTimeline,
-    streamingPrefixTimeline,
-    lastCompletedRun,
-    errorMsg,
-    isAwaitingApproval,
+    getSessionState,
     pendingApprovalInfo,
-    pendingApprovalInfos,
     isResolvingApproval,
     onLiveRunEvent,
     extractChildAgents,
     updatePermissionProfile,
   } = options;
 
-  const syncApprovalHead = () => {
-    pendingApprovalInfo.value = pendingApprovalInfos.value[0] ?? null;
-    isAwaitingApproval.value = pendingApprovalInfos.value.length > 0;
+  const syncApprovalHead = (state: SessionSpecificState) => {
+    state.pendingApprovalInfo = state.pendingApprovalInfos[0] ?? null;
+    state.isAwaitingApproval = state.pendingApprovalInfos.length > 0;
   };
 
   async function handleApprovalStream(streamFn: () => AsyncGenerator<any>, approvalId?: string) {
+    const targetSessionId = activeSessionId.value;
     const targetApprovalId = approvalId ?? pendingApprovalInfo.value?.approval_id;
-    if (!targetApprovalId) return;
+    if (!targetSessionId || !targetApprovalId) return;
 
-    // ── Step 1：收集上一条 assistant 消息的 timeline（作为流式前缀，保持上下文连续性）──
+    const state = getSessionState(targetSessionId);
+
     const initialTimeline: StreamingItem[] = [];
-    for (let i = currentMessages.value.length - 1; i >= 0; i--) {
-      const message = currentMessages.value[i];
+    for (let i = state.currentMessages.length - 1; i >= 0; i--) {
+      const message = state.currentMessages[i];
       if (message.role === 'assistant' && message.timeline && message.timeline.length > 0) {
         initialTimeline.push(...message.timeline);
         break;
       }
     }
 
-    // ── Step 2：只移除当前审批卡，保留同批剩余待审批卡 ──
-    pendingApprovalInfos.value = removePendingApproval(pendingApprovalInfos.value, targetApprovalId);
-    syncApprovalHead();
+    state.pendingApprovalInfos = removePendingApproval(state.pendingApprovalInfos, targetApprovalId);
+    syncApprovalHead(state);
 
-    // ── Step 3：移除 content:null 的占位消息（由 paused 插入的空壳），避免与新流式块重叠 ──
-    //   有真实 content 的消息保留（它们是有价值的历史上下文）
-    currentMessages.value = currentMessages.value.filter(
-      m => !(m.role === 'assistant' && m.content === null)
-    );
+    state.currentMessages = state.currentMessages
+      .filter(m => !(m.role === 'assistant' && m.content === null))
+      .map(m => {
+        if (m.role === 'assistant' && m.timeline && m.timeline.length > 0) {
+          return { ...m, timeline: [] };
+        }
+        return m;
+      });
 
-    // ── Step 3b：清除保留消息的 timeline（tool cards 已并入 streamingTimeline 前缀，避免重复渲染）──
-    //   流结束后 reconstructUiMessages 会从服务器重建最终完整状态
-    currentMessages.value = currentMessages.value.map(m => {
-      if (m.role === 'assistant' && m.timeline && m.timeline.length > 0) {
-        return { ...m, timeline: [] };
-      }
-      return m;
-    });
-
-    isStreaming.value = true;
-    isChatLoading.value = true;
+    state.isStreaming = true;
+    state.isChatLoading = true;
+    state.streamingPrefixTimeline = [...initialTimeline];
+    state.streamingTimeline = [];
+    state.streamingLatestUsage = null;
+    state.errorMsg = null;
     isResolvingApproval.value = true;
-    // ── Step 4：设置流式块前缀（initialTimeline），让 call+result 能正确配对显示 ──
-    // streaming block 会渲染 streamingPrefixTimeline + streamingTimeline
-    streamingPrefixTimeline.value = [...initialTimeline];
-    streamingTimeline.value = [];
-    errorMsg.value = null;
+
     let capturedRunId: string | null = null;
     let stillAwaitingApproval = false;
+
+    const upsertApprovalForState = (approval: ApprovalInfo) => {
+      state.pendingApprovalInfos = upsertPendingApproval(state.pendingApprovalInfos, approval);
+      syncApprovalHead(state);
+    };
 
     try {
       for await (const frame of streamFn()) {
         if (frame.type === 'start' || frame.type === 'resume') {
           capturedRunId = frame.data.run_id;
         } else if (frame.type === 'delta') {
-          const tl = streamingTimeline.value;
+          const tl = state.streamingTimeline;
           const last = tl[tl.length - 1];
           if (last?.kind === 'text') {
             last.content += frame.data.content;
-            streamingTimeline.value = [...tl];
+            state.streamingTimeline = [...tl];
           } else {
-            streamingTimeline.value = [...tl, { kind: 'text', content: frame.data.content }];
+            state.streamingTimeline = [...tl, { kind: 'text', content: frame.data.content }];
           }
         } else if (frame.type === 'thinking_delta') {
-          const tl = streamingTimeline.value;
+          const tl = state.streamingTimeline;
           const last = tl[tl.length - 1];
           if (last?.kind === 'thinking') {
             last.content += frame.data.content;
-            streamingTimeline.value = [...tl];
+            state.streamingTimeline = [...tl];
           } else {
-            streamingTimeline.value = [...tl, { kind: 'thinking', content: frame.data.content }];
+            state.streamingTimeline = [...tl, { kind: 'thinking', content: frame.data.content }];
           }
         } else if (frame.type === 'run_event') {
           if (!['assistant_text', 'final_answer', 'thinking'].includes(frame.data.type)) {
-            streamingTimeline.value = [...streamingTimeline.value, { kind: 'event', event: frame.data }];
+            state.streamingTimeline = [...state.streamingTimeline, { kind: 'event', event: frame.data }];
           }
-          if (activeSessionId.value) {
-            onLiveRunEvent(activeSessionId.value, frame.data);
+          if (frame.data.type === 'approval_required' && frame.data.content) {
+            const nextApprovalId = frame.data.content;
+            const pendingApproval = {
+              approval_id: nextApprovalId,
+              tool_name: frame.data.tool_name ?? '',
+              arguments: '',
+              run_id: capturedRunId ?? '',
+              tool_call_id: frame.data.tool_call_id ?? undefined,
+            };
+            upsertApprovalForState(pendingApproval);
+
+            api.getApproval(nextApprovalId).then(info => {
+              upsertApprovalForState({
+                approval_id: nextApprovalId,
+                tool_name: info.tool_name ?? pendingApproval.tool_name,
+                arguments: info.arguments ?? pendingApproval.arguments,
+                run_id: capturedRunId ?? pendingApproval.run_id,
+                tool_call_id: (info as any).tool_call_id ?? pendingApproval.tool_call_id,
+              });
+            }).catch(() => {});
           }
+          onLiveRunEvent(targetSessionId, frame.data);
+        } else if (frame.type === 'usage') {
+          state.streamingLatestUsage = frame.data;
         } else if (frame.type === 'paused') {
           stillAwaitingApproval = true;
-          isAwaitingApproval.value = true;
+          state.isAwaitingApproval = true;
           isResolvingApproval.value = false;
 
-          const partialTimeline = [...initialTimeline, ...streamingTimeline.value];
+          const partialTimeline = [...initialTimeline, ...state.streamingTimeline];
           if (capturedRunId) {
             writeTimelineToStore(capturedRunId, partialTimeline);
           }
 
           if (partialTimeline.length > 0) {
-            const newMsgs = [...currentMessages.value];
+            const newMsgs = [...state.currentMessages];
             let found = false;
             for (let i = newMsgs.length - 1; i >= 0; i--) {
-              if (newMsgs[i].role === 'assistant') {
-                newMsgs[i] = { ...newMsgs[i], timeline: partialTimeline };
+              const msg = newMsgs[i];
+              if (msg.role === 'assistant' &&
+                  (msg.content === null || (capturedRunId && msg.run_id === capturedRunId))) {
+                newMsgs[i] = { ...msg, timeline: partialTimeline, run_id: capturedRunId ?? undefined };
                 found = true;
                 break;
               }
             }
             if (!found) {
-              newMsgs.push({ role: 'assistant', content: null, timeline: partialTimeline });
+              newMsgs.push({
+                role: 'assistant',
+                content: null,
+                timeline: partialTimeline,
+                run_id: capturedRunId ?? undefined
+              });
             }
-            currentMessages.value = newMsgs;
+            state.currentMessages = newMsgs;
           }
 
           const nextApprovalId = frame.data.approval_id;
@@ -158,57 +202,63 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
               arguments: '',
               run_id: capturedRunId ?? '',
             };
-            pendingApprovalInfos.value = upsertPendingApproval(pendingApprovalInfos.value, pendingApproval);
-            syncApprovalHead();
+            upsertApprovalForState(pendingApproval);
 
             api.getApproval(nextApprovalId).then(info => {
-              pendingApprovalInfos.value = upsertPendingApproval(pendingApprovalInfos.value, {
+              upsertApprovalForState({
                 approval_id: nextApprovalId,
                 tool_name: info.tool_name,
                 arguments: info.arguments,
                 run_id: capturedRunId ?? '',
                 tool_call_id: (info as any).tool_call_id ?? undefined,
               });
-              syncApprovalHead();
             }).catch(() => {});
           }
         } else if (frame.type === 'end') {
-          const frozenTimeline = [...initialTimeline, ...streamingTimeline.value];
+          const frozenTimeline = [...initialTimeline, ...state.streamingTimeline];
           if (capturedRunId) {
             writeTimelineToStore(capturedRunId, frozenTimeline);
           }
 
-          if (activeSessionId.value) {
-            const [, traceResult] = await Promise.allSettled([
-              api.getSessions().then(data => { sessions.value = data || []; }),
-              api.getTrace(activeSessionId.value),
-            ]);
-            if (traceResult.status === 'fulfilled') {
-              traceRuns.value = (traceResult.value as any).runs || [];
-            }
-            const activeMsgs = frame.data.state?.messages || [];
-            currentMessages.value = reconstructUiMessages(traceRuns.value, activeMsgs);
-            extractChildAgents(activeSessionId.value, currentMessages.value, traceRuns.value);
-            if (capturedRunId) {
-              lastCompletedRun.value = traceRuns.value.find(r => r.run_id === capturedRunId) ?? null;
+          const [, traceResult] = await Promise.allSettled([
+            api.getSessions().then(data => { sessions.value = data || []; }),
+            api.getTrace(targetSessionId),
+          ]);
+          if (traceResult.status === 'fulfilled') {
+            state.traceRuns = (traceResult.value as any).runs || [];
+          }
+
+          const activeMsgs = frame.data.state?.messages || [];
+          state.currentMessages = reconstructUiMessages(state.traceRuns, activeMsgs);
+          if (capturedRunId && frozenTimeline.length > 0) {
+            for (let i = state.currentMessages.length - 1; i >= 0; i--) {
+              if (state.currentMessages[i].role === 'assistant' && state.currentMessages[i].run_id === capturedRunId) {
+                state.currentMessages[i] = { ...state.currentMessages[i], timeline: frozenTimeline };
+                break;
+              }
             }
           }
+          extractChildAgents(targetSessionId, state.currentMessages, state.traceRuns);
+          if (capturedRunId) {
+            state.lastCompletedRun = state.traceRuns.find(r => r.run_id === capturedRunId) ?? null;
+          }
         } else if (frame.type === 'error') {
-          errorMsg.value = frame.data.message ?? 'Approval error';
+          state.errorMsg = frame.data.message ?? 'Approval error';
         }
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        errorMsg.value = 'Resume failed: ' + err.message;
+        state.errorMsg = 'Resume failed: ' + err.message;
       }
     } finally {
       isResolvingApproval.value = false;
-      isAwaitingApproval.value = stillAwaitingApproval || pendingApprovalInfos.value.length > 0;
-      pendingApprovalInfo.value = pendingApprovalInfos.value[0] ?? null;
-      isStreaming.value = false;
-      isChatLoading.value = false;
-      streamingTimeline.value = [];
-      streamingPrefixTimeline.value = []; // 清空前缀，流式块消失后不留残影
+      state.isAwaitingApproval = stillAwaitingApproval || state.pendingApprovalInfos.length > 0;
+      state.pendingApprovalInfo = state.pendingApprovalInfos[0] ?? null;
+      state.isStreaming = false;
+      state.isChatLoading = false;
+      state.streamingTimeline = [];
+      state.streamingLatestUsage = null;
+      state.streamingPrefixTimeline = [];
     }
   }
 
@@ -236,6 +286,4 @@ export function useApprovalFlow(options: ApprovalFlowOptions) {
     rejectAction,
     approveAllAction,
   };
-
-  // ── 注：streamingPrefixTimeline 通过 options.streamingPrefixTimeline 共享给外部 ──
 }

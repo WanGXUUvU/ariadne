@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue';
-import type { AgentMessage, TraceRunSummary, StreamingItem, ApprovalInfo } from '../types';
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
+import type { AgentMessage, TraceRunSummary, StreamingItem, ApprovalInfo, StreamUsageData } from '../types';
 import AssistantMessage from './chat/AssistantMessage.vue';
 import { formatContent } from '../utils/formatContent';
 
@@ -12,6 +12,7 @@ const props = defineProps<{
   isStreaming?: boolean;
   streamingTimeline?: StreamingItem[];
   streamingPrefixTimeline?: StreamingItem[]; // 审批批准后的前缀 timeline（initialTimeline），与 streamingTimeline 合并渲染
+  streamingLatestUsage?: StreamUsageData | null;
   lastCompletedRun?: TraceRunSummary | null;
   error?: string | null;
   
@@ -77,23 +78,79 @@ const handleEditSubmit = (m: AgentMessage) => {
   }
 };
 
-const visibleMessages = computed(() =>
-  props.messages.filter((message) => 
-    message.role === 'user' || 
+const visibleMessages = computed(() => {
+  const msgs = props.messages.filter((message) =>
+    message.role === 'user' ||
     (message.role === 'assistant' && (!!message.content || (message.timeline && message.timeline.length > 0)))
-  )
+  );
+
+  // 将流式输出块并入 visibleMessages，使其与最终消息共享同一个 DOM 元素，
+  // 避免 end 时 v-if 移除流式块 + v-for 新增消息行导致的闪烁
+  if (props.isStreaming) {
+    const timeline = [...(props.streamingPrefixTimeline ?? []), ...(props.streamingTimeline ?? [])];
+    msgs.push({
+      role: 'assistant' as const,
+      content: '',
+      timeline,
+      _streaming: true,
+    } as AgentMessage & { _streaming?: boolean });
+  }
+
+  return msgs;
+});
+
+// ── 自动滚动 ──────────────────────────────────────────────────────────────
+// 非流式：只在消息数/loading 变化时滚动一次（轻量 watcher）
+watch(
+  [() => visibleMessages.value.length, () => props.isLoading, () => props.isCompacting],
+  async () => {
+    await nextTick();
+    if (listRef.value && !isUserScrolledUp.value) {
+      listRef.value.scrollTop = listRef.value.scrollHeight;
+    }
+  }
 );
 
-// 流式滚动定位 - 只有用户在底部附近时才自动滚动
-watch([() => visibleMessages.value.length, () => props.isLoading, () => props.isCompacting, () => props.streamingTimeline?.length], async () => {
-  await nextTick();
-  if (listRef.value && !isUserScrolledUp.value) {
-    listRef.value.scrollTo({
-      top: listRef.value.scrollHeight,
-      behavior: 'smooth'
+// 流式：用 requestAnimationFrame 循环跟随底部，避免 deep watch 的 O(n) 遍历
+let rafId: number | null = null;
+
+const startScrollLoop = () => {
+  if (rafId !== null) return;
+  const loop = () => {
+    if (listRef.value && !isUserScrolledUp.value) {
+      listRef.value.scrollTop = listRef.value.scrollHeight;
+    }
+    if (props.isStreaming) {
+      rafId = requestAnimationFrame(loop);
+    } else {
+      rafId = null;
+    }
+  };
+  rafId = requestAnimationFrame(loop);
+};
+
+const stopScrollLoop = () => {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+};
+
+watch(() => props.isStreaming, (streaming) => {
+  if (streaming) {
+    startScrollLoop();
+  } else {
+    stopScrollLoop();
+    // 流式结束后再滚一次确保对齐底部
+    nextTick(() => {
+      if (listRef.value && !isUserScrolledUp.value) {
+        listRef.value.scrollTop = listRef.value.scrollHeight;
+      }
     });
   }
-}, { deep: true });
+});
+
+onBeforeUnmount(() => stopScrollLoop());
 
 // 当新会话加载时（消息列表清空后重建），重置滚动锁定状态
 watch(() => visibleMessages.value.length, (newLen, oldLen) => {
@@ -102,6 +159,7 @@ watch(() => visibleMessages.value.length, (newLen, oldLen) => {
     isUserScrolledUp.value = false;
   }
 });
+
 
 // 💡 采用事件代理拦截来自子元素代码块中 Copy 按钮的点击事件，安全、快速且彻底免除 inline JS 漏洞
 const handleCodeBlockClick = (e: MouseEvent) => {
@@ -132,6 +190,74 @@ const handleCodeBlockClick = (e: MouseEvent) => {
 };
 
 const copiedIndex = ref<number | null>(null);
+const runStartedAt = ref<number | null>(null);
+const heartbeatTick = ref(0);
+let heartbeatTimer: number | null = null;
+
+const activityWords = ['Thinking', 'Hashing', 'Reading', 'Checking', 'Composing', 'Planning'];
+const activityTips = [
+  '工具结果会先进入上下文，模型再基于结果继续生成。',
+  '如果模型需要更多证据，它会继续请求工具而不是直接猜测。',
+  '长回答通常会先整理结构，再逐段输出。',
+  '运行中显示的是估算 token，模型返回 usage 后会替换成准确值。',
+  '工具调用本身不产生模型 usage，只有模型调用结束时才会返回。',
+];
+
+const startHeartbeat = () => {
+  if (heartbeatTimer !== null) return;
+  heartbeatTimer = window.setInterval(() => {
+    heartbeatTick.value += 1;
+  }, 900);
+};
+
+const stopHeartbeat = () => {
+  if (heartbeatTimer !== null) {
+    window.clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+};
+
+watch(() => props.isStreaming, (streaming) => {
+  if (streaming) {
+    runStartedAt.value = Date.now();
+    heartbeatTick.value = 0;
+    startHeartbeat();
+  } else {
+    runStartedAt.value = null;
+    stopHeartbeat();
+  }
+}, { immediate: true });
+
+onBeforeUnmount(() => {
+  stopHeartbeat();
+});
+
+const activeWord = computed(() => activityWords[heartbeatTick.value % activityWords.length]);
+const activeTip = computed(() => activityTips[Math.floor(heartbeatTick.value / 2) % activityTips.length]);
+const elapsedSeconds = computed(() => {
+  if (!runStartedAt.value) return 0;
+  heartbeatTick.value;
+  return Math.max(0, Math.floor((Date.now() - runStartedAt.value) / 1000));
+});
+
+const streamingTextSize = computed(() => {
+  const items = [...(props.streamingPrefixTimeline ?? []), ...(props.streamingTimeline ?? [])];
+  return items.reduce((sum, item) => {
+    if (item.kind === 'text' || item.kind === 'thinking') return sum + item.content.length;
+    return sum;
+  }, 0);
+});
+
+const displayTokens = computed(() => {
+  const real = props.streamingLatestUsage?.usage?.output_tokens
+    ?? props.streamingLatestUsage?.usage?.total_tokens
+    ?? null;
+  if (typeof real === 'number') {
+    return { value: real, estimated: false };
+  }
+  const estimate = Math.max(8, Math.ceil(streamingTextSize.value / 3) + heartbeatTick.value * 3);
+  return { value: estimate, estimated: true };
+});
 
 const handleCopyMessage = (content: string, index: number) => {
   navigator.clipboard.writeText(content).then(() => {
@@ -172,7 +298,7 @@ const scrollToBottom = () => {
         <span v-else class="scroll-btn-label">最新</span>
       </button>
     </Transition>
-    <template v-for="(m, idx) in visibleMessages" :key="idx">
+    <template v-for="(m, idx) in visibleMessages" :key="(m as any)._streaming ? '__streaming__' : (m.run_id ? m.run_id + '-' + m.role : m.role + '-' + idx)">
       <!-- 💡 A-2 动态分割线注入：上一条为非活跃，当前为活跃时 -->
       <div 
         v-if="idx > 0 && !visibleMessages[idx - 1].isActive && m.isActive" 
@@ -197,21 +323,40 @@ const scrollToBottom = () => {
         </div>
       </div>
 
-      <div :class="['message-row', `role-${m.role}`, m.isActive ? 'active-context' : 'compacted-context']">
+      <div :class="['message-row', `role-${m.role}`, m.isActive ? 'active-context' : 'compacted-context', (m as any)._streaming ? 'pending' : '']">
         <div class="message-row-inner">
           <div class="message-avatar">
-            <svg v-if="m.role === 'user'" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-            <svg v-else class="ai-avatar glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
+            <!-- 流式输出：脉冲光环头像 -->
+            <template v-if="(m as any)._streaming">
+              <div class="ai-avatar-wrapper streaming-active">
+                <div class="pulse-ring ring-1"></div>
+                <div class="pulse-ring ring-2"></div>
+                <div class="pulse-ring ring-3"></div>
+                <svg class="ai-avatar spin glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
+              </div>
+            </template>
+            <!-- 普通消息头像 -->
+            <template v-else>
+              <svg v-if="m.role === 'user'" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <svg v-else class="ai-avatar glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
+            </template>
           </div>
-          
+
           <div class="message-content">
-            <div class="message-meta mono-label">{{ m.role === 'user' ? 'USER' : 'AGENT' }}</div>
-            
+            <div class="message-meta mono-label">
+              {{ m.role === 'user' ? 'USER' : 'AGENT' }}
+              <span v-if="(m as any)._streaming" class="blink">STREAMING...</span>
+            </div>
+
             <!-- AI 回复代理层 -->
             <template v-if="m.role === 'assistant'">
+              <!-- 流式空时间线：骨架屏 -->
+              <div v-if="(m as any)._streaming && (!m.timeline || m.timeline.length === 0)" class="message-text loader-block"></div>
+              <!-- 有内容：正常渲染 -->
               <AssistantMessage
+                v-else
                 :message="m"
-                :msgIndex="idx"
+                :msgIndex="(m as any)._streaming ? 9999 : idx"
                 :isLast="idx === visibleMessages.length - 1"
                 :traceRuns="traceRuns"
                 :lastCompletedRun="lastCompletedRun"
@@ -223,8 +368,18 @@ const scrollToBottom = () => {
                 @reject="emit('reject', $event)"
                 @approve-all="emit('approve-all')"
               />
+              <!-- 流式状态条：打字词 + 耗时 + token 估算 + 提示 -->
+              <div v-if="(m as any)._streaming" class="agent-active-strip">
+                <div class="agent-active-main">
+                  <span class="agent-active-word">{{ activeWord }}...</span>
+                  <span class="agent-active-meta">
+                    {{ elapsedSeconds }}s · {{ displayTokens.estimated ? '~' : '' }}{{ displayTokens.value }} tokens
+                  </span>
+                </div>
+                <div class="agent-active-tip">└─ {{ activeTip }}</div>
+              </div>
             </template>
- 
+
             <!-- 用户消息渲染 -->
             <template v-else>
               <div v-if="m.skill_name" class="msg-skill-badge">
@@ -248,8 +403,8 @@ const scrollToBottom = () => {
               <div v-else class="message-text" v-html="formatContent(m.content)" @click="handleCodeBlockClick"></div>
             </template>
 
-            <!-- Message Footer Action Row -->
-            <div class="message-footer">
+            <!-- Message Footer Action Row（流式消息不显示） -->
+            <div v-if="!(m as any)._streaming" class="message-footer">
               <!-- 编辑按钮 -->
               <button
                 v-if="m.role === 'user' && editingIndex !== idx"
@@ -262,10 +417,10 @@ const scrollToBottom = () => {
                   <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                 </svg>
               </button>
-              <button 
-                class="action-btn copy-btn" 
+              <button
+                class="action-btn copy-btn"
                 :class="{ copied: copiedIndex === idx }"
-                title="复制文本" 
+                title="复制文本"
                 @click="handleCopyMessage(m.content || '', idx)"
               >
                 <svg v-if="copiedIndex !== idx" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.8" fill="none">
@@ -281,7 +436,7 @@ const scrollToBottom = () => {
         </div>
       </div>
     </template>
-    
+
     <!-- 记忆折叠中的 Loading 状态 -->
     <div v-if="isCompacting" class="message-row role-assistant pending">
       <div class="message-row-inner">
@@ -291,43 +446,6 @@ const scrollToBottom = () => {
         <div class="message-content">
           <div class="message-meta mono-label" style="color: var(--text-muted)">SYSTEM <span class="blink" style="color: var(--text-muted)">COMPACTING...</span></div>
           <div class="message-text" style="color: var(--text-muted); font-style: italic;">正在生成上下文摘要并折叠历史记录 (Compressing context)...</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- SSE 流输出实时代理卡片 -->
-    <div v-if="isStreaming" class="message-row role-assistant pending">
-      <div class="message-row-inner">
-        <div class="message-avatar">
-          <div class="ai-avatar-wrapper streaming-active">
-            <div class="pulse-ring ring-1"></div>
-            <div class="pulse-ring ring-2"></div>
-            <div class="pulse-ring ring-3"></div>
-            <svg class="ai-avatar spin glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
-          </div>
-        </div>
-        
-        <div class="message-content">
-          <div class="message-meta mono-label">AGENT <span class="blink">STREAMING...</span></div>
-
-          <template v-if="(streamingTimeline && streamingTimeline.length > 0) || (streamingPrefixTimeline && streamingPrefixTimeline.length > 0)">
-            <!-- 代理实时消息渲染 -->
-            <AssistantMessage
-              :message="{ role: 'assistant', content: '', timeline: [...(streamingPrefixTimeline ?? []), ...(streamingTimeline ?? [])] }"
-              :msgIndex="9999"
-              :isLast="true"
-              :traceRuns="traceRuns"
-              :lastCompletedRun="lastCompletedRun"
-              :isAwaitingApproval="isAwaitingApproval"
-              :pendingApprovalInfo="pendingApprovalInfo"
-              :pendingApprovalInfos="pendingApprovalInfos"
-              :isProcessingApproval="isProcessingApproval"
-              @approve="emit('approve', $event)"
-              @reject="emit('reject', $event)"
-              @approve-all="emit('approve-all')"
-            />
-          </template>
-          <div v-else class="message-text loader-block"></div>
         </div>
       </div>
     </div>
@@ -392,6 +510,46 @@ const scrollToBottom = () => {
 .message-content {
   position: relative;
   width: 100%;
+}
+
+.agent-active-strip {
+  margin-top: 10px;
+  padding-left: 2px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  animation: statusFadeIn 0.28s ease both;
+}
+
+.agent-active-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.agent-active-word {
+  color: var(--accent, #a66a43);
+  font-weight: 700;
+}
+
+.agent-active-meta {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.agent-active-tip {
+  color: var(--text-secondary);
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes statusFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .message-footer {
