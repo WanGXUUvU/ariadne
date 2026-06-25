@@ -7,6 +7,7 @@ import type {
   ChildAgentInfo,
   CompactResponse,
   SessionSummary,
+  StreamUsageData,
   StreamingItem,
   TraceRunSummary,
 } from '../types';
@@ -18,6 +19,7 @@ import { useWorkspaceResources } from './workspace/useWorkspaceResources';
 import { useRunStreaming } from './workspace/useRunStreaming';
 import { useSessionState } from './workspace/useSessionState';
 import { useWorkspaceCatalog } from './workspace/useWorkspaceCatalog';
+import { hasOpenToolCalls } from './workspace/helpers';
 
 interface SessionSpecificState {
   historyMessages: AgentMessage[];
@@ -28,6 +30,7 @@ interface SessionSpecificState {
   isStreaming: boolean;
   streamingTimeline: StreamingItem[];
   streamingPrefixTimeline: StreamingItem[];
+  streamingLatestUsage: StreamUsageData | null;
   lastCompletedRun: TraceRunSummary | null;
   errorMsg: string | null;
   isAwaitingApproval: boolean;
@@ -53,6 +56,7 @@ const createDefaultSessionState = (): SessionSpecificState => ({
   isStreaming: false,
   streamingTimeline: [],
   streamingPrefixTimeline: [],
+  streamingLatestUsage: null,
   lastCompletedRun: null,
   errorMsg: null,
   isAwaitingApproval: false,
@@ -128,6 +132,11 @@ export function useWorkspace() {
     set: (val) => { if (activeSessionId.value) getSessionState(activeSessionId.value).streamingPrefixTimeline = val; }
   });
 
+  const streamingLatestUsage = computed({
+    get: () => activeSessionId.value ? getSessionState(activeSessionId.value).streamingLatestUsage : null,
+    set: (val) => { if (activeSessionId.value) getSessionState(activeSessionId.value).streamingLatestUsage = val; }
+  });
+
   const interruptionPendingMessage = computed({
     get: () => activeSessionId.value ? getSessionState(activeSessionId.value).interruptionPendingMessage : null,
     set: (val) => { if (activeSessionId.value) getSessionState(activeSessionId.value).interruptionPendingMessage = val; }
@@ -143,17 +152,7 @@ export function useWorkspace() {
     const state = getSessionState(activeSessionId.value);
     if (!state.isStreaming) return false;
 
-    let activeToolCallsCount = 0;
-    for (const item of state.streamingTimeline) {
-      if (item.kind === 'event') {
-        if (item.event.type === 'assistant_tool_call') {
-          activeToolCallsCount++;
-        } else if (item.event.type === 'tool_result' || item.event.type === 'tool_error') {
-          activeToolCallsCount--;
-        }
-      }
-    }
-    return activeToolCallsCount > 0;
+    return hasOpenToolCalls(state.streamingTimeline);
   });
 
   const lastCompletedRun = computed({
@@ -262,15 +261,17 @@ export function useWorkspace() {
     extractChildAgents,
   });
 
-  const approvalFlow = useApprovalFlow({
-    sessions,
-    activeSessionId,
-    currentMessages,
+	  const approvalFlow = useApprovalFlow({
+	    sessions,
+	    activeSessionId,
+	    getSessionState,
+	    currentMessages,
     traceRuns,
     isStreaming,
     isChatLoading,
     streamingTimeline,
     streamingPrefixTimeline,
+    streamingLatestUsage,
     lastCompletedRun,
     errorMsg,
     isAwaitingApproval,
@@ -355,7 +356,7 @@ export function useWorkspace() {
         pendingApprovalInfo.value = null;
       }
     }
-  }, { deep: true, immediate: true });
+  }, { immediate: true });
 
   const retryLastRun = () => {
     if (pendingUserInput.value) {
@@ -429,21 +430,11 @@ export function useWorkspace() {
     if (isStreaming.value) {
       const targetSessionId = activeSessionId.value;
       if (targetSessionId) {
-        const state = getSessionState(targetSessionId);
-        let activeToolCallsCount = 0;
-        for (const item of state.streamingTimeline) {
-          if (item.kind === 'event') {
-            if (item.event.type === 'assistant_tool_call') {
-              activeToolCallsCount++;
-            } else if (item.event.type === 'tool_result' || item.event.type === 'tool_error') {
-              activeToolCallsCount--;
-            }
-          }
-        }
-        if (activeToolCallsCount > 0) {
-          state.interruptionPendingMessage = trimmed;
-          state.interruptionPendingSkill = skillName ?? null;
-          state.interruptionWaitForTool = true; // 默认自动排队等待
+	        const state = getSessionState(targetSessionId);
+	        if (hasOpenToolCalls(state.streamingTimeline)) {
+	          state.interruptionPendingMessage = trimmed;
+	          state.interruptionPendingSkill = skillName ?? null;
+	          state.interruptionWaitForTool = true; // 默认自动排队等待
           return;
         }
       }
@@ -525,6 +516,7 @@ export function useWorkspace() {
     isStreaming,
     streamingTimeline,
     streamingPrefixTimeline,
+    streamingLatestUsage,
     lastCompletedRun,
     errorMsg,
     infoMsg,

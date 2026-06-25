@@ -40,6 +40,7 @@ const wTraceRuns = computed(() => workspace.traceRuns.value);
 const wIsStreaming = computed(() => workspace.isStreaming.value);
 const wStreamingTimeline = computed(() => workspace.streamingTimeline.value);
 const wStreamingPrefixTimeline = computed(() => workspace.streamingPrefixTimeline.value);
+const wStreamingLatestUsage = computed(() => workspace.streamingLatestUsage.value);
 const wLastCompletedRun = computed(() => workspace.lastCompletedRun.value);
 const wIsAwaitingApproval = computed(() => workspace.isAwaitingApproval.value);
 const wPendingApprovalInfo = computed(() => workspace.pendingApprovalInfo.value);
@@ -226,6 +227,7 @@ onMounted(() => {
               :isStreaming="wIsStreaming"
               :streamingTimeline="wStreamingTimeline"
               :streamingPrefixTimeline="wStreamingPrefixTimeline"
+              :streamingLatestUsage="wStreamingLatestUsage"
               :lastCompletedRun="wLastCompletedRun"
               :isAwaitingApproval="wIsAwaitingApproval"
               :pendingApprovalInfo="wPendingApprovalInfo"
@@ -433,9 +435,8 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 20px;
-  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.3);
+  background: rgba(var(--bg-panel-rgb, 10, 10, 10), 0.5);
   border-bottom: 1px solid var(--border-dim);
-  backdrop-filter: blur(10px);
   font-family: var(--font-mono, monospace);
   font-size: 11px;
 }
@@ -571,14 +572,12 @@ onMounted(() => {
 .core-ring-1 {
   width: 80px;
   height: 80px;
-  animation: spin-clockwise 10s linear infinite;
 }
 
 .core-ring-2 {
   width: 60px;
   height: 60px;
   border-color: rgba(6, 182, 212, 0.2);
-  animation: spin-counter-clockwise 8s linear infinite;
 }
 
 .core-center {
@@ -649,7 +648,6 @@ onMounted(() => {
   background: var(--bg-hover);
   border: 1px solid var(--border-dim);
   border-radius: 10px;
-  backdrop-filter: blur(8px);
 }
 
 .indicator-dot {
@@ -661,19 +659,16 @@ onMounted(() => {
 .green-pulsing {
   background: #10b981;
   box-shadow: 0 0 8px #10b981;
-  animation: status-pulse 2s infinite;
 }
 
 .cyan-pulsing {
   background: #06b6d4;
   box-shadow: 0 0 8px #06b6d4;
-  animation: status-pulse 2s infinite 0.6s;
 }
 
 .purple-pulsing {
   background: #a855f7;
   box-shadow: 0 0 8px #a855f7;
-  animation: status-pulse 2s infinite 1.2s;
 }
 
 @keyframes status-pulse {

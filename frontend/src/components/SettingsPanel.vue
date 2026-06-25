@@ -4,7 +4,7 @@
  * 职责：模型 Provider 管理与模型设置启用面板 (Codex 侧边栏风格升级)
  * 不负责：对话逻辑与会话管理
  */
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch, computed, nextTick } from 'vue';
 import { settingsApi } from '../api/settings';
 import type { Provider, ModelSetting } from '../api/settings';
 import McpServersSettings from './settings/McpServersSettings.vue';
@@ -78,6 +78,96 @@ const newProvider = ref({
   base_url: '',
   api_key: '',
 });
+
+// 预设模型提供商定义
+interface PresetProvider {
+  id: string;
+  name: string;
+  base_url: string;
+  official_url: string;
+  description: string;
+}
+
+const PRESET_PROVIDERS: PresetProvider[] = [
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    base_url: 'https://api.deepseek.com/v1',
+    official_url: 'https://platform.deepseek.com/',
+    description: '官方 API (V3 / R1)'
+  },
+  {
+    id: 'siliconflow',
+    name: 'SiliconFlow',
+    base_url: 'https://api.siliconflow.cn/v1',
+    official_url: 'https://siliconflow.cn/',
+    description: '硅基流动开源模型分发'
+  },
+  {
+    id: 'kimi',
+    name: 'Kimi',
+    base_url: 'https://api.moonshot.cn/v1',
+    official_url: 'https://platform.moonshot.cn/',
+    description: '月之暗面 (Moonshot)'
+  },
+  {
+    id: 'zhipu',
+    name: 'Zhipu GLM',
+    base_url: 'https://open.bigmodel.cn/api/paas/v4',
+    official_url: 'https://open.bigmodel.cn/',
+    description: '智谱 GLM-4 / GLM-Zero'
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    base_url: 'https://openrouter.ai/api/v1',
+    official_url: 'https://openrouter.ai/',
+    description: '聚合平台 (Claude / GPT)'
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    base_url: 'https://api.openai.com/v1',
+    official_url: 'https://platform.openai.com/',
+    description: '官方 API (GPT-4o / o1 / o3)'
+  },
+  {
+    id: 'minimax',
+    name: 'MiniMax',
+    base_url: 'https://api.minimax.chat/v1',
+    official_url: 'https://platform.minimaxlight.com/',
+    description: '官方 API (MiniMax-Text)'
+  },
+  {
+    id: 'qwen',
+    name: 'Qwen',
+    base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    official_url: 'https://bailian.console.aliyun.com/',
+    description: '阿里云百炼兼容接口'
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    base_url: 'http://localhost:11434/v1',
+    official_url: 'https://ollama.com/',
+    description: '本地运行部署 (Local)'
+  }
+];
+
+const selectedPresetId = ref<string | null>(null);
+const apiKeyInputRef = ref<HTMLInputElement | null>(null);
+
+const handleSelectPreset = (preset: PresetProvider) => {
+  newProvider.value.name = preset.name;
+  newProvider.value.base_url = preset.base_url;
+  selectedPresetId.value = preset.id;
+  
+  nextTick(() => {
+    if (apiKeyInputRef.value) {
+      apiKeyInputRef.value.focus();
+    }
+  });
+};
 
 // ── 行为方法 ──
 
@@ -224,6 +314,7 @@ const handleCreateProvider = async () => {
     });
     providers.value.push(created);
     newProvider.value = { name: '', base_url: '', api_key: '' };
+    selectedPresetId.value = null;
     showAddForm.value = false;
     await toggleExpandProvider(created.id);
   } catch (err: any) {
@@ -472,18 +563,45 @@ const selectTheme = (themeId: string) => {
                 <!-- Inline Add Form -->
                 <Transition name="expand">
                   <div v-if="showAddForm" class="add-provider-inline-form">
+                    <!-- Presets Selection Grid -->
+                    <div class="preset-section">
+                      <div class="preset-title">选择预设快捷配置</div>
+                      <div class="preset-grid">
+                        <button 
+                          v-for="preset in PRESET_PROVIDERS" 
+                          :key="preset.id"
+                          type="button"
+                          class="preset-item"
+                          :class="{ active: selectedPresetId === preset.id }"
+                          @click="handleSelectPreset(preset)"
+                        >
+                          <span class="preset-item-name">{{ preset.name }}</span>
+                          <span class="preset-item-desc">{{ preset.description }}</span>
+                        </button>
+                      </div>
+                      
+                      <!-- Quick Link for API key of the selected preset -->
+                      <Transition name="fade">
+                        <div v-if="selectedPresetId" class="preset-helper-text">
+                          <span class="info-icon">ℹ️</span>
+                          已选择 <strong>{{ PRESET_PROVIDERS.find(p => p.id === selectedPresetId)?.name }}</strong>，
+                          你可以前往 <a :href="PRESET_PROVIDERS.find(p => p.id === selectedPresetId)?.official_url" target="_blank" class="preset-link">官方控制台</a> 获取 API Key 并填入下方表单。
+                        </div>
+                      </Transition>
+                    </div>
+
                     <div class="form-grid">
                       <div class="form-group">
                         <label>服务商自定义名称</label>
-                        <input v-model="newProvider.name" type="text" placeholder="例如: DeepSeek, OpenAI, Ollama" />
+                        <input v-model="newProvider.name" type="text" placeholder="例如: DeepSeek, OpenAI, Ollama" @input="selectedPresetId = null" />
                       </div>
                       <div class="form-group">
                         <label>API Base URL</label>
-                        <input v-model="newProvider.base_url" type="text" placeholder="https://api.deepseek.com/v1" />
+                        <input v-model="newProvider.base_url" type="text" placeholder="https://api.deepseek.com/v1" @input="selectedPresetId = null" />
                       </div>
                       <div class="form-group">
                         <label>API Key (密钥)</label>
-                        <input v-model="newProvider.api_key" type="password" placeholder="sk-..." />
+                        <input ref="apiKeyInputRef" v-model="newProvider.api_key" type="password" placeholder="sk-..." />
                       </div>
                     </div>
                     <div class="form-actions">
@@ -1876,5 +1994,98 @@ const selectTheme = (themeId: string) => {
 .mono-text {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
+}
+
+.preset-section {
+  margin-bottom: 20px;
+  border-bottom: 1px dashed var(--border-dim);
+  padding-bottom: 16px;
+}
+
+.preset-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted, #666);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.preset-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.preset-item:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.preset-item.active {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.preset-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #eee);
+  margin-bottom: 2px;
+}
+
+.preset-item-desc {
+  font-size: 9px;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.preset-helper-text {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-dim);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.preset-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.preset-link:hover {
+  text-decoration: underline;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

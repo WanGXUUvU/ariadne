@@ -114,7 +114,10 @@ const getGroupedToolExecutions = (items: MergedTimelineItem[]): GroupedToolExecu
         }
       }
       
-      let duration = `${Math.floor(Math.random() * 30) + 15}ms`;
+      // 用 cid 哈希得到确定性的伪随机 duration，避免每次渲染随机跳变
+      let hashNum = 0;
+      for (let ci = 0; ci < cid.length; ci++) { hashNum = (hashNum * 31 + cid.charCodeAt(ci)) >>> 0; }
+      let duration = `${(hashNum % 30) + 15}ms`;
       if (tool_name.includes('search') || tool_name.includes('web')) duration = '1.2s';
       else if (tool_name.includes('command') || tool_name.includes('run')) duration = '680ms';
       else if (tool_name.includes('spawn') || tool_name.includes('subagent')) duration = '1.8s';

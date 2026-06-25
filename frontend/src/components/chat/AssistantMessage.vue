@@ -183,8 +183,13 @@ const getSyntheticTimeline = computed((): StreamingItem[] => {
 const findRun = computed((): TraceRunSummary | undefined => {
   if (props.isLast && props.lastCompletedRun) return props.lastCompletedRun;
   
-  // 按照 parent 的上下文解析对应的 run
-  // 这一步由 traceRuns 进行顺序对齐
+  // 优先用 run_id 精确匹配，避免 visibleMessages 下标与 traceRuns 下标错位
+  if (props.message.run_id && props.traceRuns) {
+    const byId = props.traceRuns.find(r => r.run_id === props.message.run_id);
+    if (byId) return byId;
+  }
+
+  // 降级：按 traceRuns 顺序对齐（仅在无 run_id 时兜底）
   if (props.traceRuns && props.msgIndex >= 0 && props.traceRuns.length > props.msgIndex) {
     return props.traceRuns[props.msgIndex];
   }
@@ -347,6 +352,76 @@ const isChunkCollapsed = (chunk: TimelineChunk) => {
   return true;
 };
 
+const toolCnNameMap: Record<string, string> = {
+  write_file: 'WRITE',
+  replace_file_content: 'WRITE',
+  multi_replace_file_content: 'WRITE',
+  view_file: 'READ',
+  list_dir: 'READ',
+  grep_search: 'SEARCH',
+  web_search: 'SEARCH',
+  run_command: 'RUN',
+  invoke_subagent: 'SUBAGENT',
+  define_subagent: 'SUBAGENT',
+};
+
+const toolRunningNameMap: Record<string, string> = {
+  write_file: 'WRITING',
+  replace_file_content: 'WRITING',
+  multi_replace_file_content: 'WRITING',
+  view_file: 'READING',
+  list_dir: 'READING',
+  grep_search: 'SEARCHING',
+  web_search: 'SEARCHING',
+  run_command: 'RUNNING',
+  invoke_subagent: 'CALLING',
+  define_subagent: 'DEFINING',
+};
+
+const getFirstToolName = (chunk: TimelineChunk): string | null => {
+  if (chunk.type !== 'tools' || !chunk.items || chunk.items.length === 0) return null;
+  const first = chunk.items[0];
+  if (first.kind === 'event') {
+    return first.event.tool_name ?? null;
+  } else if (first.kind === 'event_group') {
+    return first.tool_name ?? null;
+  }
+  return null;
+};
+
+const timelineNodeLabel = (chunk: TimelineChunk, index: number): string => {
+  if (chunk.type === 'thinking') return props.msgIndex === 9999 && isThinkingActive(chunk) ? 'Thinking' : 'Thought';
+  if (chunk.type === 'tools') {
+    if (hasError(chunk)) return 'Tool Error';
+    const rawName = getFirstToolName(chunk);
+    if (rawName) {
+      const active = isTimelineNodeActive(chunk, index);
+      if (active) {
+        return toolRunningNameMap[rawName] || rawName.toUpperCase();
+      } else {
+        return toolCnNameMap[rawName] || rawName.toUpperCase();
+      }
+    }
+    return 'Tool Use';
+  }
+  return 'Ariadne';
+};
+
+const isTimelineNodeActive = (chunk: TimelineChunk, index: number): boolean => {
+  if (props.msgIndex !== 9999) return false;
+  if (chunk.type === 'thinking') return isThinkingActive(chunk);
+  if (chunk.type === 'tools') return hasRunningToolInChunk(chunk) || hasPendingApprovalInChunk(chunk);
+  return index === chunkTimeline.value.length - 1;
+};
+
+const timelineNodeClass = (chunk: TimelineChunk, index: number) => ({
+  'is-active': isTimelineNodeActive(chunk, index),
+  'is-error': chunk.type === 'tools' && hasError(chunk),
+  'is-tool': chunk.type === 'tools',
+  'is-thinking': chunk.type === 'thinking',
+  'is-text': chunk.type === 'text',
+});
+
 // 💡 采用事件代理拦截来自子元素代码块中 Copy 按钮的点击事件，安全、快速且彻底免除 inline JS 漏洞
 const handleCodeBlockClick = (e: MouseEvent) => {
   const target = e.target as HTMLElement;
@@ -378,7 +453,20 @@ const handleCodeBlockClick = (e: MouseEvent) => {
 
 <template>
   <div class="assistant-message-content">
-    <template v-for="chunk in chunkTimeline" :key="chunk.id">
+    <div
+      v-for="(chunk, chunkIndex) in chunkTimeline"
+      :key="chunk.id"
+      class="agent-timeline-node"
+      :class="timelineNodeClass(chunk, chunkIndex)"
+    >
+      <div class="agent-timeline-rail" aria-hidden="true">
+        <span class="agent-timeline-marker"></span>
+      </div>
+      <div class="agent-timeline-body">
+        <div class="agent-timeline-label">
+          <span>{{ timelineNodeLabel(chunk, chunkIndex) }}</span>
+          <span v-if="isTimelineNodeActive(chunk, chunkIndex) && chunk.type === 'text'" class="agent-timeline-running">running</span>
+        </div>
       <!-- 渲染文本 Chunk -->
       <div 
         v-if="chunk.type === 'text'" 
@@ -406,37 +494,24 @@ const handleCodeBlockClick = (e: MouseEvent) => {
       <!-- 渲染独立工具链 -->
       <div 
         v-else-if="chunk.type === 'tools'" 
-        class="history-trace-container" 
-        :class="{ 'has-error': hasError(chunk) }"
+        class="history-trace-container-flat"
       >
-        <button class="timeline-toggle" @click="toggleChunk(chunk.id)">
-          <span class="toggle-verb">
-            <template v-if="hasError(chunk)">调用失败: {{ getToolNamesList(chunk) }}</template>
-            <template v-else>链式调用: {{ getToolNamesList(chunk) }}</template>
-          </span>
-          <span class="toggle-count">共 {{ chunk.raw_count }} 步</span>
-          <svg class="toggle-chevron" :class="{ open: !isChunkCollapsed(chunk) }" viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
-
-        <div class="tool-tree-wrapper" :class="{ expanded: !isChunkCollapsed(chunk) }">
-          <div class="tool-tree-inner">
-            <ToolTree
-              :items="chunk.items"
-              :isAwaitingApproval="isAwaitingApproval"
-              :pendingApprovalInfo="pendingApprovalInfo"
-              :pendingApprovalInfos="pendingApprovalInfos"
-              :isProcessingApproval="isProcessingApproval"
-              @approve="emit('approve', $event)"
-              @reject="emit('reject', $event)"
-              @approve-all="emit('approve-all')"
-            />
-          </div>
+        <div class="tool-tree-inner">
+          <ToolTree
+            :items="chunk.items"
+            :isAwaitingApproval="isAwaitingApproval"
+            :pendingApprovalInfo="pendingApprovalInfo"
+            :pendingApprovalInfos="pendingApprovalInfos"
+            :isProcessingApproval="isProcessingApproval"
+            @approve="emit('approve', $event)"
+            @reject="emit('reject', $event)"
+            @approve-all="emit('approve-all')"
+          />
         </div>
       </div>
-    </template>
-    <div v-if="message.stopped" class="stopped-label">⏹ Stopped</div>
+      </div>
+    </div>
+    <div v-if="message.stopped" class="stopped-label">Stopped</div>
   </div>
 </template>
 
@@ -445,15 +520,158 @@ const handleCodeBlockClick = (e: MouseEvent) => {
   width: 100%;
   display: flex;
   flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+
+.agent-timeline-node {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 8px;
+  position: relative;
+  animation: nodeIn 0.2s ease both;
+}
+
+.agent-timeline-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* Continuous │ line drawn as a CSS border — monospace-width centered */
+.agent-timeline-rail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-0.5px);
+  width: 1px;
+  background: var(--text-muted);
+  opacity: 0.22;
+}
+
+/* Hide top connector on first node, bottom on last */
+.agent-timeline-node:first-child .agent-timeline-rail::before {
+  top: 14px;
+}
+
+.agent-timeline-node:last-of-type .agent-timeline-rail::before {
+  bottom: calc(100% - 14px);
+}
+
+/* Branch marker rendered as a monospace character */
+.agent-timeline-marker {
+  position: relative;
+  z-index: 1;
+  width: 14px;
+  height: 18px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.35;
+  flex-shrink: 0;
+  /* White background to "cut" the rail line, creating a node point */
+  background: var(--bg-app);
+}
+
+.agent-timeline-marker::before {
+  content: '·';
+  font-size: 16px;
+  line-height: 1;
+}
+
+.agent-timeline-node.is-active .agent-timeline-marker {
+  opacity: 1;
+  background: var(--bg-app);
+}
+
+.agent-timeline-node.is-active .agent-timeline-marker::before {
+  content: '▸';
+  font-size: 9px;
+  color: var(--accent-emerald, #34c759);
+  animation: activeMarkerPulse 1.2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.agent-timeline-node.is-error .agent-timeline-marker {
+  opacity: 1;
+}
+
+.agent-timeline-node.is-error .agent-timeline-marker::before {
+  content: '✗';
+  font-size: 9px;
+  color: var(--danger, #ff453a);
+}
+
+
+.agent-timeline-body {
+  min-width: 0;
+  padding: 0 0 10px;
+}
+
+.agent-timeline-label {
+  min-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+.agent-timeline-node.is-active .agent-timeline-label {
+  opacity: 1;
+  color: var(--text-secondary);
+  animation: activeMarkerPulse 1.8s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.agent-timeline-running {
+  color: var(--accent-emerald, #34c759);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+  animation: activeMarkerPulse 1.2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+@keyframes nodeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes activeMarkerPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .message-text {
   font-size: 13.5px;
-  line-height: 1.6;
+  line-height: 1.65;
   word-break: break-word;
 }
 
-/* ── 链式调用外部 Trace 容器 ── */
+/* Tool chain containers */
+.history-trace-container-flat {
+  margin: 2px 0 0;
+  width: 100%;
+}
+
 .history-trace-container {
   margin: 8px 0;
   background: transparent !important;
@@ -467,19 +685,9 @@ const handleCodeBlockClick = (e: MouseEvent) => {
   width: 100%;
 }
 
-.history-trace-container:hover {
-  background: transparent !important;
-}
-
-.history-trace-container.has-error {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.history-trace-container.has-error:hover {
-  background: transparent !important;
-}
+.history-trace-container:hover { background: transparent !important; }
+.history-trace-container.has-error { background: transparent !important; border: none !important; box-shadow: none !important; }
+.history-trace-container.has-error:hover { background: transparent !important; }
 
 .timeline-toggle {
   display: flex;
@@ -491,74 +699,37 @@ const handleCodeBlockClick = (e: MouseEvent) => {
   padding: 6px 0;
   width: 100%;
   text-align: left;
-  position: relative;
-  transition: all 0.2s ease;
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.timeline-toggle:hover {
-  background: transparent;
-}
-
-.toggle-left-indicator {
-  display: none;
-}
+.timeline-toggle:hover { background: transparent; }
+.toggle-left-indicator { display: none; }
 
 .evt-icon-box.header-icon-box {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  width: 20px; height: 20px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   color: var(--text-secondary, #A1A1AA);
-  background: transparent !important;
-  border: none !important;
-  transition: all 0.2s ease;
-  margin-right: 4px;
+  background: transparent !important; border: none !important;
+  transition: all 0.2s ease; margin-right: 4px;
 }
-
-.evt-icon-box.header-icon-box.status-success {
-  color: #34D399;
-}
-
-.evt-icon-box.header-icon-box.status-running {
-  color: #FBBF24;
-}
-
-.evt-icon-box.header-icon-box.status-error {
-  color: #F87171;
-}
+.evt-icon-box.header-icon-box.status-success { color: #34D399; }
+.evt-icon-box.header-icon-box.status-running { color: #FBBF24; }
+.evt-icon-box.header-icon-box.status-error { color: #F87171; }
 
 .toggle-verb {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  font-family: inherit;
-  letter-spacing: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+  font-family: inherit; letter-spacing: 0; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-
-.toggle-verb:hover {
-  color: var(--text-primary);
-}
+.toggle-verb:hover { color: var(--text-primary); }
 
 .toggle-count {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-muted);
+  font-size: 11px; font-weight: 500; color: var(--text-muted);
   font-family: var(--font-mono, monospace);
-  padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 4px;
-  margin-right: 4px;
+  padding: 2px 6px; background: rgba(255,255,255,0.04); border-radius: 4px; margin-right: 4px;
 }
 
 .toggle-chevron {
@@ -566,13 +737,8 @@ const handleCodeBlockClick = (e: MouseEvent) => {
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   flex-shrink: 0;
 }
+.toggle-chevron.open { transform: rotate(180deg); color: var(--text-secondary); }
 
-.toggle-chevron.open {
-  transform: rotate(180deg);
-  color: var(--text-secondary);
-}
-
-/* --- Smooth CSS Grid Height Transition --- */
 .tool-tree-wrapper {
   display: grid;
   grid-template-rows: 0fr;
@@ -582,27 +748,19 @@ const handleCodeBlockClick = (e: MouseEvent) => {
   padding-top: 0;
   padding-bottom: 0;
 }
-
-.tool-tree-wrapper.expanded {
-  grid-template-rows: 1fr;
-  opacity: 1;
-  padding: 4px 0 10px 0;
-}
+.tool-tree-wrapper.expanded { grid-template-rows: 1fr; opacity: 1; padding: 4px 0 10px 0; }
 
 .tool-tree-inner {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 1px;
   position: relative;
 }
 
 .stopped-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-size: 10.5px; font-weight: 500; color: var(--text-muted);
   font-family: var(--font-mono, monospace);
-  margin-top: 8px;
-  text-transform: uppercase;
+  margin-top: 8px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.45;
 }
 </style>

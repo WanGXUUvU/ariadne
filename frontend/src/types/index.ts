@@ -84,6 +84,7 @@ export interface RunEvent {
   tool_name?: string | null;
   tool_call_id?: string | null;
   tool_result?: ToolResult | null;
+  transient?: boolean;
 }
 
 export interface ApprovalInfo {
@@ -156,11 +157,23 @@ export interface StreamPausedData {
   approval_id?: string;
 }
 
+export interface ModelUsage {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  total_tokens?: number | null;
+}
+
+export interface StreamUsageData {
+  model_call_index: number;
+  usage: ModelUsage;
+}
+
 export type StreamFrame =
   | { type: 'start';          data: StreamStartData }
   | { type: 'run_event';    data: RunEvent }
   | { type: 'delta';          data: StreamDeltaData }
   | { type: 'thinking_delta'; data: StreamThinkingDeltaData }
+  | { type: 'usage';          data: StreamUsageData }
   | { type: 'end';            data: StreamEndData }
   | { type: 'error';          data: StreamErrorData }
   | { type: 'paused';         data: StreamPausedData }

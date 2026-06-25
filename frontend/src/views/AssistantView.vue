@@ -41,6 +41,7 @@ const wTraceRuns = computed(() => workspace.traceRuns.value);
 const wIsStreaming = computed(() => workspace.isStreaming.value);
 const wStreamingTimeline = computed(() => workspace.streamingTimeline.value);
 const wStreamingPrefixTimeline = computed(() => workspace.streamingPrefixTimeline.value);
+const wStreamingLatestUsage = computed(() => workspace.streamingLatestUsage.value);
 const wLastCompletedRun = computed(() => workspace.lastCompletedRun.value);
 const wIsAwaitingApproval = computed(() => workspace.isAwaitingApproval.value);
 const wPendingApprovalInfo = computed(() => workspace.pendingApprovalInfo.value);
@@ -227,6 +228,7 @@ onMounted(() => {
               :isStreaming="wIsStreaming"
               :streamingTimeline="wStreamingTimeline"
               :streamingPrefixTimeline="wStreamingPrefixTimeline"
+              :streamingLatestUsage="wStreamingLatestUsage"
               :lastCompletedRun="wLastCompletedRun"
               :isAwaitingApproval="wIsAwaitingApproval"
               :pendingApprovalInfo="wPendingApprovalInfo"
@@ -464,14 +466,12 @@ onMounted(() => {
 .logo-ring-1 {
   width: 70px;
   height: 70px;
-  animation: spin-clockwise 12s linear infinite;
   border-color: rgba(var(--accent-rgb, 255,255,255), 0.1);
 }
 
 .logo-ring-2 {
   width: 54px;
   height: 54px;
-  animation: spin-counter-clockwise 9s linear infinite;
   border-color: var(--accent-subtle);
 }
 

@@ -26,9 +26,16 @@ public struct ToolCall: Codable, Equatable, Identifiable {
 
 public struct ChatMessage: Codable, Identifiable, Equatable {
     public var id: String {
-        // Since messages from the server might not have a unique ID field, we generate one,
-        // or combine role/content, but a UUID fallback is safest if we construct them locally.
-        return toolCallId ?? content.map { "\($0.hashValue)" } ?? UUID().uuidString
+        if let toolCallId {
+            return "tool-\(toolCallId)"
+        }
+        if let firstToolCall = toolCalls?.first {
+            return "assistant-tool-\(firstToolCall.id)"
+        }
+        if let content {
+            return "\(role)-\(content.hashValue)"
+        }
+        return "\(role)-empty"
     }
     
     public let role: String // "system" | "user" | "assistant" | "tool"

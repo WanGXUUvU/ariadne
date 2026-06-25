@@ -144,12 +144,15 @@ class ResumeRunService:
                 )
 
             tool_result = await pipeline.execute(context, terminal_execute_call)
-            content = (
-                tool_result.content
-                if tool_result.ok
-                else f"[TOOL_ERROR] {tool_result.error.message}"
-            )
-            tr = ToolResult(ok=tool_result.ok, content=content)
+            if tool_result.ok:
+                content = tool_result.content
+                tr = tool_result
+            else:
+                error_message = (
+                    tool_result.error.message if tool_result.error else "Tool failed"
+                )
+                content = f"[TOOL_ERROR] {error_message}"
+                tr = tool_result.model_copy(update={"content": content})
 
         tool_result_event = RunEvent(
             index=event_index,
