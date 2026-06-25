@@ -909,10 +909,10 @@ body.theme-light-openai .blob-3 { background: radial-gradient(circle, rgba(16, 1
   transition: var(--transition-fast);
 }
 
-/* 💡 全局高定 Spotlight 聚焦环：应用于输入框、下拉选择器等 */
-input:focus,
+/* 💡 全局高定 Spotlight 聚焦环：应用于输入框、下拉选择器等 (排除已自带包装聚焦效果的输入框以求无痕感) */
+input:not(.search-input):focus,
 select:focus,
-textarea:focus,
+textarea:not(.composer-input):focus,
 .ms-trigger:focus,
 .ms-trigger.open,
 .session-sidebar .search-box:focus-within {
