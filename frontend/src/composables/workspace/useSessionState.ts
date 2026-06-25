@@ -200,7 +200,7 @@ export function useSessionState(options: SessionStateOptions) {
       await api.resetSession(currentId);
       historyMessages.value = [
         ...historyMessages.value,
-        ...currentMessages.value,
+        ...currentMessages.value.map(m => ({ ...m, isActive: false })),
         { role: 'system', content: RESET_MARKER_CONTENT },
       ];
       writeSessionResetHistory(currentId, historyMessages.value);

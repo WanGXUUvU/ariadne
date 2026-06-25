@@ -3,6 +3,7 @@ import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
 import type { AgentMessage, TraceRunSummary, StreamingItem, ApprovalInfo, StreamUsageData } from '../types';
 import AssistantMessage from './chat/AssistantMessage.vue';
 import { formatContent } from '../utils/formatContent';
+import { RESET_MARKER_CONTENT } from '../composables/workspace/helpers';
 
 const props = defineProps<{
   messages: AgentMessage[];
@@ -278,6 +279,8 @@ const scrollToBottom = () => {
   listRef.value.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' });
   isUserScrolledUp.value = false;
 };
+
+const resetMarker = RESET_MARKER_CONTENT;
 </script>
 
 <template>
@@ -300,142 +303,161 @@ const scrollToBottom = () => {
       </button>
     </Transition>
     <template v-for="(m, idx) in visibleMessages" :key="(m as any)._streaming ? '__streaming__' : (m.run_id ? m.run_id + '-' + m.role : m.role + '-' + idx)">
-      <!-- 💡 A-2 动态分割线注入：上一条为非活跃，当前为活跃时 -->
-      <div 
-        v-if="idx > 0 && !visibleMessages[idx - 1].isActive && m.isActive" 
-        class="memory-boundary-divider-row"
-      >
-        <div class="message-row-inner" style="width: 100%;">
-          <!-- 如果 m 带有 summary_text，说明是 Compaction，渲染记忆折叠线 -->
-          <div v-if="m.summary_text" class="compact-alert premium-compaction" style="width: 100%;" :title="m.summary_text">
-            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="M8 17l4 4 4-4"></path></svg>
-            <span class="pulse-dot"></span>
-            <span>AI 记忆分割线 · 线上消息已折叠压缩 (Context Compacted)</span>
-          </div>
-          <!-- 如果没有 summary_text，说明是重置会话导致的划分，渲染重置分割线 -->
-          <div v-else class="reset-alert" style="width: 100%;">
-            <div class="reset-line"></div>
-            <div class="reset-text">
-              <span>上下文已重设 (Context Reset)</span>
-              <span class="sub">以上内容已不再被模型记忆感知</span>
-            </div>
-            <div class="reset-line"></div>
-          </div>
-        </div>
-      </div>
-
-      <div :class="['message-row', `role-${m.role}`, m.isActive ? 'active-context' : 'compacted-context', (m as any)._streaming ? 'pending' : '']">
-        <div class="message-row-inner">
-          <div class="message-avatar">
-            <!-- 流式输出：脉冲光环头像 -->
-            <template v-if="(m as any)._streaming">
-              <div class="ai-avatar-wrapper streaming-active">
-                <div class="pulse-ring ring-1"></div>
-                <div class="pulse-ring ring-2"></div>
-                <div class="pulse-ring ring-3"></div>
-                <svg class="ai-avatar spin glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
+      <!-- 💡 如果是系统重设标记，渲染重置分割线 -->
+      <template v-if="m.role === 'system' && m.content === resetMarker">
+        <div class="memory-boundary-divider-row">
+          <div class="message-row-inner" style="width: 100%;">
+            <div class="reset-alert" style="width: 100%;">
+              <div class="reset-line"></div>
+              <div class="reset-text">
+                <span>上下文已重设 (Context Reset)</span>
+                <span class="sub">以上内容已不再被模型记忆感知</span>
               </div>
-            </template>
-            <!-- 普通消息头像 -->
-            <template v-else>
-              <svg v-if="m.role === 'user'" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <svg v-else class="ai-avatar glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
-            </template>
-          </div>
-
-          <div class="message-content">
-            <div class="message-meta mono-label">
-              {{ m.role === 'user' ? 'USER' : 'AGENT' }}
-              <span v-if="(m as any)._streaming" class="blink">STREAMING...</span>
-            </div>
-
-            <!-- AI 回复代理层 -->
-            <template v-if="m.role === 'assistant'">
-              <!-- 流式空时间线：骨架屏 -->
-              <div v-if="(m as any)._streaming && (!m.timeline || m.timeline.length === 0)" class="message-text loader-block"></div>
-              <!-- 有内容：正常渲染 -->
-              <AssistantMessage
-                v-else
-                :message="m"
-                :msgIndex="(m as any)._streaming ? 9999 : idx"
-                :isLast="idx === visibleMessages.length - 1"
-                :traceRuns="traceRuns"
-                :lastCompletedRun="lastCompletedRun"
-                :isAwaitingApproval="isAwaitingApproval"
-                :pendingApprovalInfo="pendingApprovalInfo"
-                :pendingApprovalInfos="pendingApprovalInfos"
-                :isProcessingApproval="isProcessingApproval"
-                @approve="emit('approve', $event)"
-                @reject="emit('reject', $event)"
-                @approve-all="emit('approve-all')"
-              />
-              <!-- 流式状态条：打字词 + 耗时 + token 估算 + 提示 -->
-              <div v-if="(m as any)._streaming" class="agent-active-strip">
-                <div class="agent-active-main">
-                  <span class="agent-active-word">{{ activeWord }}...</span>
-                  <span class="agent-active-meta">
-                    {{ elapsedSeconds }}s · {{ displayTokens.estimated ? '~' : '' }}{{ displayTokens.value }} tokens
-                  </span>
-                </div>
-                <div class="agent-active-tip">└─ {{ activeTip }}</div>
-              </div>
-            </template>
-
-            <!-- 用户消息渲染 -->
-            <template v-else>
-              <div v-if="m.skill_name" class="msg-skill-badge">
-                <span class="msg-skill-icon">📚</span>
-                <span class="msg-skill-name">{{ m.skill_name }}</span>
-              </div>
-              <!-- 编辑态 -->
-              <div v-if="editingIndex === idx" class="message-edit-block">
-                <textarea
-                  v-model="editingContent"
-                  class="edit-textarea"
-                  rows="3"
-                  placeholder="编辑你的消息..."
-                ></textarea>
-                <div class="edit-actions">
-                  <button class="edit-btn save" @click="handleEditSubmit(m)">保存并重发</button>
-                  <button class="edit-btn cancel" @click="cancelEdit">取消</button>
-                </div>
-              </div>
-              <!-- 展示态 -->
-              <div v-else class="message-text" v-html="formatContent(m.content)" @click="handleCodeBlockClick"></div>
-            </template>
-
-            <!-- Message Footer Action Row（流式消息不显示） -->
-            <div v-if="!(m as any)._streaming" class="message-footer">
-              <!-- 编辑按钮 -->
-              <button
-                v-if="m.role === 'user' && editingIndex !== idx"
-                class="action-btn edit-action-btn"
-                title="编辑消息"
-                @click="startEdit(m.content || '', idx)"
-              >
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.8" fill="none">
-                  <path d="M12 20h9"></path>
-                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                </svg>
-              </button>
-              <button
-                class="action-btn copy-btn"
-                :class="{ copied: copiedIndex === idx }"
-                title="复制文本"
-                @click="handleCopyMessage(m.content || '', idx)"
-              >
-                <svg v-if="copiedIndex !== idx" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.8" fill="none">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                <svg v-else viewBox="0 0 24 24" width="14" height="14" stroke="var(--accent-emerald, #34c759)" stroke-width="2.2" fill="none">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
+              <div class="reset-line"></div>
             </div>
           </div>
         </div>
-      </div>
+      </template>
+
+      <!-- 否则如果是正常的用户/助理消息，正常渲染 -->
+      <template v-else-if="m.role !== 'system'">
+        <!-- 💡 A-2 动态分割线注入：上一条为非活跃，当前为活跃时 -->
+        <div 
+          v-if="idx > 0 && !visibleMessages[idx - 1].isActive && m.isActive" 
+          class="memory-boundary-divider-row"
+        >
+          <div class="message-row-inner" style="width: 100%;">
+            <!-- 如果 m 带有 summary_text，说明是 Compaction，渲染记忆折叠线 -->
+            <div v-if="m.summary_text" class="compact-alert premium-compaction" style="width: 100%;" :title="m.summary_text">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="M8 17l4 4 4-4"></path></svg>
+              <span class="pulse-dot"></span>
+              <span>AI 记忆分割线 · 线上消息已折叠压缩 (Context Compacted)</span>
+            </div>
+            <!-- 如果没有 summary_text，说明是重置会话导致的划分，渲染重置分割线 -->
+            <div v-else class="reset-alert" style="width: 100%;">
+              <div class="reset-line"></div>
+              <div class="reset-text">
+                <span>上下文已重设 (Context Reset)</span>
+                <span class="sub">以上内容已不再被模型记忆感知</span>
+              </div>
+              <div class="reset-line"></div>
+            </div>
+          </div>
+        </div>
+
+        <div :class="['message-row', `role-${m.role}`, m.isActive ? 'active-context' : 'compacted-context', (m as any)._streaming ? 'pending' : '']">
+          <div class="message-row-inner">
+            <div class="message-avatar">
+              <!-- 流式输出：脉冲光环头像 -->
+              <template v-if="(m as any)._streaming">
+                <div class="ai-avatar-wrapper streaming-active">
+                  <div class="pulse-ring ring-1"></div>
+                  <div class="pulse-ring ring-2"></div>
+                  <div class="pulse-ring ring-3"></div>
+                  <svg class="ai-avatar spin glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
+                </div>
+              </template>
+              <!-- 普通消息头像 -->
+              <template v-else>
+                <svg v-if="m.role === 'user'" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <svg v-else class="ai-avatar glow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 1-5 4.5 1.5 7-6.5-3.5-6.5 3.5 1.5-7-5-4.5 7-1z"></path></svg>
+              </template>
+            </div>
+
+            <div class="message-content">
+              <div class="message-meta mono-label">
+                {{ m.role === 'user' ? 'USER' : 'AGENT' }}
+                <span v-if="(m as any)._streaming" class="blink">STREAMING...</span>
+              </div>
+
+              <!-- AI 回复代理层 -->
+              <template v-if="m.role === 'assistant'">
+                <!-- 流式空时间线：骨架屏 -->
+                <div v-if="(m as any)._streaming && (!m.timeline || m.timeline.length === 0)" class="message-text loader-block"></div>
+                <!-- 有内容：正常渲染 -->
+                <AssistantMessage
+                  v-else
+                  :message="m"
+                  :msgIndex="(m as any)._streaming ? 9999 : idx"
+                  :isLast="idx === visibleMessages.length - 1"
+                  :traceRuns="traceRuns"
+                  :lastCompletedRun="lastCompletedRun"
+                  :isAwaitingApproval="isAwaitingApproval"
+                  :pendingApprovalInfo="pendingApprovalInfo"
+                  :pendingApprovalInfos="pendingApprovalInfos"
+                  :isProcessingApproval="isProcessingApproval"
+                  @approve="emit('approve', $event)"
+                  @reject="emit('reject', $event)"
+                  @approve-all="emit('approve-all')"
+                />
+                <!-- 流式状态条：打字词 + 耗时 + token 估算 + 提示 -->
+                <div v-if="(m as any)._streaming" class="agent-active-strip">
+                  <div class="agent-active-main">
+                    <span class="agent-active-word">{{ activeWord }}...</span>
+                    <span class="agent-active-meta">
+                      {{ elapsedSeconds }}s · {{ displayTokens.estimated ? '~' : '' }}{{ displayTokens.value }} tokens
+                    </span>
+                  </div>
+                  <div class="agent-active-tip">└─ {{ activeTip }}</div>
+                </div>
+              </template>
+
+              <!-- 用户消息渲染 -->
+              <template v-else>
+                <div v-if="m.skill_name" class="msg-skill-badge">
+                  <span class="msg-skill-icon">📚</span>
+                  <span class="msg-skill-name">{{ m.skill_name }}</span>
+                </div>
+                <!-- 编辑态 -->
+                <div v-if="editingIndex === idx" class="message-edit-block">
+                  <textarea
+                    v-model="editingContent"
+                    class="edit-textarea"
+                    rows="3"
+                    placeholder="编辑你的消息..."
+                  ></textarea>
+                  <div class="edit-actions">
+                    <button class="edit-btn save" @click="handleEditSubmit(m)">保存并重发</button>
+                    <button class="edit-btn cancel" @click="cancelEdit">取消</button>
+                  </div>
+                </div>
+                <!-- 展示态 -->
+                <div v-else class="message-text" v-html="formatContent(m.content)" @click="handleCodeBlockClick"></div>
+              </template>
+
+              <!-- Message Footer Action Row（流式消息不显示） -->
+              <div v-if="!(m as any)._streaming" class="message-footer">
+                <!-- 编辑按钮 -->
+                <button
+                  v-if="m.role === 'user' && editingIndex !== idx"
+                  class="action-btn edit-action-btn"
+                  title="编辑消息"
+                  @click="startEdit(m.content || '', idx)"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.8" fill="none">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                </button>
+                <button
+                  class="action-btn copy-btn"
+                  :class="{ copied: copiedIndex === idx }"
+                  title="复制文本"
+                  @click="handleCopyMessage(m.content || '', idx)"
+                >
+                  <svg v-if="copiedIndex !== idx" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.8" fill="none">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <svg v-else viewBox="0 0 24 24" width="14" height="14" stroke="var(--accent-emerald, #34c759)" stroke-width="2.2" fill="none">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
     </template>
 
     <!-- 记忆折叠中的 Loading 状态 -->
