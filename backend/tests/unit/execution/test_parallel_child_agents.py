@@ -51,7 +51,7 @@ class TestSpawnReturnsRunIdImmediately(unittest.TestCase):
         self.executor.shutdown(wait=False)
 
     def test_spawn_returns_child_run_id(self):
-        db = MagicMock()
+        MagicMock()
         with (
             patch(
                 "backend.run.child.launcher._executor", self.executor
@@ -105,7 +105,7 @@ class TestCheckChildStatus(unittest.TestCase):
         self.executor.shutdown(wait=False)
 
     def test_status_done_after_completion(self):
-        db = MagicMock()
+        MagicMock()
         with (
             patch(
                 "backend.run.child.launcher._executor", self.executor
@@ -145,7 +145,7 @@ class TestCheckChildStatus(unittest.TestCase):
         self.assertEqual(statuses[child_run_id]["reply"], "结果X")
 
     def test_status_not_found_for_unknown_id(self):
-        db = MagicMock()
+        MagicMock()
         with (
             patch(
                 "backend.run.child.launcher._executor", self.executor
@@ -194,7 +194,7 @@ class TestWaitChildAgent(unittest.TestCase):
         self.executor.shutdown(wait=False)
 
     def test_wait_returns_reply(self):
-        db = MagicMock()
+        MagicMock()
         with (
             patch(
                 "backend.run.child.launcher._executor", self.executor
@@ -229,7 +229,7 @@ class TestWaitChildAgent(unittest.TestCase):
         self.assertEqual(wait_result.content, "最终答案")
 
     def test_wait_not_found_returns_error(self):
-        db = MagicMock()
+        MagicMock()
         with (
             patch(
                 "backend.run.child.launcher._executor", self.executor
@@ -280,7 +280,7 @@ class TestParallelSpawn(unittest.TestCase):
         tasks = ["任务一", "任务二", "任务三"]
         child_run_ids = []
 
-        db = MagicMock()
+        MagicMock()
         with (
             patch(
                 "backend.run.child.launcher._executor", self.executor

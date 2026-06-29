@@ -11,7 +11,7 @@ import unittest
 
 from backend.approval.checker import needs_approval
 from backend.tools.types import RiskLevel
-from backend.core.types import ChatMessage, ToolCall, ToolCallFunction
+from backend.core.types import ToolCall, ToolCallFunction
 from backend.security.policy import ApprovalPolicy
 from backend.agent_loop.handle_tool_calls import stream_tool_calls
 from backend.tools.registry import ToolRegistry
@@ -43,8 +43,10 @@ def make_mixed_registry() -> ToolRegistry:
     """构造一个包含 SAFE 工具和 WRITE 工具的 ToolRegistry。"""
     registry = ToolRegistry()
 
-    safe_handler = lambda **k: ToolResult(ok=True, content="safe-ok")
-    write_handler = lambda **k: ToolResult(ok=True, content="write-ok")
+    def safe_handler(**k):
+        return ToolResult(ok=True, content="safe-ok")
+    def write_handler(**k):
+        return ToolResult(ok=True, content="write-ok")
     registry.register(
         ToolDefinition(
             name="safe_tool",

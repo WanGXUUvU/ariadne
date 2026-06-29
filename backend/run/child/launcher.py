@@ -9,7 +9,7 @@ from backend.agent.types import AgentDefinition
 from backend.run.types import RunInput, RunOutput
 from backend.agent_loop.loop import AgentLoop
 from backend.run.lifecycle import persist_run_event, finalize_run_execution
-from backend.agent_loop.types import RunState, RunEvent
+from backend.agent_loop.types import RunState
 from backend.run.types import RunFinalStatus
 from backend.run.runtime.vfs import RunVfsRegistry
 from backend.run.setup import build_model_adapter

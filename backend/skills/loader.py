@@ -1,6 +1,5 @@
 """加载技能列表和技能内容。"""
 from pathlib import Path
-from typing import Optional
 from backend.skills.types import SkillSummary
 from backend.infra.config.settings import load_settings,save_settings
 

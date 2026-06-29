@@ -11,8 +11,6 @@ from backend.mcp.settings import load_mcp_server_config
 from backend.mcp.types import (
     McpServerConfig,
     McpTranSport,
-    StdioMcpServerConfig,
-    StreamableHttpMcpServerConfig,
 )
 
 @dataclass(frozen=True)
