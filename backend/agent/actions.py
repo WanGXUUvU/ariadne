@@ -3,8 +3,8 @@
 from sqlalchemy.orm import Session
 
 from backend.agent.types import AgentDefinition, DEFAULT_AGENT_DEFINITION
-from backend.agent_definition.loader import list_builtin_agents
-from backend.agent_definition.store import SqliteAgentDefinitionStore
+from backend.agent.loader import list_builtin_agents
+from backend.agent.store import SqliteAgentDefinitionStore
 
 
 def load_agent_definition(db: Session, agent_id: str) -> AgentDefinition:

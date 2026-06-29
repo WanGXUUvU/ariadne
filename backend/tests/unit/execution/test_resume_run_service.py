@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from backend.agent.types import AgentDefinition
+from backend.agent import AgentDefinition
 from backend.core.types import ChatMessage
 from backend.run.types import RunFinalStatus
 from backend.run.execute_run_resume import execute_run_resume

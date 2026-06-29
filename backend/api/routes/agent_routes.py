@@ -3,8 +3,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from backend.agent.types import AgentDefinition
-from backend.agent_definition import (
+from backend.agent import (
+    AgentDefinition,
     delete_agent_definition,
     list_agent_definitions,
     load_agent_definition,

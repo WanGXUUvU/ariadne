@@ -4,8 +4,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from backend.agent.types import AgentDefinition
-from backend.agent_definition import load_agent_definition
+from backend.agent import AgentDefinition, load_agent_definition
 from backend.context.compaction import HistoryCompactor
 from backend.core.adapters.chat_completions import ChatCompletionsAdapter
 from backend.prompt.builder import build_runtime_system_prompt

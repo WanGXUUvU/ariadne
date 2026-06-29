@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from backend.agent.types import AgentDefinition
+from backend.agent import AgentDefinition
 from backend.run.types import RunSetup, RunInput, RunFinalStatus
 from backend.core.types import ModelUsage, StreamChunk, ToolCall, ToolCallFunction
 from backend.agent_loop.loop import AgentLoop

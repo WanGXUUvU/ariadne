@@ -1,9 +1,11 @@
 import tempfile
 import unittest
 
-from backend.agent.types import AgentDefinition
-from backend.agent_definition import load_agent_definition
-from backend.agent_definition.store import SqliteAgentDefinitionStore
+from backend.agent import (
+    AgentDefinition,
+    load_agent_definition,
+    SqliteAgentDefinitionStore,
+)
 from backend.tests.helpers.db import make_sqlite_test_db
 
 

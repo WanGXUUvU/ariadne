@@ -11,7 +11,7 @@ from backend.run.types import (
     RunFinalStatus,
 )
 from backend.approval.store import SqliteApprovalStore
-from backend.agent_definition import load_agent_definition
+from backend.agent import load_agent_definition
 from backend.agent_loop.types import RunEvent
 from backend.run.build_agent_loop import build_agent_loop, build_run_tool_registry
 from backend.tools.result_types import ToolResult

@@ -4,9 +4,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.agent.types import AgentDefinition
+from backend.agent import AgentDefinition, SqliteAgentDefinitionStore
 from backend.agent_loop.types import RunState
-from backend.agent_definition.store import SqliteAgentDefinitionStore
 from backend.api.app import app
 from backend.skills.types import SkillSummary
 from backend.infra.db.engine import get_db
